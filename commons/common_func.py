@@ -60,6 +60,24 @@ def modify_file(file_path_list, is_modify=False, input_content=""):
                 log.info("[modify_file] file(%s) modification is complete." % file_path)
 
 
+def write_shell_file(file_path, input_content: str = ''):
+    folder_path, file_name = os.path.split(file_path)
+    if not os.path.isdir(folder_path):
+        log.debug("[write_shell_file] folder(%s) is not exist." % folder_path)
+        os.makedirs(folder_path)
+
+    if not os.path.isfile(file_path):
+        log.debug("[write_shell_file] file(%s) is not exist." % file_path)
+        open(file_path, "a").close()
+
+    log.debug("[write_shell_file] start modifying file(%s)..." % file_path)
+    with open(file_path, "r+") as f:
+        f.seek(0)
+        f.truncate()
+        f.write(input_content)
+        f.close()
+
+
 def read_json_str(json_str: str, out_put=True):
     try:
         return json.loads(json_str, strict=False)

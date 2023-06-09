@@ -106,6 +106,13 @@ class ApiCollectionWrapper:
                                        partition_name=partition_name, **kwargs).run()
         return InterfaceResponse(*res, res_result, check_result)
 
+    def upsert(self, data, partition_name=None, timeout=None, check_task=None, check_items=None, **kwargs):
+        func_name = sys._getframe().f_code.co_name
+        res, res_result = api_request([self.collection.upsert, data, partition_name, timeout], **kwargs)
+        check_result = ResponseChecker(res, func_name, check_task, check_items, res_result, dat=data,
+                                       partition_name=partition_name, **kwargs).run()
+        return InterfaceResponse(*res, res_result, check_result)
+
     def _flush(self):
         log.warning("[ApiCollectionWrapper] Collection has not attribute 'flush', call 'num_entities' instead.")
         start = time.perf_counter()

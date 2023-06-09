@@ -34,6 +34,14 @@ class EnvVariable:
     KUBERNETES_SERVICE_HOST = BaseConfig.get_env_variable(default_var="KUBERNETES_SERVICE_HOST",
                                                           default_value="localhost")
 
+    FOURAM_SAVE_CONNECT_PARAMS_NAME = "FOURAM_SAVE_CONNECT_PARAMS"
+    FOURAM_SAVE_CONNECT_PARAMS = BaseConfig.get_env_variable(default_var=FOURAM_SAVE_CONNECT_PARAMS_NAME,
+                                                             default_value="false")
+
+    FOURAM_SAVE_CONNECT_PARAMS_PATH_NAME = "FOURAM_SAVE_CONNECT_PARAMS_PATH"
+    FOURAM_SAVE_CONNECT_PARAMS_PATH = BaseConfig.get_env_variable(default_var=FOURAM_SAVE_CONNECT_PARAMS_PATH_NAME,
+                                                                  default_value="/tmp/connect_params.sh")
+
 
 class GlobalParams:
     metric = None

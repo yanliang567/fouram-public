@@ -48,3 +48,8 @@ class HttpStatusCode:
     NotFound = 404
     BadGateway = 502
     GatewayTimeout = 504
+
+
+class TeardownType:
+    DeployDelete = "deploy_delete"
+    SaveEnvParams = "save_env_params"

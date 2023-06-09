@@ -10,7 +10,7 @@ def func_catch():
             kwargs.pop("result_check", None)
             try:
                 res = func(*args, **kwargs)
-                # log.debug("(func_catch) : {} ".format(res))
+                log.debug("(func_catch) : {} ".format(res))
                 return (res, True) if result_check else res
             except Exception as e:
                 log.error(traceback.format_exc())

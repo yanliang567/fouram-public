@@ -126,14 +126,16 @@ class CliClient(BaseClient):
 
     def get_pods(self, release_name: str):
         release_name = release_name or self.release_name
-        _cmd = " kubectl get pods %s -o wide | grep -E 'STATUS|%s' " % (self.ns, release_name)
+        check_list = "STATUS|{0}-milvus|{0}-minio|{0}-etcd|{0}-pulsar|{0}-kafka".format(release_name)
+        _cmd = " kubectl get pods %s -o wide | grep -E '%s' " % (self.ns, check_list)
         res_cmd = CmdExe(_cmd).run_cmd()
         log.info("[CliClient] pod details of release({0}): \n {1}".format(release_name, res_cmd))
         return res_cmd
 
     def get_pvc(self, release_name: str):
         release_name = release_name or self.release_name
-        _cmd = " kubectl get pvc %s | grep -E 'STATUS|%s' " % (self.ns, release_name)
+        check_list = "STATUS|{0}-milvus|{0}-minio|{0}-etcd|{0}-pulsar|{0}-kafka".format(release_name)
+        _cmd = " kubectl get pvc %s | grep -E '%s' " % (self.ns, check_list)
         res_cmd = CmdExe(_cmd).run_cmd()
         log.info("[CliClient] pvc storage class of release({0}): \n {1}".format(release_name, res_cmd))
         return res_cmd

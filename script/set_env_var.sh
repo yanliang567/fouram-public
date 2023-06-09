@@ -17,3 +17,8 @@ export NAMESPACE=qa-milvus
 export FOURAM_HELM_CHART_PATH=/home/helm/charts/milvus/
 
 #export MILVUS_GOBENCH=/Users/wt/Desktop/go_benchmark/benchmark-mac
+
+export FOURAM_SAVE_CONNECT_PARAMS=false
+#export FOURAM_SAVE_CONNECT_PARAMS=true
+
+export FOURAM_SAVE_CONNECT_PARAMS_PATH="/tmp/connect_params.sh"

@@ -16,6 +16,7 @@ class VDCUSERParams(ParamsBase):
     email: Optional[str] = field(default_factory=lambda: "")
     password: Optional[str] = field(default_factory=lambda: "")
     user_id: Optional[str] = field(default_factory=lambda: "")
+    proxy_user_id: Optional[str] = field(default_factory=lambda: "")
 
     def check_params(self):
         assert self.email and self.password and self.user_id

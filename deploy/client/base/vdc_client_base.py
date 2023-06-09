@@ -29,6 +29,7 @@ class VDCClientBase:
     email = ""
     password = ""
     user_id = ""
+    proxy_user_id = ""
 
     region_id = ""
     rm_host = ""
@@ -64,7 +65,8 @@ class VDCClientBase:
     @property
     def cloud_rm_api(self) -> CloudRMApi:
         if not isinstance(self._cloud_rm_api, CloudRMApi):
-            self._cloud_rm_api = CloudRMApi(user_id=self.user_id, host=self.rm_host, region_id=self.region_id)
+            user_id = self.proxy_user_id or self.user_id
+            self._cloud_rm_api = CloudRMApi(user_id=user_id, host=self.rm_host, region_id=self.region_id)
         return self._cloud_rm_api
 
     @property
@@ -109,6 +111,7 @@ class VDCClientBase:
         self.email = vdc_user.email
         self.password = vdc_user.password
         self.user_id = vdc_user.user_id
+        self.proxy_user_id = vdc_user.proxy_user_id
 
         self.region_id = param_info.vdc_region_id or vdc_env.region_id
         self.rm_host = vdc_env.rm_host

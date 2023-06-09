@@ -157,7 +157,7 @@ class AccParams:
                                   index_type=pn.IndexTypeName.DISKANN, search_list=None, metric_type=""):
         index_param = {}
 
-        search_list = [10, 15, 20, 30, 40, 150, 170, 200] if search_list is None else search_list
+        search_list = [10, 15, 20, 30, 40, 50, 60, 70, 150, 170, 200] if search_list is None else search_list
         search_param = {"search_list": search_list}
 
         default_params = self.base(dataset_name=dataset_name, index_type=index_type, index_param=index_param,

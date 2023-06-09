@@ -330,7 +330,7 @@ class TestRecallCases(PerfTemplate):
                              case_callable_obj=AccCases().scene_recall,
                              default_case_params=AccParams().glove_200_angular_hnsw(), node_resources=node_resources)
 
-    # @pytest.mark.recall
+    @pytest.mark.recall
     @pytest.mark.parametrize("deploy_mode", [CLUSTER])
     def test_recall_glove_hnsw_cosine_cluster(self, input_params: InputParamsBase, deploy_mode):
         """
@@ -342,7 +342,7 @@ class TestRecallCases(PerfTemplate):
                              default_case_params=AccParams().glove_200_angular_hnsw(
                                  metric_type=pn.MetricsTypeName.COSINE))
 
-    # @pytest.mark.recall
+    @pytest.mark.recall
     @pytest.mark.parametrize("deploy_mode", [STANDALONE])
     def test_recall_glove_hnsw_cosine_standalone(self, input_params: InputParamsBase, deploy_mode):
         """
@@ -383,7 +383,7 @@ class TestRecallCases(PerfTemplate):
                              default_case_params=AccParams().glove_200_angular_ivf_flat(),
                              node_resources=node_resources)
 
-    # @pytest.mark.recall
+    @pytest.mark.recall
     @pytest.mark.parametrize("deploy_mode", [STANDALONE])
     def test_recall_glove_ivf_flat_cosine_standalone(self, input_params: InputParamsBase, deploy_mode):
         """
@@ -395,7 +395,7 @@ class TestRecallCases(PerfTemplate):
                              default_case_params=AccParams().glove_200_angular_ivf_flat(
                                  metric_type=pn.MetricsTypeName.COSINE))
 
-    # @pytest.mark.recall
+    @pytest.mark.recall
     @pytest.mark.parametrize("deploy_mode", [CLUSTER])
     def test_recall_glove_ivf_flat_cosine_cluster(self, input_params: InputParamsBase, deploy_mode):
         """
@@ -431,7 +431,7 @@ class TestRecallCases(PerfTemplate):
                              case_callable_obj=AccCases().scene_recall,
                              default_case_params=AccParams().glove_200_angular_diskann())
 
-    # @pytest.mark.recall
+    @pytest.mark.recall
     @pytest.mark.parametrize("deploy_mode", [STANDALONE])
     def test_recall_glove_diskann_cosine_standalone(self, input_params: InputParamsBase, deploy_mode):
         """
@@ -444,7 +444,7 @@ class TestRecallCases(PerfTemplate):
                              default_case_params=AccParams().glove_200_angular_diskann(
                                  metric_type=pn.MetricsTypeName.COSINE))
 
-    # @pytest.mark.recall
+    @pytest.mark.recall
     @pytest.mark.parametrize("deploy_mode", [CLUSTER])
     def test_recall_glove_diskann_cosine_cluster(self, input_params: InputParamsBase, deploy_mode):
         """
