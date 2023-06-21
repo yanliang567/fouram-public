@@ -92,8 +92,10 @@ class VDCClient(BaseClient):
         Only 4 upgrades are supported: image_tag, deploy_mode, server_resource, milvus_config
         """
         release_name = release_name or self.release_name
-        image_tag, deploy_mode, server_resource, milvus_config = \
-            [body.get(i, None) for i in ["image_tag", "deploy_mode", "server_resource", "milvus_config"]]
+        image_tag = body.get("image_tag", "") or (self.client.get_release_version(body.get("milvus_tag_prefix", ""))
+                                                  if body.get("milvus_tag_prefix") else "")
+        deploy_mode, server_resource, milvus_config = \
+            [body.get(i, None) for i in ["deploy_mode", "server_resource", "milvus_config"]]
 
         # check instance exist
         if check_release_exist:

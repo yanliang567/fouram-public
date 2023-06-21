@@ -160,7 +160,8 @@ class Base:
         release_name = release_name or param_info.release_name
         if not release_name:
             raise Exception(f"[Base] Can not upgrade empty release name:{release_name}, please check.")
-        tag = tag or param_info.milvus_tag
+        tag = tag or param_info.milvus_tag or (
+            AutoGetTag().auto_tag(deploy_tool=deploy_tool) if param_info.milvus_tag_prefix else "")
         repository = repository or param_info.tag_repository
 
         # parser configs and install server
@@ -171,7 +172,8 @@ class Base:
         config_obj = DefaultConfigs(deploy_tool=deploy_tool, deploy_mode=deploy_mode)
 
         # get image tag from cmd
-        set_image = config_obj.set_image(tag=tag, repository=repository, prefix="") if tag else {}
+        set_image = config_obj.set_image(tag=tag, repository=repository, prefix=param_info.milvus_tag_prefix)\
+            if tag or param_info.milvus_tag_prefix else {}
         get_deploy_mode = config_obj.get_deploy_mode(deploy_mode=deploy_mode)
 
         # merge configs
