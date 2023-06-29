@@ -227,7 +227,16 @@ class ConcurrentInputParamsQuery(DataClassBase):
     expr: Optional[str] = None
     output_fields: Optional[list] = None
     ignore_growing: Optional[bool] = False
+    offset: Optional[int] = None
+    limit: Optional[int] = None
     timeout: Optional[int] = DefaultValue.default_timeout
+
+    # other params
+    random_data: Optional[bool] = False
+    random_count: Optional[int] = 0
+    random_range: Optional[list] = field(default_factory=lambda: [0, 1])
+    field_name: Optional[str] = DefaultValue.default_query_field
+    field_type: Optional[str] = DefaultValue.default_int64_field_name
 
 
 @dataclass
@@ -235,13 +244,29 @@ class ConcurrentTaskQuery(DataClassBase):
     expr: str
     output_fields: Optional[list] = None
     ignore_growing: Optional[bool] = False
+    offset: Optional[int] = None
+    limit: Optional[int] = None
     timeout: Optional[int] = DefaultValue.default_timeout
+
+    # other params
+    random_data: Optional[bool] = False
+    random_count: Optional[int] = 0
+    random_range: Optional[list] = field(default_factory=lambda: [0, 1])
+    field_name: Optional[str] = DefaultValue.default_query_field
+    field_type: Optional[str] = DefaultValue.default_int64_field_name
 
     @property
     def obj_params(self):
         _p = copy.deepcopy(self.to_dict)
         if _p["ignore_growing"] not in [True]:
             del _p["ignore_growing"]
+
+        for i in ["offset", "limit"]:
+            if _p[i] is None:
+                del _p[i]
+
+        for j in ["expr", "random_data", "random_count", "random_range", "field_name", "field_type"]:
+            del _p[j]
         return _p
 
 

@@ -12,7 +12,7 @@ from client.common.common_func import (
     gen_collection_schema, gen_unique_str, get_file_list, read_npy_file, parser_data_size, loop_files, loop_ids,
     gen_vectors, gen_entities, run_go_bench_process, go_bench, GoSearchParams, loop_gen_files, remove_list_values,
     parser_segment_info, gen_scalar_values, update_dict_value, get_default_search_params, parser_search_params_expr,
-    hide_dict_value)
+    hide_dict_value, gen_random_query_data)
 from client.common.common_param import TransferNodesParams, TransferReplicasParams
 from client.common.common_type import Precision, CheckTasks
 from client.common.common_type import DefaultValue as dv
@@ -171,7 +171,8 @@ class Base:
             for db in remove_list_values(self.db_wrap.list_database().response, dv.default_database):
                 self.db_wrap.drop_database(db_name=db)
 
-            log.customize(log_level)(f"[Base] Cleaned all databases and collections:{self.get_all_db_and_collections()}")
+            log.customize(log_level)(
+                f"[Base] Cleaned all databases and collections:{self.get_all_db_and_collections()}")
 
     def connect(self, host=None, port=None, secure=False, user="", password="", db_name="",
                 alias=DefaultConfig.DEFAULT_USING, log_level=LogLevel.INFO, **kwargs):
@@ -210,7 +211,7 @@ class Base:
 
         update_params = {"alias": dv.default_backup_alias, "db_name": dv.default_database}
         if _kwargs["user"] != dv.default_rbac_user:
-            update_params.update({"user": dv.default_rbac_user,  "password": dv.default_rbac_password})
+            update_params.update({"user": dv.default_rbac_user, "password": dv.default_rbac_password})
 
         _kwargs.update(update_params)
         if not self.connection_wrap.has_connection(alias=dv.default_backup_alias).response:
@@ -734,7 +735,17 @@ class Base:
         return self.collection_wrap.search(check_task=CheckTasks.assert_result, **params.obj_params)
 
     def concurrent_query(self, params: ConcurrentTaskQuery):
-        return self.collection_wrap.query(check_task=CheckTasks.assert_result, **params.obj_params)
+        _extra_expr = ""
+        if params.random_data:
+            _symbol, _expr = " ", params.expr.strip()
+            if not (_expr == "" or _expr.endswith("&&") or _expr.endswith("||")):
+                _symbol = " || "
+
+            _extra_expr += _symbol + gen_random_query_data(
+                random_count=params.random_count, random_range=params.random_range,
+                query_field_name=params.field_name, query_field_type=params.field_type)
+        return self.collection_wrap.query(expr=params.expr + _extra_expr, check_task=CheckTasks.assert_result,
+                                          **params.obj_params)
 
     def concurrent_flush(self, params: ConcurrentTaskFlush):
         return self.collection_wrap.flush(check_task=CheckTasks.assert_result, **params.obj_params)

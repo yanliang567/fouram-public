@@ -172,8 +172,9 @@ class Base:
         config_obj = DefaultConfigs(deploy_tool=deploy_tool, deploy_mode=deploy_mode)
 
         # get image tag from cmd
-        set_image = config_obj.set_image(tag=tag, repository=repository, prefix=param_info.milvus_tag_prefix)\
-            if tag or param_info.milvus_tag_prefix else {}
+        set_image = config_obj.set_image(
+            tag=tag, repository=repository,
+            prefix=param_info.milvus_tag_prefix) if tag or param_info.milvus_tag_prefix else {}
         get_deploy_mode = config_obj.get_deploy_mode(deploy_mode=deploy_mode)
 
         # merge configs

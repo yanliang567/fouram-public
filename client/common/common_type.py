@@ -1,6 +1,8 @@
 import queue
 from typing import Optional, Union, Callable, List, Dict, AnyStr
 
+from pymilvus import DataType
+
 from commons.common_params import EnvVariable
 
 
@@ -66,6 +68,10 @@ class DefaultValue:
     default_rbac_password = "Milvus"
     default_rbac_role_name = "admin"
     default_backup_alias = "backup_alias"
+    default_query_field = "id"
+    default_query_scalar_types = ["int64", "varchar"]
+    default_scalar_types = [i for i in dict(DataType.__members__).keys() if
+                            i not in ["NONE", "UNKNOWN", "BINARY_VECTOR", "FLOAT_VECTOR"]]
 
 
 class SimilarityMetrics:
@@ -150,4 +156,3 @@ class ConcurrentGlobalParams:
 
 
 concurrent_global_params = ConcurrentGlobalParams()
-

@@ -133,6 +133,7 @@ class DatasetsName:
     GIST = "gist"
     TEXT2IMG = "text2img"
     LAION = "laion"
+    EMBED = "embed"
 
 
 class MetricsTypeName:

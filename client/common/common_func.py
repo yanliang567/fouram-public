@@ -162,7 +162,7 @@ def get_default_field_name(data_type=DataType.FLOAT_VECTOR, default_field_name: 
 
 
 def get_vector_type(data_type):
-    if data_type in ["random", "sift", "deep", "glove", "local", "gist", "text2img", "laion"]:
+    if data_type in ["random", "sift", "deep", "glove", "local", "gist", "text2img", "laion", "embed"]:
         vector_type = DataType.FLOAT_VECTOR
     elif data_type in ["binary", "kosarak"]:
         vector_type = DataType.BINARY_VECTOR
@@ -392,7 +392,7 @@ def parser_search_params_expr(expr):
 
 
 def get_vectors_from_binary(nq, dimension, dataset_name):
-    if dataset_name in ["sift", "deep", "binary", "gist", "text2img", "laion"]:
+    if dataset_name in ["sift", "deep", "binary", "gist", "text2img", "laion", "embed"]:
         # dataset_name: local, sift, deep, binary
         file_name = DatasetPath[dataset_name] + "query.npy"
 
@@ -440,6 +440,19 @@ def gen_scalar_values(scalars_params: dict, insert_length: int):
             _insert_scalars_params[k]["default_value"] = _loop_dict[k]["default_value"][:insert_length]
             _loop_dict[k]["default_value"] = _loop_dict[k]["default_value"][insert_length:]
         yield _insert_scalars_params
+
+
+def gen_random_query_data(random_count: int, random_range: list, query_field_name: str, query_field_type: str):
+    if query_field_type not in dv.default_query_scalar_types:
+        raise ValueError(
+            f"[gen_random_query_data] Query field:{query_field_type} not support in {dv.default_query_scalar_types}")
+
+    if len(random_range) != 2:
+        raise ValueError(f"[gen_random_query_data] The length of random_range must be 2, not {len(random_range)}")
+
+    _query_field_type = "int" if query_field_type == dv.default_int64_field_name else "str"
+    _query_range = [eval(f"{_query_field_type}({random.randint(*random_range)})") for i in range(random_count)]
+    return f"{query_field_name} in {_query_range}"
 
 
 """ common func """

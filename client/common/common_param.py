@@ -15,6 +15,8 @@ DatasetPath = {
     "text2img_ground_truth": NAS.RAW_DATA_DIR + 'text2img1b/gnd',
     "laion": NAS.RAW_DATA_DIR + 'laion1b/',
     "laion_ground_truth": NAS.RAW_DATA_DIR + 'laion1b/gnd',
+    "embed": NAS.RAW_DATA_DIR + 'embed5m/',
+    "embed_ground_truth": NAS.RAW_DATA_DIR + 'embed5m/gnd',
     "gist": NAS.RAW_DATA_DIR + 'gist1m/',
     "structure": NAS.RAW_DATA_DIR + 'structure/',
     "binary": NAS.RAW_DATA_DIR + 'binary/',
