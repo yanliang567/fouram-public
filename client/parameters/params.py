@@ -367,6 +367,16 @@ class ConcurrentTaskInsert(DataClassBase):
 
 
 @dataclass
+class ConcurrentInputParamsUpsert(ConcurrentInputParamsInsert):
+    pass
+
+
+@dataclass
+class ConcurrentTaskUpsert(ConcurrentTaskInsert):
+    pass
+
+
+@dataclass
 class ConcurrentInputParamsDelete(DataClassBase):
     delete_length: Optional[int] = 1
     timeout: Optional[int] = DefaultValue.default_timeout
@@ -677,6 +687,7 @@ class ConcurrentTasksParams:
     release: Optional[ConcurrentObjParams] = ConcurrentObjParams(**{"params": ConcurrentTaskRelease})
     load_release: Optional[ConcurrentObjParams] = ConcurrentObjParams(**{"params": ConcurrentTaskLoadRelease})
     insert: Optional[ConcurrentObjParams] = ConcurrentObjParams(**{"params": ConcurrentTaskInsert})
+    upsert: Optional[ConcurrentObjParams] = ConcurrentObjParams(**{"params": ConcurrentTaskUpsert})
     delete: Optional[ConcurrentObjParams] = ConcurrentObjParams(**{"params": ConcurrentTaskDelete})
     scene_test: Optional[ConcurrentObjParams] = ConcurrentObjParams(**{"params": ConcurrentTaskSceneTest})
     scene_insert_delete_flush: Optional[ConcurrentObjParams] = ConcurrentObjParams(

@@ -16,13 +16,27 @@ from client.common.common_func import (
 from client.common.common_param import TransferNodesParams, TransferReplicasParams
 from client.common.common_type import Precision, CheckTasks
 from client.common.common_type import DefaultValue as dv
-from client.parameters.params import (
-    ConcurrentTaskSearch, ConcurrentTaskQuery, ConcurrentTaskFlush, ConcurrentTaskLoad, ConcurrentTaskRelease,
-    ConcurrentTaskLoadRelease, ConcurrentTaskInsert, ConcurrentTaskDelete, ConcurrentTaskSceneTest,
-    ConcurrentTaskSceneInsertDeleteFlush, DataClassBase, ConcurrentTaskIterateSearch, ConcurrentTaskLoadSearchRelease,
-    ConcurrentTaskSceneSearchTest, ConcurrentTaskSceneInsertPartition, ConcurrentTaskSceneTestPartition)
 from client.parameters.params_name import (
     reset, groups, max_length, dim, transfer_nodes, transfer_replicas, resource_groups)
+from client.parameters.params import (
+    DataClassBase,
+    ConcurrentTaskSearch,
+    ConcurrentTaskQuery,
+    ConcurrentTaskFlush,
+    ConcurrentTaskLoad,
+    ConcurrentTaskRelease,
+    ConcurrentTaskLoadRelease,
+    ConcurrentTaskInsert,
+    ConcurrentTaskUpsert,
+    ConcurrentTaskDelete,
+    ConcurrentTaskSceneTest,
+    ConcurrentTaskSceneInsertDeleteFlush,
+    ConcurrentTaskIterateSearch,
+    ConcurrentTaskLoadSearchRelease,
+    ConcurrentTaskSceneSearchTest,
+    ConcurrentTaskSceneInsertPartition,
+    ConcurrentTaskSceneTestPartition
+)
 from client.util.api_request import func_time_catch
 
 # packages outside the client folder
@@ -766,6 +780,10 @@ class Base:
     def concurrent_insert(self, params: ConcurrentTaskInsert):
         entities = gen_entities(self.collection_schema, params.get_vectors, params.get_ids, params.varchar_filled)
         return self.collection_wrap.insert(entities, check_task=CheckTasks.assert_result, **params.obj_params)
+
+    def concurrent_upsert(self, params: ConcurrentTaskUpsert):
+        entities = gen_entities(self.collection_schema, params.get_vectors, params.get_ids, params.varchar_filled)
+        return self.collection_wrap.upsert(entities, check_task=CheckTasks.assert_result, **params.obj_params)
 
     def concurrent_delete(self, params: ConcurrentTaskDelete):
         return self.collection_wrap.delete(expr="id in {}".format(params.get_ids), check_task=CheckTasks.assert_result,

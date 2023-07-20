@@ -18,6 +18,7 @@ from client.parameters.params import (
     ConcurrentTaskRelease, ConcurrentInputParamsRelease,
     ConcurrentTaskLoadRelease, ConcurrentInputParamsLoadRelease,
     ConcurrentTaskInsert, ConcurrentInputParamsInsert,
+    ConcurrentTaskUpsert, ConcurrentInputParamsUpsert,
     ConcurrentTaskDelete, ConcurrentInputParamsDelete,
     ConcurrentTaskSceneTest, ConcurrentInputParamsSceneTest,
     ConcurrentTaskSceneInsertDeleteFlush, ConcurrentInputParamsSceneInsertDeleteFlush,
@@ -189,10 +190,10 @@ class ConcurrentClientBase(CommonCases):
             result = self.query_param_analysis(**params.to_dict)
             return ConcurrentTaskQuery(**result)
 
-        elif req_type == pn.insert:
-            params = ConcurrentInputParamsInsert(**req_params).to_dict
+        elif req_type in [pn.insert, pn.upsert]:
+            params = eval("ConcurrentInputParams{0}(**req_params).to_dict".format(req_type.capitalize()))
             params.update({"dim": self.params_obj.dataset_params[pn.dim]})
-            _p = ConcurrentTaskInsert(**params)
+            _p = eval("ConcurrentTask{0}(**params)".format(req_type.capitalize()))
             _p.set_params()
             return _p
 

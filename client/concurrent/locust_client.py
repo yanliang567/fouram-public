@@ -59,6 +59,9 @@ class MyTaskSet(TaskSet):
     def insert(self):
         self.client.insert(self.tasks_params.insert.params)
 
+    def upsert(self):
+        self.client.upsert(self.tasks_params.upsert.params)
+
     def delete(self):
         self.client.delete(self.tasks_params.delete.params)
 
