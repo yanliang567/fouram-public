@@ -797,6 +797,8 @@ def go_bench(go_benchmark: str, uri: str, collection_name: str, index_type: str,
         }
     """
     assert check_params_exist(search_params, ["anns_field", "metric_type", "params", "limit", "expression"])
+    output_fields = search_params["output_fields"] if "output_fields" in search_params else []
+    search_timeout = search_params["timeout"] if "timeout" in search_params else search_timeout
     query_json = {
         "collection_name": collection_name,
         "partition_names": partition_names,
@@ -806,7 +808,7 @@ def go_bench(go_benchmark: str, uri: str, collection_name: str, index_type: str,
         "params": search_params["params"],
         "limit": search_params["limit"],
         "expr": search_params["expression"],
-        "output_fields": [],
+        "output_fields": output_fields,
         "timeout": search_timeout
     }
     search_vector_file = write_json_file(search_vector, json_file_path=json_file_path)
@@ -846,7 +848,7 @@ def go_bench(go_benchmark: str, uri: str, collection_name: str, index_type: str,
 
 class GoSearchParams:
     def __init__(self, data, anns_field: str, param: dict, dim: int, limit: int, expr=None,
-                 json_file_path="/root/query_vector.json"):
+                 json_file_path="/root/query_vector.json", **kwargs):
         self.data = data
         self.json_file_path = json_file_path
         # self.search_vector_file = write_json_file(self.data, json_file_path=json_file_path)
@@ -864,13 +866,13 @@ class GoSearchParams:
         params = {"sp_value": sp_value}
         params.update({"dim": dim})
 
-        self.search_parameters = {
+        self.search_parameters = update_dict_value({
             "anns_field": anns_field,
             "metric_type": param["metric_type"],
             "params": params,
             "limit": limit,
             "expression": expr,
-        }
+        }, kwargs)
 
 
 def get_spawn_rate(total_num: int, default_max_step: int = 5, default_max_spawn_rate: int = 100):
