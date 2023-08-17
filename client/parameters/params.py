@@ -39,6 +39,7 @@ class ParamsFormat:
             # collection_name: ([type(str())], OPTION),
             metric_type: ([type(str())], OPTION),
             vector_field_name: ([type(str())], OPTION),
+            column_name: ([type(str())], OPTION),
             dim: ([type(int())], OPTION),
             max_length: ([type(int())], OPTION),
             varchar_filled: ([type(bool())], OPTION),

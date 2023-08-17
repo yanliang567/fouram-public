@@ -40,6 +40,7 @@ timeout = "timeout"
 collection_name = "collection_name"
 vector_field_name = "vector_field_name"
 dataset_name = "dataset_name"
+column_name = "column_name"
 dim = "dim"
 dataset_size = "dataset_size"
 max_length = "max_length"
@@ -111,6 +112,10 @@ test = "test"
 train = "train"
 distances = "distances"
 
+# Dataset types, file format
+NUMPY = "npy"
+PARQUET = "parquet"
+
 
 class AccDatasetsName:
     sift_128_euclidean = "sift-128-euclidean"
@@ -135,6 +140,10 @@ class DatasetsName:
     TEXT2IMG = "text2img"
     LAION = "laion"
     EMBED = "embed"
+
+    # parquet
+    Cohere10mParquet = "cohere10m_parquet"
+    Laion5bParquet = "laion5b_parquet"
 
 
 class MetricsTypeName:

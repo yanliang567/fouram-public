@@ -12,7 +12,7 @@ from client.common.common_func import (
     gen_collection_schema, gen_unique_str, get_file_list, read_npy_file, parser_data_size, loop_files, loop_ids,
     gen_vectors, gen_entities, run_go_bench_process, go_bench, GoSearchParams, loop_gen_files, remove_list_values,
     parser_segment_info, gen_scalar_values, update_dict_value, get_default_search_params, parser_search_params_expr,
-    hide_dict_value, gen_random_query_data)
+    hide_dict_value, gen_random_query_data, read_data_file)
 from client.common.common_param import TransferNodesParams, TransferReplicasParams
 from client.common.common_type import Precision, CheckTasks
 from client.common.common_type import DefaultValue as dv
@@ -327,7 +327,7 @@ class Base:
         self.count_entities(collection_obj=collection_obj, log_level=log_level)
         return res.rt
 
-    def insert(self, data_type, dim, size, ni, varchar_filled=False, collection_obj: callable = None,
+    def insert(self, data_type, dim, size, ni, varchar_filled=False, collection_obj: callable = None, column_name="",
                collection_schema=None, collection_name="", log_level=LogLevel.INFO, scalars_params={}, **kwargs):
         data_size = parser_data_size(size)
         data_size_format = str(format(data_size, ',d'))
@@ -368,7 +368,8 @@ class Base:
             for i in range(0, ni_cunt):
                 if len(vectors) < ni:
                     while True:
-                        vectors.extend(read_npy_file(next(_loop_file)))
+                        # vectors.extend(read_npy_file(next(_loop_file)))
+                        vectors.extend(read_data_file(next(_loop_file), column=column_name))
                         if len(vectors) >= ni:
                             break
                 batch_rt += self.insert_batch(vectors[:ni], next(_loop_ids), data_size_format, varchar_filled,
@@ -379,7 +380,8 @@ class Base:
             if last_insert > 0:
                 if len(vectors) < last_insert:
                     while True:
-                        vectors.extend(read_npy_file(next(_loop_file)))
+                        # vectors.extend(read_npy_file(next(_loop_file)))
+                        vectors.extend(read_data_file(next(_loop_file), column=column_name))
                         if len(vectors) >= last_insert:
                             break
                 last_rt = self.insert_batch(

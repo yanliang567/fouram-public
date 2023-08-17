@@ -4,6 +4,11 @@ from typing import Optional, List, Union
 from client.common.common_type import NAS
 import client.parameters.params_name as pn
 
+DatasetType = {
+    "cohere10m_parquet": pn.PARQUET,
+    "laion5b_parquet": pn.PARQUET
+}
+
 DatasetPath = {
     "random": NAS.RAW_DATA_DIR + 'random/',
     "deep": NAS.RAW_DATA_DIR + 'deep1b/',
@@ -20,12 +25,20 @@ DatasetPath = {
     "gist": NAS.RAW_DATA_DIR + 'gist1m/',
     "structure": NAS.RAW_DATA_DIR + 'structure/',
     "binary": NAS.RAW_DATA_DIR + 'binary/',
+
+    "cohere10m_parquet": NAS.RAW_DATA_DIR + 'cohere10m_parquet/',
+    "cohere10m_parquet_ground_truth": NAS.RAW_DATA_DIR + 'cohere10m_parquet/gnd',
+    "laion5b_parquet": NAS.RAW_DATA_DIR + 'laion5b_parquet/',
+    "laion5b_parquet_ground_truth": NAS.RAW_DATA_DIR + 'laion5b_parquet/gnd',
 }
 
 ScalarDatasetPath = {
     "laion2b_url": NAS.SCALAR_DATA_DIR + "laion2b_url/",
     "laion2b_int64": NAS.SCALAR_DATA_DIR + "laion2b_int64/",
     "laion2b_json": NAS.SCALAR_DATA_DIR + "laion2b_json/",
+
+    "cohere10m_parquet": NAS.RAW_DATA_DIR + 'cohere10m_parquet/',
+    "laion5b_parquet": NAS.RAW_DATA_DIR + 'laion5b_parquet/',
 }
 
 MetricsToIndexType = {

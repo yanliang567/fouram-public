@@ -9,7 +9,9 @@ import pandas as pd
 import h5py
 import tqdm
 import subprocess
+from typing import List
 from sklearn import preprocessing
+import pyarrow.parquet as pq
 from itertools import product
 
 from pymilvus import DataType
@@ -18,7 +20,7 @@ from client.client_base.schema_wrapper import ApiCollectionSchemaWrapper, ApiFie
 from client.parameters import params_name as pn
 from client.common.common_type import DefaultValue as dv
 from client.common.common_type import NAS, SimilarityMetrics, AccMetrics, Precision
-from client.common.common_param import DatasetPath, ScalarDatasetPath, GoBenchIndex, SegmentsAnalysis
+from client.common.common_param import DatasetType, DatasetPath, ScalarDatasetPath, GoBenchIndex, SegmentsAnalysis
 
 from utils.util_log import log
 
@@ -162,7 +164,8 @@ def get_default_field_name(data_type=DataType.FLOAT_VECTOR, default_field_name: 
 
 
 def get_vector_type(data_type):
-    if data_type in ["random", "sift", "deep", "glove", "local", "gist", "text2img", "laion", "embed"]:
+    if data_type in ["random", "sift", "deep", "glove", "local", "gist", "text2img", "laion", "embed",
+                     "cohere10m_parquet", "laion5b_parquet"]:
         vector_type = DataType.FLOAT_VECTOR
     elif data_type in ["binary", "kosarak"]:
         vector_type = DataType.BINARY_VECTOR
@@ -172,7 +175,8 @@ def get_vector_type(data_type):
 
 
 def gen_file_name(file_id, dim, data_type):
-    file_name = "%s_%sd_%05d.npy" % (dv.FILE_PREFIX, str(dim), int(file_id))
+    file_name = "%s_%sd_%05d.%s" % (dv.FILE_PREFIX, str(dim), int(file_id), DatasetType.get(data_type, pn.NUMPY))
+
     if data_type in DatasetPath.keys():
         return DatasetPath[data_type] + file_name
     else:
@@ -180,8 +184,11 @@ def gen_file_name(file_id, dim, data_type):
         return ""
 
 
-def gen_scalar_file_name(file_id, dataset_name):
-    file_name = "%s_%05d.npy" % (dv.SCALAR_FILE_PREFIX, int(file_id))
+def gen_scalar_file_name(file_id, dataset_name: str, dim=dv.default_dim):
+    if DatasetType.get(dataset_name, pn.NUMPY) == pn.NUMPY:
+        file_name = "%s_%05d.npy" % (dv.SCALAR_FILE_PREFIX, int(file_id))
+    else:
+        file_name = "%s_%sd_%05d.parquet" % (dv.FILE_PREFIX, int(dim), int(file_id))
     if dataset_name in ScalarDatasetPath.keys():
         return ScalarDatasetPath[dataset_name] + file_name
     else:
@@ -392,7 +399,8 @@ def parser_search_params_expr(expr):
 
 
 def get_vectors_from_binary(nq, dimension, dataset_name):
-    if dataset_name in ["sift", "deep", "binary", "gist", "text2img", "laion", "embed"]:
+    if dataset_name in ["sift", "deep", "binary", "gist", "text2img", "laion", "embed", "cohere10m_parquet",
+                        "laion5b_parquet"]:
         # dataset_name: local, sift, deep, binary
         file_name = DatasetPath[dataset_name] + "query.npy"
 
@@ -405,7 +413,7 @@ def get_vectors_from_binary(nq, dimension, dataset_name):
     else:
         raise Exception("[get_vectors_from_binary] Not support dataset: {0}, please check".format(dataset_name))
 
-    data = np.load(file_name)
+    data = np.load(file_name, allow_pickle=True)
     if nq > len(data):
         raise Exception("[get_vectors_from_binary] nq large than file support({0})".format(len(data)))
     vectors = data[0:nq].tolist()
@@ -423,7 +431,8 @@ def gen_insert_scalars_params(scalars_params: dict):
 
 
 def gen_scalar_values(scalars_params: dict, insert_length: int):
-    _loop_files = {k: loop_gen_scalar_files(scalars_params[k]["other_params"].get("dataset")) for k in
+    _loop_files = {k: loop_gen_scalar_files(scalars_params[k]["other_params"].get("dataset"),
+                                            dim=scalars_params[k]["other_params"].get("dim", dv.default_dim)) for k in
                    scalars_params.keys() if scalars_params[k].get("other_params", {}).get("dataset", False)}
     _insert_scalars_params = gen_insert_scalars_params(scalars_params)
     _loop_dict = copy.deepcopy(_insert_scalars_params)
@@ -434,7 +443,9 @@ def gen_scalar_values(scalars_params: dict, insert_length: int):
     while True:
         for k, v in _loop_files.items():
             while len(_loop_dict[k]["default_value"]) < insert_length:
-                _loop_dict[k]["default_value"].extend(read_npy_file(next(v), allow_pickle=True))
+                # _loop_dict[k]["default_value"].extend(read_npy_file(next(v), allow_pickle=True))
+                _loop_dict[k]["default_value"].extend(read_data_file(
+                    next(v), column=_loop_dict[k].get("other_params", {}).get("column_name", ""), allow_pickle=True))
 
         for k, v in _loop_dict.items():
             _insert_scalars_params[k]["default_value"] = _loop_dict[k]["default_value"][:insert_length]
@@ -532,6 +543,27 @@ def write_json_file(data, json_file_path=""):
     # return json_file_path
 
 
+def read_data_file(file_name: str, column="", allow_pickle=False):
+    if file_name.endswith(pn.NUMPY):
+        return read_npy_file(file_name, allow_pickle=allow_pickle)
+    elif file_name.endswith(pn.PARQUET):
+        return read_parquet_file(file_name, column=column)
+    raise Exception("[read_data_file] Can not read file: %s" % file_name)
+
+
+def read_parquet_file(file_name: str, column: str):
+    file_list = []
+    if check_file_exist(file_name):
+        try:
+            file_list = pq.read_table(file_name, columns=[column])[column].to_pylist()
+        except Exception as e:
+            log.error(f"[read_parquet_file] Can not read parquet file: {e}")
+        return file_list
+    msg = "[read_parquet_file] Can not read parquet file, please check."
+    log.error(msg)
+    return []
+
+
 def read_json_file(file_name):
     if check_file_exist(file_name):
         with open(file_name) as f:
@@ -596,9 +628,9 @@ def loop_gen_files(dim, data_type):
         yield gen_file_name(i, dim, data_type)
 
 
-def loop_gen_scalar_files(dataset_name):
+def loop_gen_scalar_files(dataset_name, dim=dv.default_dim):
     for i in range(dv.Max_file_count):
-        yield gen_scalar_file_name(i, dataset_name)
+        yield gen_scalar_file_name(i, dataset_name, dim)
 
 
 def loop_ids(step=50000, start_id=0):

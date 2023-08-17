@@ -60,7 +60,8 @@ class CommonCases(Base):
     def prepare_insert(self, data_type, dim, size, ni, varchar_filled=False):
         varchar_filled = self.params_obj.dataset_params.get(pn.varchar_filled, varchar_filled)
         res_insert = self.insert(data_type=data_type, dim=dim, size=size, ni=ni, varchar_filled=varchar_filled,
-                                 scalars_params=self.params_obj.dataset_params.get(pn.scalars_params, {}))
+                                 scalars_params=self.params_obj.dataset_params.get(pn.scalars_params, {}),
+                                 column_name=self.params_obj.dataset_params.get(pn.column_name, ""))
         self.case_report.add_attr(**res_insert)
 
     def prepare_load(self, **kwargs):
