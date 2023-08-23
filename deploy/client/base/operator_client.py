@@ -173,12 +173,16 @@ class OperatorClient(BaseClient):
 
         start_time = time.time()
         while time.time() < start_time + timeout:
-            status, metadata_generation, status_observed_generation, milvus_updated_status = self.get_status(
+            _exist, status, metadata_generation, status_observed_generation, milvus_updated_status = self.get_status(
                 release_name, namespace)
 
-            if not status or not metadata_generation or not status_observed_generation or not milvus_updated_status:
+            if _exist is False:
                 log.error("[wait_for_healthy] release:{} does not exist.".format(release_name))
                 break
+
+            # if not status or not metadata_generation or not status_observed_generation or not milvus_updated_status:
+            #     log.error("[wait_for_healthy] release:{} does not exist.".format(release_name))
+            #     break
 
             if status == "Healthy" and int(status_observed_generation) >= int(metadata_generation) and \
                     milvus_updated_status == "True":
@@ -195,11 +199,12 @@ class OperatorClient(BaseClient):
         res = self.dc.get(namespace=namespace)
         parser_res = self.dc.result_to_dict(res)
 
-        _status, _metadata_generation, _status_observed_generation, _milvus_updated_status = '', '', '', ''
+        _exist, _status, _metadata_generation, _status_observed_generation, _milvus_updated_status = False, '', '', '', ''
         if isinstance(parser_res, dict):
             items = parser_res["items"]
             for item in items:
                 if item["metadata"]["name"] == release_name:
+                    _exist = True
                     if "status" in item and "status" in item["status"]:
                         _status = item["status"]["status"]
 
@@ -213,10 +218,11 @@ class OperatorClient(BaseClient):
                         for c in item["status"]["conditions"]:
                             if "type" in c and c["type"] == "MilvusUpdated" and "status" in c:
                                 _milvus_updated_status = c["status"]
-        log.debug(
-            "[get_status] status:%s, metadata_generation:%s, status_observed_generation:%s, milvus_updated_status:%s" % (
-                _status, _metadata_generation, _status_observed_generation, _milvus_updated_status))
-        return _status, _metadata_generation, _status_observed_generation, _milvus_updated_status
+
+        msg = "[get_status] Server exist: %s, status:%s, metadata_generation:%s, " + \
+              "status_observed_generation:%s, milvus_updated_status:%s"
+        log.debug(msg % (_exist, _status, _metadata_generation, _status_observed_generation, _milvus_updated_status))
+        return _exist, _status, _metadata_generation, _status_observed_generation, _milvus_updated_status
 
     def get_all_values(self, release_name: str, namespace=None):
         release_name = release_name or self.release_name

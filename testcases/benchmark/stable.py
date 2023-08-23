@@ -129,6 +129,43 @@ class TestConcurrentCases(PerfTemplate):
 
     @pytest.mark.locust
     @pytest.mark.parametrize("deploy_mode", [STANDALONE])
+    def test_concurrent_locust_hnsw_search_standalone(self, input_params: InputParamsBase, deploy_mode):
+        """
+        :test steps:
+            1. concurrent test and calculation of RT and QPS
+        """
+        default_case_params = ConcurrentParams().params_scene_concurrent(
+            [ConcurrentParams.params_search(nq=10000, top_k=10, search_param={"ef": 16}, timeout=3600)],
+            concurrent_number=[100], during_time=1800, interval=20, **cdp.DefaultIndexParams.HNSW)
+
+        self.concurrency_template(input_params=input_params, cpu=8, mem=32,
+                                  deploy_mode=deploy_mode, old_version_format=False,
+                                  case_callable_obj=ConcurrentClientBase().scene_concurrent_locust,
+                                  default_case_params=default_case_params)
+
+    @pytest.mark.locust
+    @pytest.mark.parametrize("deploy_mode", [CLUSTER])
+    def test_concurrent_locust_hnsw_search_cluster(self, input_params: InputParamsBase, deploy_mode):
+        """
+        :test steps:
+            1. concurrent test and calculation of RT and QPS
+        """
+        default_case_params = ConcurrentParams().params_scene_concurrent(
+            [ConcurrentParams.params_search(nq=10000, top_k=10, search_param={"ef": 16}, timeout=3600)],
+            concurrent_number=[100], during_time=1800, interval=20, **cdp.DefaultIndexParams.HNSW)
+
+        node_resources = [
+            NodeResource(nodes=[indexNode], cpu=8, mem=8),
+            NodeResource(nodes=[queryNode], cpu=16, mem=32)
+        ]
+
+        self.concurrency_template(input_params=input_params, cpu=dp.min_cpu, mem=dp.min_mem,
+                                  deploy_mode=deploy_mode, old_version_format=False,
+                                  case_callable_obj=ConcurrentClientBase().scene_concurrent_locust,
+                                  default_case_params=default_case_params, node_resources=node_resources)
+
+    @pytest.mark.locust
+    @pytest.mark.parametrize("deploy_mode", [STANDALONE])
     def test_concurrent_locust_ivf_sq8_search_high_standalone(self, input_params: InputParamsBase, deploy_mode):
         """
         :test steps:

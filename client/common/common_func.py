@@ -868,14 +868,18 @@ def go_bench(go_benchmark: str, uri: str, collection_name: str, index_type: str,
     try:
         result = json.loads(process_result)
     except ValueError:
-        msg = "[go_bench] The type of go_benchmark response is not a json: {}".format(process_result)
-        raise ValueError(msg)
+        log.error("[go_bench] The type of go_benchmark response is not a json: {}".format(process_result))
+        return {"response": False}
 
-    if isinstance(result, dict) and "response" in result and result["response"] is True:
-        log.info("[go_bench] Result of go_benchmark: {}".format(result))
+    if isinstance(result, dict) and "response" in result:
+        if result["response"] is True:
+            log.info("[go_bench] Result of go_benchmark: {}".format(result))
+        else:
+            log.error("[go_bench] Result of go_benchmark check failed:{0}".format(result))
         return result
-    else:
-        raise Exception("[go_bench] Result of go_benchmark check failed:{0}".format(result))
+
+    log.error("[go_bench] The `response` field is not included in the result:{0}".format(result))
+    return {"response": False}
 
 
 class GoSearchParams:
