@@ -5,7 +5,7 @@ from deploy.client.default_client import DefaultClient
 from utils.util_log import log
 from parameters.input_params import param_info
 from commons.common_func import (
-    parser_input_config, execute_funcs, update_dict_value, check_deploy_config, write_shell_file)
+    parser_input_config, execute_funcs, update_dict_value, check_deploy_config, write_shell_file, waiting_all_threads)
 from commons.auto_get import AutoGetTag
 from commons.common_params import EnvVariable
 from commons.common_type import TeardownType
@@ -70,6 +70,9 @@ class Base:
         log.info("[teardown_method] Execute teardown functions: {0}".format(self.teardown_funcs))
         execute_funcs(list(self.teardown_funcs.values()))
         log.info("[teardown_method] Teardown test case %s done." % method.__name__)
+
+        # Clean up remaining threads
+        waiting_all_threads()
 
         if param_info.test_status is False:
             msg = "Test result is False, please check!!!"

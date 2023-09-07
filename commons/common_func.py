@@ -1,4 +1,6 @@
 import os
+import time
+import threading
 import json
 from yaml import full_load
 import copy
@@ -299,3 +301,31 @@ def hide_dict_value(source, keys):
     _s = copy.deepcopy(source)
     target = hide_value(_s, keys)
     return target
+
+
+def waiting_all_threads(timeout: int = 600):
+    main_thread = "MainThread"
+
+    start = time.time()
+    while time.time() - start < timeout:
+        t = threading.enumerate()
+        if len(t) == 1 and t[0].name == main_thread:
+            return True
+        log.debug(f"[waiting_all_threads] Threads haven't been cleaned: {[i.name for i in t if i.name != main_thread]}")
+
+        flag = False
+        for i in threading.enumerate():
+            if i.is_alive() and i.name != main_thread and not i.daemon:
+                if hasattr(i, "cancel"):
+                    log.debug(f"[waiting_all_threads] Cancel thread: {i.name}")
+                    i.cancel()
+                flag = True
+
+        if flag:
+            time.sleep(1)
+        else:
+            log.debug(f"[waiting_all_threads] Active threads have exited: {[i.name for i in threading.enumerate()]}")
+            return True
+
+    log.error(f"[waiting_all_threads] Threads haven't been cleaned: {[i.name for i in threading.enumerate()]}")
+    return False
