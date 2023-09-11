@@ -1,6 +1,7 @@
 from deploy.configs.default_configs import DefaultConfigs
 from deploy.commons.common_params import CLUSTER, STANDALONE, Helm, Operator, DefaultRepository
 from deploy.client.default_client import DefaultClient
+from client.cases import ConcurrentClientBase, GoBenchCases
 
 from utils.util_log import log
 from parameters.input_params import param_info
@@ -8,7 +9,7 @@ from commons.common_func import (
     parser_input_config, execute_funcs, update_dict_value, check_deploy_config, write_shell_file, waiting_all_threads)
 from commons.auto_get import AutoGetTag
 from commons.common_params import EnvVariable
-from commons.common_type import TeardownType
+from commons.common_type import TeardownType, ConcurrencyType
 from data_report.metrics import Report_Metric_Object
 
 
@@ -22,6 +23,7 @@ class Base:
     deploy_release_name = ""
     deploy_initial_state = ""
     deploy_end_state = ""
+    method_name = ""
 
     def setup_class(self):
         log.info(" Start setup class ".center(100, "~"))
@@ -32,11 +34,14 @@ class Base:
         log.info(" Start teardown class ".center(100, "~"))
 
     def setup_method(self, method):
-        log.reset_log_file_path(subfolder=method.__name__)
+        self.method_name = method.__name__
+        self.set_method_name()
+
+        log.reset_log_file_path(subfolder=self.method_name)
         log.info(" setup ".center(100, "*"))
         log.info(log.log_msg)
 
-        log.info("[setup_method] Start setup test case {0}, test document:{1}".format(method.__name__, method.__doc__))
+        log.info("[setup_method] Start setup test case {0}, test document:{1}".format(self.method_name, method.__doc__))
 
         self.teardown_funcs = {}
 
@@ -50,7 +55,7 @@ class Base:
 
         # reset data report object
         Report_Metric_Object.reset()
-        Report_Metric_Object.update_client(test_case_name=method.__name__)
+        Report_Metric_Object.update_client(test_case_name=self.method_name)
 
         # Delete the service after the test is over
         if not param_info.deploy_retain and not param_info.deploy_skip:
@@ -66,10 +71,10 @@ class Base:
 
     def teardown_method(self, method):
         log.info(" teardown ".center(100, "*"))
-        log.info("[teardown_method] Start teardown test case %s." % method.__name__)
+        log.info("[teardown_method] Start teardown test case %s." % self.method_name)
         log.info("[teardown_method] Execute teardown functions: {0}".format(self.teardown_funcs))
         execute_funcs(list(self.teardown_funcs.values()))
-        log.info("[teardown_method] Teardown test case %s done." % method.__name__)
+        log.info("[teardown_method] Teardown test case %s done." % self.method_name)
 
         # Clean up remaining threads
         waiting_all_threads()
@@ -84,6 +89,37 @@ class Base:
         c = [callable_obj, ]
         c.extend(list(args))
         self.teardown_funcs[key_name] = (c, kwargs)
+
+    def set_method_name(self):
+        if param_info.concurrency_type in [ConcurrencyType.Locust, ConcurrencyType.GoBench]:
+            """
+            Only supports running locust cases into goBench
+            Only for framework performance comparison
+            """
+            self.method_name = str(self.method_name).replace(
+                ConcurrencyType.Locust.lower(), param_info.concurrency_type)
+        elif param_info.concurrency_type:
+            log.error(f"[set_method_name] Concurrency type is not supported: {param_info.concurrency_type}")
+
+    @staticmethod
+    def get_callable_object(default_value: callable):
+        if not param_info.concurrency_type:
+            return default_value
+        elif param_info.concurrency_type == ConcurrencyType.Locust:
+            return ConcurrentClientBase().scene_concurrent_locust
+        elif param_info.concurrency_type == ConcurrencyType.GoBench:
+            return GoBenchCases().scene_go_bench
+        raise Exception(f"[get_callable_object] Concurrency type is not supported: {param_info.concurrency_type}")
+
+    @staticmethod
+    def get_report_version_format(default_value: bool):
+        if not param_info.concurrency_type:
+            return default_value
+        elif param_info.concurrency_type == ConcurrencyType.Locust:
+            return False
+        elif param_info.concurrency_type == ConcurrencyType.GoBench:
+            return True
+        raise Exception(f"[get_report_version_format] Concurrency type is not supported: {param_info.concurrency_type}")
 
     @staticmethod
     def save_env_params():

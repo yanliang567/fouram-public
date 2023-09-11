@@ -53,3 +53,8 @@ class HttpStatusCode:
 class TeardownType:
     DeployDelete = "deploy_delete"
     SaveEnvParams = "save_env_params"
+
+
+class ConcurrencyType:
+    Locust = "Locust"
+    GoBench = "goBench"

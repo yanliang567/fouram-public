@@ -41,6 +41,8 @@ class ParamInfo:
         self.vdc_env = "UAT3"
         self.vdc_region_id = ""
         self.vdc_serverless_host = ""
+        self.go_bench_type = "parallel"
+        self.concurrency_type = ""
 
     def prepare_param_info(
             self, client_version, host, port,
@@ -50,7 +52,7 @@ class ParamInfo:
             update_helm_file=False, deploy_skip=False, deploy_retain=False, deploy_retain_pvc=False,
             client_test_skip=False, replica_num=1,
             run_id=None, sync_report=False, async_report=False,
-            locust_patch_switch=False):
+            locust_patch_switch=False, go_bench_type="", concurrency_type=""):
         self.client_version = client_version
         self.param_host = host
         self.param_port = port
@@ -91,6 +93,12 @@ class ParamInfo:
 
         # for monkey patch
         self.locust_patch_switch = locust_patch_switch
+
+        # for go bench
+        self.go_bench_type = go_bench_type or self.go_bench_type
+
+        # concurrency type
+        self.concurrency_type = concurrency_type or self.concurrency_type
 
     def to_dict(self):
         return vars(self)

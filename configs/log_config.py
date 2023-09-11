@@ -26,12 +26,13 @@ class LogConfig:
     def gen_log_path(self, subfolder="", retry_counts=1000):
         count = 0
         random_count = 1
+
+        _sub_folder = subfolder
         while True:
             if self.log_folder == "":
                 sub_folder_prefix = EnvVariable.FOURAM_LOG_SUB_FOLDER_PREFIX or self.log_name
                 self.log_folder = "/{:%Y_%m_%d}/{}".format(datetime.now(),
                                                            sub_folder_prefix + "_" + str(random.randint(10000, 99999)))
-            _sub_folder = subfolder
 
             log_folder = self.log_folder if subfolder == "" else "{0}/{1}".format(self.log_folder, _sub_folder)
             log_dir = str(EnvVariable.FOURAM_LOG_PATH).rstrip('/') + log_folder
@@ -41,7 +42,7 @@ class LogConfig:
                 return log_dir
 
             if subfolder != "":
-                _sub_folder += "_" + str(random_count)
+                _sub_folder = str(subfolder) + "_" + str(random_count)
                 random_count += 1
 
             count += 1

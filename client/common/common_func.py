@@ -22,6 +22,7 @@ from client.common.common_type import DefaultValue as dv
 from client.common.common_type import NAS, SimilarityMetrics, AccMetrics, Precision
 from client.common.common_param import DatasetType, DatasetPath, ScalarDatasetPath, GoBenchIndex, SegmentsAnalysis
 
+from commons.common_params import EnvVariable
 from utils.util_log import log
 
 """API func"""
@@ -790,10 +791,21 @@ def check_params_exist(target: dict, keys: list):
     return True
 
 
+def gen_go_bench_json_file(prefix_file_path: str, retry_counts: int = 99999):
+    file_path = prefix_file_path
+    for i in range(retry_counts):
+        file_path = f"{prefix_file_path}_{i}.json"
+        if not os.path.isfile(str(file_path)):
+            return file_path
+
+    raise Exception(
+        "[gen_go_bench_json_file] Generated file exceeds the maximum retry counts: {0}".format(file_path))
+
+
 def go_bench(go_benchmark: str, uri: str, collection_name: str, index_type: str, search_params: dict,
              search_timeout: int, search_vector, concurrent_number: int, during_time: int, interval: int,
              log_path: str, output_format="json", partition_names=[], secure=False, user="", password="",
-             json_file_path="/root/query_vector.json") -> dict:
+             json_file_path="") -> dict:
     """
     :param go_benchmark: path to the go executable
     :param uri: milvus connection address host:port
@@ -843,6 +855,7 @@ def go_bench(go_benchmark: str, uri: str, collection_name: str, index_type: str,
         "output_fields": output_fields,
         "timeout": search_timeout
     }
+    json_file_path = json_file_path or f"{EnvVariable.FOURAM_TEMPORARY_DIR}/query_vector.json"
     search_vector_file = write_json_file(search_vector, json_file_path=json_file_path)
 
     go_search_params = [go_benchmark,  # path to the go executable
@@ -882,11 +895,68 @@ def go_bench(go_benchmark: str, uri: str, collection_name: str, index_type: str,
     return {"response": False}
 
 
+def go_bench_refine(go_benchmark: str, uri: str, case_params: dict, log_path: str, concurrency_type: str = "parallel",
+                    secure=False, user="", password="", output_format="json") -> dict:
+    """
+    :param go_benchmark: path to the go executable
+    :param uri: milvus connection address host:port
+    :param case_params: Input params for testing, file path(.json or .yaml) or json string
+    :param log_path: The log path to save the go print information
+    :param concurrency_type: str, support: parallel、batch、locust
+    :param secure: bool
+    :param user: root user name
+    :param password: root password
+    :param output_format: default json
+    :return:
+        "result": {
+            "response": bool,
+            "concurrency_type": string,
+            "goBench": dict{'<request type>': {<test result>} ... }
+        }
+    """
+    assert check_params_exist(case_params, ["dataset_params", "collection_params", "index_params", "concurrent_params",
+                                            "concurrent_tasks"])
+
+    log.debug(f"[go_bench_refine] Case params: {case_params}")
+    case_params_json = write_json_file(
+        case_params, json_file_path=gen_go_bench_json_file(f"{EnvVariable.FOURAM_TEMPORARY_DIR}/go_bench_config"))
+
+    go_bench_params = [go_benchmark,  # path to the go executable
+                       concurrency_type,
+                       '-u', uri,  # host:port
+                       '-c', case_params_json,  # test configs
+                       '-f', output_format,  # format of output
+                       '-l', str(log_path),  # log file path
+                       ]
+    if secure is True:
+        # connect used user and password
+        go_bench_params.extend(['-n', user, '-p', password])
+        go_bench_params.append('-v=true')
+
+    log.info("[go_bench_refine] Params of go_benchmark: {}".format(go_bench_params))
+    process_result = run_go_bench_process(params=go_bench_params)
+    try:
+        result = json.loads(process_result)
+    except ValueError:
+        log.error("[go_bench_refine] The type of go_benchmark response is not a json: {}".format(process_result))
+        return {"response": False}
+
+    if isinstance(result, dict) and "response" in result:
+        if result["response"] is True:
+            log.info("[go_bench_refine] Result of go_benchmark: {}".format(result))
+        else:
+            log.error("[go_bench_refine] Result of go_benchmark check failed:{0}".format(result))
+        return result
+
+    log.error("[go_bench_refine] The `response` field is not included in the result:{0}".format(result))
+    return {"response": False}
+
+
 class GoSearchParams:
     def __init__(self, data, anns_field: str, param: dict, dim: int, limit: int, expr=None,
-                 json_file_path="/root/query_vector.json", **kwargs):
+                 json_file_path="", **kwargs):
         self.data = data
-        self.json_file_path = json_file_path
+        self.json_file_path = json_file_path or f"{EnvVariable.FOURAM_TEMPORARY_DIR}/query_vector.json"
         # self.search_vector_file = write_json_file(self.data, json_file_path=json_file_path)
         if "ef" in param["params"]:
             sp_value = param["params"]["ef"]
@@ -909,6 +979,41 @@ class GoSearchParams:
             "limit": limit,
             "expression": expr,
         }, kwargs)
+
+
+class GoBenchParams:
+    def __init__(self, concurrent_tasks: list, concurrent_number: int, during_time: int, interval: int, index_type: str,
+                 collection_name: str, metric_type: str, dim: int, vector_field: str):
+        self.concurrent_tasks = concurrent_tasks
+        self.concurrent_number = concurrent_number
+        self.during_time = during_time
+        self.interval = interval
+        self.index_type = index_type
+        self.collection_name = collection_name
+        self.metric_type = metric_type
+        self.dim = dim
+        self.vector_field = vector_field
+
+    def target_params(self):
+        return {
+            pn.dataset_params: {
+                pn.metric_type: self.metric_type,
+                pn.dim: self.dim,
+                "vector_field": self.vector_field
+            },
+            pn.collection_params: {
+                pn.collection_name: self.collection_name
+            },
+            pn.index_params: {
+                pn.index_type: self.index_type
+            },
+            pn.concurrent_params: {
+                pn.concurrent_number: self.concurrent_number,
+                pn.during_time: parser_time(self.during_time),
+                pn.interval: self.interval
+            },
+            pn.concurrent_tasks: self.concurrent_tasks
+        }
 
 
 def get_spawn_rate(total_num: int, default_max_step: int = 5, default_max_spawn_rate: int = 100):

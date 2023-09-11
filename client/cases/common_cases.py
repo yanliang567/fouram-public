@@ -10,8 +10,10 @@ from client.common.common_type import Precision, CaseIterParams
 from client.common.common_type import DefaultValue as dv
 from client.common.common_func import (
     gen_combinations, update_dict_value, get_vector_type, get_default_field_name, get_vectors_from_binary,
-    parser_search_params_expr, get_ground_truth_ids, get_search_ids, get_recall_value, get_input_params)
+    parser_search_params_expr, get_ground_truth_ids, get_search_ids, get_recall_value, get_input_params,
+    write_json_file, gen_go_bench_json_file)
 
+from commons.common_params import EnvVariable
 from utils.util_log import log
 
 
@@ -25,6 +27,9 @@ class CommonCases(Base):
         if not isinstance(params, dict):
             log.error("[CommonCases] Params({}) do not match to dict.".format(type(params)))
         self.params_obj = ParamsBase(**copy.deepcopy(params))
+
+    def parser_concurrent_params(self):
+        return gen_combinations(self.params_obj.concurrent_params)
 
     def prepare_collection(self, vector_field_name, prepare, prepare_clean=True):
         self.clean_all_rbac(reset_rbac=self.params_obj.database_user_params.get(pn.reset_rbac, False))
@@ -195,6 +200,23 @@ class CommonCases(Base):
             "expr": expr,
         }, _params)
         return result, nq, top_k, expr, _params
+
+    def go_bench_search_param_analysis(self, _search_params: dict):
+        _params = copy.deepcopy(_search_params)
+        nq = _params.get(pn.nq)
+        expr = parser_search_params_expr(_params.pop(pn.expr)) if pn.expr in _params else None
+
+        data = get_vectors_from_binary(nq=nq, dimension=self.params_obj.dataset_params[pn.dim],
+                                       dataset_name=self.params_obj.dataset_params[pn.dataset_name])
+
+        query_file = write_json_file(data, json_file_path=gen_go_bench_json_file(
+            f"{EnvVariable.FOURAM_TEMPORARY_DIR}/query_vector"))
+
+        result = update_dict_value({
+            "query_file": query_file,
+            "expr": expr,
+        }, _params)
+        return result
 
     @staticmethod
     def query_param_analysis(**kwargs):

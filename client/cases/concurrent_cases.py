@@ -1,18 +1,19 @@
 import copy
+import dacite
 
 from client.common.common_type import Precision, CaseIterParams
 from client.common.common_func import (
-    gen_combinations, get_vector_type, get_default_field_name, GoSearchParams, parser_time, update_dict_value,
-    get_input_params)
+    gen_combinations, get_vector_type, get_default_field_name, GoSearchParams, GoBenchParams, parser_time,
+    update_dict_value, get_input_params)
 from client.util.params_check import check_params
 from client.util.api_request import info_logout
 from client.cases.common_cases import CommonCases
 from client.parameters import params_name as pn
 from client.parameters.params import (
-    ParamsFormat, ConcurrentObjParams, ConcurrentTasksParams, DataClassBase,
+    ParamsFormat, ConcurrentObjParams, ConcurrentTasksParams, DataClassBase, ConcurrentGoBenchTasksParams,
     ConcurrentTaskDebug, ConcurrentInputParamsDebug,
-    ConcurrentTaskSearch, ConcurrentInputParamsSearch,
-    ConcurrentTaskQuery, ConcurrentInputParamsQuery,
+    ConcurrentTaskSearch, ConcurrentInputParamsSearch, ConcurrentGoBenchParamsSearch,
+    ConcurrentTaskQuery, ConcurrentInputParamsQuery, ConcurrentGoBenchParamsQuery,
     ConcurrentTaskFlush, ConcurrentInputParamsFlush,
     ConcurrentTaskLoad, ConcurrentInputParamsLoad,
     ConcurrentTaskRelease, ConcurrentInputParamsRelease,
@@ -60,6 +61,39 @@ class GoBenchCases(CommonCases):
 
     def parser_go_search_params(self):
         return gen_combinations(self.params_obj.go_search_params)
+
+    def prepare_go_bench(self, case_params: dict, concurrency_type: str = "parallel"):
+        res_go = self.go_bench(case_params=case_params, concurrency_type=concurrency_type)
+        self.case_report.add_attr(**{"go_bench": res_go})
+        result_check = True if "response" in res_go and res_go["response"] is True else False
+        return self.case_report.to_dict(), result_check
+
+    def parser_go_bench_tasks_params(self, req_type, req_params):
+        if req_type == pn.search:
+            params = ConcurrentInputParamsSearch(**req_params)
+            result = self.go_bench_search_param_analysis(_search_params=params.to_dict)
+            return dacite.from_dict(data_class=ConcurrentGoBenchParamsSearch, data=result)
+
+        elif req_type == pn.query:
+            params = ConcurrentInputParamsQuery(**req_params)
+            result = self.query_param_analysis(**params.to_dict)
+            return dacite.from_dict(data_class=ConcurrentGoBenchParamsQuery, data=result)
+
+        return DataClassBase()
+
+    def parser_concurrent_tasks(self, tasks: list) -> list:
+        tasks_dict = {}
+        all_support_obj = ConcurrentGoBenchTasksParams().all_obj
+        for task in tasks:
+            if task["type"] not in all_support_obj:
+                log.error(f"[parser_concurrent_tasks] Task type:{task['type']} is not supported, please check!!!")
+            else:
+                task["params"] = self.parser_go_bench_tasks_params(task["type"], task["params"])
+                tasks_dict.update({task["type"]: ConcurrentObjParams(**task)})
+        p = ConcurrentGoBenchTasksParams(**tasks_dict).to_list
+        if len(p) == 0:
+            raise Exception("[parser_concurrent_tasks] No concurrent tasks need to be executed, please check!!!")
+        return p
 
     @check_params(ParamsFormat.common_scene_go_search)
     def scene_go_search(self, **kwargs):
@@ -145,6 +179,92 @@ class GoBenchCases(CommonCases):
         self.clear_collections(clean_collection=clean_collection)
         yield True
 
+    @check_params(ParamsFormat.common_scene_go_bench)
+    def scene_go_bench(self, **kwargs):
+        """
+        :param kwargs:
+            params: dict
+            prepare: bool
+            prepare_clean: bool
+            rebuild_index: bool
+            clean_collection: bool
+        :return:
+        """
+        # params prepare
+        params, prepare, prepare_clean, rebuild_index, clean_collection = get_input_params(**kwargs)
+        log.info("[GoBenchCases] The detailed test steps are as follows: {}".format(self))
+
+        # params parsing
+        self.parsing_params(params)
+        vector_type = get_vector_type(self.params_obj.dataset_params[pn.dataset_name])
+        vector_default_field_name = get_default_field_name(
+            vector_type, self.params_obj.dataset_params.get(pn.vector_field_name, ""))
+
+        params[pn.concurrent_tasks] = self.parser_concurrent_tasks(self.params_obj.concurrent_tasks)
+
+        # load prepare params
+        _prepare_load = self.params_obj.load_params.pop("prepare_load", False)
+
+        # prepare data
+        self.prepare_collection(vector_default_field_name, prepare, prepare_clean)
+        if prepare:
+            self.prepare_index(vector_field_name=vector_default_field_name,
+                               metric_type=self.params_obj.dataset_params[pn.metric_type],
+                               clean_index_before=True)
+
+            if _prepare_load:
+                self.prepare_load(**self.params_obj.load_params)
+
+            self.prepare_insert(data_type=self.params_obj.dataset_params[pn.dataset_name],
+                                dim=self.params_obj.dataset_params[pn.dim],
+                                size=self.params_obj.dataset_params[pn.dataset_size],
+                                ni=self.params_obj.dataset_params[pn.ni_per])
+            self.prepare_flush()
+            self.prepare_index(vector_field_name=vector_default_field_name,
+                               metric_type=self.params_obj.dataset_params[pn.metric_type])
+        else:
+            # if pass in rebuild_index, indexes of collection will be dropped before building index
+            if rebuild_index:
+                self.prepare_index(vector_field_name=vector_default_field_name,
+                                   metric_type=self.params_obj.dataset_params[pn.metric_type],
+                                   clean_index_before=rebuild_index)
+
+        self.count_entities()
+        # load collection
+        self.prepare_load(**self.params_obj.load_params)
+
+        self.show_all_resource(shards_num=self.params_obj.collection_params.get(pn.shards_num, 2),
+                               show_resource_groups=self.params_obj.dataset_params.get(pn.show_resource_groups, True),
+                               show_db_user=self.params_obj.dataset_params.get(pn.show_db_user, False))
+
+        # concurrent test
+        c_params = self.parser_concurrent_params()
+        params_list = []
+        for c_p in c_params:
+            con_client = GoBenchParams(
+                concurrent_tasks=params[pn.concurrent_tasks], concurrent_number=c_p[pn.concurrent_number],
+                during_time=c_p[pn.during_time], interval=c_p[pn.interval],
+                index_type=self.params_obj.index_params[pn.index_type], collection_name=self.collection_name,
+                metric_type=self.params_obj.dataset_params[pn.metric_type], dim=self.params_obj.dataset_params[pn.dim],
+                vector_field=vector_default_field_name)
+
+            actual_params_used = copy.deepcopy(params)
+            actual_params_used[pn.concurrent_params] = {
+                pn.concurrent_number: c_p[pn.concurrent_number],
+                pn.during_time: c_p[pn.during_time],
+                pn.interval: c_p[pn.interval]
+            }
+
+            p = CaseIterParams(callable_object=self.prepare_go_bench,
+                               object_args=[con_client.target_params(), param_info.go_bench_type],
+                               actual_params_used=actual_params_used, case_type=self.__class__.__name__)
+            params_list.append(p)
+        yield params_list
+
+        # clear env
+        self.clear_collections(clean_collection=clean_collection)
+        yield True
+
 
 class ConcurrentClientBase(CommonCases):
 
@@ -173,9 +293,6 @@ class ConcurrentClientBase(CommonCases):
             "limit": top_k,
         }, _params)
         return result
-
-    def parser_concurrent_params(self):
-        return gen_combinations(self.params_obj.concurrent_params)
 
     def parser_tasks_params(self, req_type, req_params, vector_field_name: str, metric_type: str):
         if req_type == pn.search:
@@ -244,7 +361,7 @@ class ConcurrentClientBase(CommonCases):
         all_support_obj = ConcurrentTasksParams().all_obj
         for task in tasks:
             if task["type"] not in all_support_obj:
-                raise Exception("[ConcurrentClientBase] Task type:{0} not support, please check!!!".format(task.type))
+                raise Exception(f"[parser_concurrent_tasks] Task type:{task['type']} is not supported, please check!!!")
             task["params"] = self.parser_tasks_params(task["type"], task["params"], vector_field_name, metric_type)
             tasks_dict.update({task["type"]: ConcurrentObjParams(**task)})
         return ConcurrentTasksParams(**tasks_dict)

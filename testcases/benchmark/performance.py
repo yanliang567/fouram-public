@@ -1,9 +1,12 @@
 import pytest
 
 from client.cases import AccCases, InsertBatch, BuildIndex, Load, Query, Search, SearchRecall, GoBenchCases
+from client.common.common_func import parser_data_size  # do not remove
 from client.parameters.input_params import (
-    AccParams, InsertBatchParams, BuildIndexParams, LoadParams, QueryParams, SearchParams, GoBenchParams)
+    AccParams, InsertBatchParams, BuildIndexParams, LoadParams, QueryParams, SearchParams, GoBenchParams,
+    ConcurrentParams)
 from client.parameters import params_name as pn
+import client.parameters.input_params.define_params as cdp
 from deploy.commons.common_params import (
     CLUSTER, STANDALONE, queryNode, dataNode, indexNode, proxy, kafka, pulsar, ClassID)
 from deploy.configs.default_configs import NodeResource, SetDependence
@@ -861,3 +864,63 @@ class TestGoBenchCases(PerfTemplate):
                                   case_callable_obj=GoBenchCases().scene_go_search,
                                   default_case_params=GoBenchParams().params_scene_go_search_auto_index(),
                                   sync_report=True)
+
+    """ go bench after refine """
+
+    def test_concurrent_go_bench_custom_parameters(self, input_params: InputParamsBase):
+        """
+        :test steps:
+            1. concurrent search and calculation of RT and QPS
+        """
+        self.concurrency_template(input_params=input_params, cpu=dp.default_cpu, mem=dp.default_mem,
+                                  deploy_mode=STANDALONE, case_callable_obj=GoBenchCases().scene_go_bench,
+                                  sync_report=True)
+
+    @pytest.mark.go
+    @pytest.mark.parametrize("deploy_mode", [STANDALONE])
+    def test_concurrent_go_bench_hnsw_dql_filter_standalone(self, input_params: InputParamsBase, deploy_mode):
+        """
+        :test steps:
+            1. concurrent test and calculation of RT and QPS
+        """
+        data_size = "1m"
+
+        concurrent_tasks = [
+            ConcurrentParams.params_search(
+                weight=3, nq=10, top_k=10, search_param={"ef": 16},
+                expr=eval("{'float_1': {'GT': -1.0, 'LT': parser_data_size(data_size) * 0.5}}"),
+                output_fields=["float_1", "float_vector"]),
+            ConcurrentParams.params_query(
+                weight=1, expr="0 <= id <= 20 && 10.0 <= float_1 <= 30.0", output_fields=["float_1", "float_vector"])
+        ]
+        default_case_params = ConcurrentParams().params_scene_concurrent(
+            concurrent_tasks, concurrent_number=[20, 50], during_time="30m", interval=20, dataset_size=data_size,
+            other_fields=["float_1"], **cdp.DefaultIndexParams.HNSW)
+
+        self.concurrency_template(
+            input_params=input_params, cpu=dp.default_cpu, mem=dp.default_mem, deploy_mode=deploy_mode,
+            case_callable_obj=GoBenchCases().scene_go_bench, default_case_params=default_case_params, sync_report=True)
+
+    @pytest.mark.go
+    @pytest.mark.parametrize("deploy_mode", [CLUSTER])
+    def test_concurrent_go_bench_hnsw_dql_filter_cluster(self, input_params: InputParamsBase, deploy_mode):
+        """
+        :test steps:
+            1. concurrent test and calculation of RT and QPS
+        """
+        data_size = "1m"
+
+        concurrent_tasks = [
+            ConcurrentParams.params_search(
+                weight=3, nq=10, top_k=10, search_param={"ef": 16},
+                expr=eval("{'float_1': {'GT': -1.0, 'LT': parser_data_size(data_size) * 0.5}}"),
+                output_fields=["float_1", "float_vector"]),
+            ConcurrentParams.params_query(
+                weight=1, expr="0 <= id <= 20 && 10.0 <= float_1 <= 30.0", output_fields=["float_1", "float_vector"])]
+        default_case_params = ConcurrentParams().params_scene_concurrent(
+            concurrent_tasks, concurrent_number=[20, 50], during_time="30m", interval=20, dataset_size=data_size,
+            other_fields=["float_1"], **cdp.DefaultIndexParams.HNSW)
+
+        self.concurrency_template(
+            input_params=input_params, cpu=dp.default_cpu, mem=dp.default_mem, deploy_mode=deploy_mode,
+            case_callable_obj=GoBenchCases().scene_go_bench, default_case_params=default_case_params, sync_report=True)

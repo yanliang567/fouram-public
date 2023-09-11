@@ -18,6 +18,10 @@ class EnvVariable:
     WORK_DIR_NAME = "FOURAM_WORK_DIR"
     WORK_DIR = BaseConfig.get_env_variable(default_var=WORK_DIR_NAME, default_value="/Users/wt/Desktop/")
 
+    FOURAM_TEMPORARY_DIR_NAME = "FOURAM_TEMPORARY_DIR"
+    FOURAM_TEMPORARY_DIR = BaseConfig.get_env_variable(default_var=FOURAM_TEMPORARY_DIR_NAME,
+                                                       default_value="/Users/wt/Desktop/")
+
     KUBECONFIG_NAME = "KUBECONFIG"
     KUBECONFIG = BaseConfig.get_env_variable(default_var=KUBECONFIG_NAME, default_value="")  # ~/.kube/config
 
@@ -41,6 +45,9 @@ class EnvVariable:
     FOURAM_SAVE_CONNECT_PARAMS_PATH_NAME = "FOURAM_SAVE_CONNECT_PARAMS_PATH"
     FOURAM_SAVE_CONNECT_PARAMS_PATH = BaseConfig.get_env_variable(default_var=FOURAM_SAVE_CONNECT_PARAMS_PATH_NAME,
                                                                   default_value="/tmp/connect_params.sh")
+
+    FOURAM_REPORT_DATA_NAME = "FOURAM_REPORT_DATA"
+    FOURAM_REPORT_DATA = BaseConfig.get_env_variable(default_var=FOURAM_REPORT_DATA_NAME, default_value="true")
 
 
 class GlobalParams:

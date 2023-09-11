@@ -29,6 +29,12 @@ def pytest_addoption(parser):
 
     # others
     parser.addoption('--locust_patch_switch', action='store_true', default=False, help="rollback locust patch")
+    # go bench
+    parser.addoption("--go_bench_type", action="store", default="parallel",
+                     help="goBench concurrency type, support: parallel, batch")
+    # concurrency type
+    parser.addoption("--concurrency_type", action="store", default="",
+                     help="goBench concurrency type, support: Locust, goBench")
 
     # deploy
     parser.addoption("--milvus_tag", action="store", default=None, help="Milvus container tag")
@@ -135,7 +141,13 @@ def initialize_env(request):
         async_report=request.config.getoption("--async_report"),
 
         # for monkey patch
-        locust_patch_switch=request.config.getoption("--locust_patch_switch")
+        locust_patch_switch=request.config.getoption("--locust_patch_switch"),
+
+        # for go bench
+        go_bench_type=request.config.getoption("--go_bench_type"),
+
+        # concurrency type
+        concurrency_type=request.config.getoption("--concurrency_type")
     )
     log.info("[initialize_milvus] Global parameters: {0}".format(param_info.to_dict()))
     # yield

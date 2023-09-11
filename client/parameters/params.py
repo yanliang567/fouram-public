@@ -158,6 +158,8 @@ class ParamsFormat:
         concurrent_tasks: ([type(list())], MUST)
     }, common_scene_build_index)
 
+    common_scene_go_bench = update_dict_value({}, common_concurrent)
+
 
 # concurrent test parameters
 
@@ -223,6 +225,17 @@ class ConcurrentTaskSearch(DataClassBase):
 
 
 @dataclass
+class ConcurrentGoBenchParamsSearch(DataClassBase):
+    nq: int
+    top_k: int
+    search_param: dict
+    query_file: str
+    timeout: Optional[int] = DefaultValue.default_timeout
+    expr: Optional[str] = ""
+    output_fields: Optional[list] = field(default_factory=lambda: [])
+
+
+@dataclass
 class ConcurrentInputParamsQuery(DataClassBase):
     ids: Optional[list] = None
     expr: Optional[str] = None
@@ -269,6 +282,13 @@ class ConcurrentTaskQuery(DataClassBase):
         for j in ["expr", "random_data", "random_count", "random_range", "field_name", "field_type"]:
             del _p[j]
         return _p
+
+
+@dataclass
+class ConcurrentGoBenchParamsQuery(DataClassBase):
+    expr: Optional[str]
+    timeout: Optional[int] = DefaultValue.default_timeout
+    output_fields: Optional[list] = field(default_factory=lambda: [])
 
 
 @dataclass
@@ -679,7 +699,55 @@ class ConcurrentObjParams(DataClassBase):
 
 
 @dataclass
-class ConcurrentTasksParams:
+class ConcurrentTasksParamsBase:
+    @property
+    def all_obj(self):
+        return list(vars(self).keys())
+
+    @property
+    def to_list(self):
+        return [v for v in self.to_dict.values()]
+
+    @property
+    def to_dict(self):
+        return self.deal_vars(vars(self))
+
+    @staticmethod
+    def deal_vars(input_dict: dict):
+        _input_dict = input_dict
+
+        def recursive_process(_dict: dict):
+            for k, v in _dict.items():
+                if isinstance(v, object) and hasattr(v, "to_dict"):
+                    _dict[k] = v.to_dict
+                elif isinstance(v, dict):
+                    recursive_process(_dict[k])
+
+        def check_object(_dict: dict):
+            global flag
+            flag = False
+
+            def func(_dict: dict):
+                global flag
+                for k, v in _dict.items():
+                    if isinstance(v, dict):
+                        func(v)
+                    elif isinstance(v, object) and hasattr(v, "to_dict"):
+                        flag = True
+
+            func(_dict)
+            return flag
+
+        object_flag = True
+        while object_flag:
+            recursive_process(_input_dict)
+            object_flag = check_object(_input_dict)
+
+        return {k: v for k, v in _input_dict.items() if isinstance(v, dict) and "type" in v and v["type"] != ""}
+
+
+@dataclass
+class ConcurrentTasksParams(ConcurrentTasksParamsBase):
     debug: Optional[ConcurrentObjParams] = ConcurrentObjParams(**{"params": DataClassBase})
     search: Optional[ConcurrentObjParams] = ConcurrentObjParams(**{"params": ConcurrentTaskSearch})
     query: Optional[ConcurrentObjParams] = ConcurrentObjParams(**{"params": ConcurrentTaskQuery})
@@ -702,38 +770,8 @@ class ConcurrentTasksParams:
         **{"params": ConcurrentTaskLoadSearchRelease})
     scene_search_test: Optional[ConcurrentObjParams] = ConcurrentObjParams(**{"params": ConcurrentTaskSceneSearchTest})
 
-    @property
-    def all_obj(self):
-        return list(vars(self).keys())
 
-    @property
-    def to_dict(self):
-        return self.deal_vars(vars(self))
-
-    @staticmethod
-    def deal_vars(input_dict: dict):
-        _input_dict = copy.deepcopy(input_dict)
-
-        def recursive_process(i_d, f_d):
-            for k, v in i_d.items():
-                if isinstance(v, object) and hasattr(v, "to_dict"):
-                    f_d.update({k: v.to_dict})
-                elif isinstance(v, dict):
-                    return recursive_process(i_d[k], f_d[k])
-            return f_d
-
-        def check_object(_dict):
-            if isinstance(_dict, dict):
-                for k in _dict.keys():
-                    if isinstance(_dict[k], dict):
-                        return check_object(_dict[k])
-                    elif isinstance(_dict[k], object) and hasattr(_dict[k], "to_dict"):
-                        return True
-            return False
-
-        object_flag = True
-        while object_flag:
-            _input_dict = recursive_process(_input_dict, _input_dict)
-            object_flag = check_object(_input_dict)
-
-        return _input_dict
+@dataclass
+class ConcurrentGoBenchTasksParams(ConcurrentTasksParamsBase):
+    search: Optional[ConcurrentObjParams] = ConcurrentObjParams(**{"params": ConcurrentGoBenchParamsSearch})
+    query: Optional[ConcurrentObjParams] = ConcurrentObjParams(**{"params": ConcurrentGoBenchParamsQuery})

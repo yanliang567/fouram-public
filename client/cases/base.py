@@ -10,9 +10,9 @@ from client.client_base import (
     ApiFieldSchemaWrapper, ApiUtilityWrapper, ApiRoleWrapper, ApiDBWrapper)
 from client.common.common_func import (
     gen_collection_schema, gen_unique_str, get_file_list, read_npy_file, parser_data_size, loop_files, loop_ids,
-    gen_vectors, gen_entities, run_go_bench_process, go_bench, GoSearchParams, loop_gen_files, remove_list_values,
-    parser_segment_info, gen_scalar_values, update_dict_value, get_default_search_params, parser_search_params_expr,
-    hide_dict_value, gen_random_query_data, read_data_file)
+    gen_vectors, gen_entities, run_go_bench_process, go_bench, go_bench_refine, GoSearchParams, loop_gen_files,
+    remove_list_values, parser_segment_info, gen_scalar_values, update_dict_value, get_default_search_params,
+    parser_search_params_expr, hide_dict_value, gen_random_query_data, read_data_file)
 from client.common.common_param import TransferNodesParams, TransferReplicasParams
 from client.common.common_type import Precision, CheckTasks
 from client.common.common_type import DefaultValue as dv
@@ -527,6 +527,22 @@ class Base:
                         concurrent_number=concurrent_number, during_time=during_time, interval=interval,
                         log_path=log.log_info, output_format=output_format, partition_names=partition_names,
                         secure=secure, user=user, password=password, json_file_path=go_search_params.json_file_path)
+
+    @staticmethod
+    def go_bench(case_params: dict, concurrency_type: str = "parallel", uri="", go_benchmark="", output_format="json",
+                 secure=False) -> dict:
+        """
+        :return: dict
+        """
+        go_benchmark = go_benchmark or EnvVariable.MILVUS_GOBENCH_PATH
+        uri = uri or "{0}:{1}".format(param_info.param_host, param_info.param_port)
+        secure = secure or param_info.param_secure
+        user = param_info.param_user
+        password = param_info.param_password
+
+        return go_bench_refine(go_benchmark=go_benchmark, uri=uri, case_params=case_params, log_path=log.log_info,
+                               concurrency_type=concurrency_type, output_format=output_format,
+                               secure=secure, user=user, password=password)
 
     def _transfer_nodes(self, source: str, target: str, num_node: int):
         if num_node > 0:

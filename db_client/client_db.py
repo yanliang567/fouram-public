@@ -4,6 +4,18 @@ from db_client.client_influx_db import ClientInfluxDB
 from db_client.client_mongo_db import ClientMongoDB
 from utils.util_log import log
 from commons.common_func import dict2str
+from commons.common_params import EnvVariable
+
+
+def db_client_catch():
+    """ Check whether data needs to be reported. """
+    def wrapper(func):
+        def inner_wrapper(*args, **kwargs):
+            if str(EnvVariable.FOURAM_REPORT_DATA).lower() == "true":
+                return func(*args, **kwargs)
+            log.info(f"[db_client_catch] Data reporting is disabled:{EnvVariable.FOURAM_REPORT_DATA}")
+        return inner_wrapper
+    return wrapper
 
 
 class DBClient:
@@ -16,10 +28,12 @@ class DBClient:
         self.mongo_db_clients = []
         self.init_clients()
 
+    # @db_client_catch()
     def influx_insert(self, tags=None, fields=None, time=None, measurement=None):
         for c in self.influx_db_clients + self.influx_db_v1_clients:
             c.insert(measurement=measurement, tags=tags, fields=fields, time=time)
 
+    # @db_client_catch()
     def mongo_insert(self, data):
         for c in self.mongo_db_clients:
             c.insert(dict2str(data))
@@ -50,6 +64,7 @@ class DBClient:
                 log.error("[DBClient] Failed to initialize MongoDB client : {}".format(k))
         log.debug("[DBClient] MongoDB client numbers: {}".format(len(self.mongo_db_clients)))
 
+    @db_client_catch()
     def init_clients(self):
         self._influx_v1()
         self._influx_v2()
