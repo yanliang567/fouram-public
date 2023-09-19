@@ -116,6 +116,9 @@ distances = "distances"
 NUMPY = "npy"
 PARQUET = "parquet"
 
+# data type name lower
+ARRAY = "array"
+
 
 class AccDatasetsName:
     sift_128_euclidean = "sift-128-euclidean"

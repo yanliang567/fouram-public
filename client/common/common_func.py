@@ -48,15 +48,32 @@ def field_type():
     return data_types
 
 
+def get_array_element_type(data_type: str):
+    if hasattr(DataType, "ARRAY") and data_type.startswith(pn.ARRAY):
+        element_type = data_type.lstrip(pn.ARRAY).lstrip("_")
+        for _field in field_type().keys():
+            if element_type.startswith(_field.lower()):
+                return _field, eval(f"DataType.{_field}")
+        raise ValueError(f"[get_array_data_type] Can't find element type:{element_type} for array:{data_type}")
+    raise ValueError(f"[get_array_data_type] Data type is not start with array: {data_type}")
+
+
 def gen_field_schema(name: str, dtype=None, description=dv.default_desc, is_primary=False, scalars_params={}, **kwargs):
     field_types = field_type()
     if dtype is None:
         for _field in field_types.keys():
             if name.startswith(_field.lower()):
                 _kwargs = {}
-                if _field in ["STRING", "VARCHAR"]:
+
+                _field_element, _data_type = _field, DataType.NONE
+                if hasattr(DataType, "ARRAY") and _field.lower() == pn.ARRAY:
+                    _field_element, _data_type = get_array_element_type(name)
+                    _kwargs.update({"max_capacity": kwargs.get("max_capacity", dv.default_array_max_capacity),
+                                    "element_type": _data_type})
+
+                if _field_element in ["STRING", "VARCHAR"]:
                     _kwargs.update({"max_length": kwargs.get("max_length", dv.default_max_length)})
-                elif _field in ["BINARY_VECTOR", "FLOAT_VECTOR"]:
+                elif _field_element in ["BINARY_VECTOR", "FLOAT_VECTOR"]:
                     _kwargs.update({"dim": kwargs.get("dim", dv.default_dim)})
 
                 _kwargs.update(scalars_params.get(name, {}).get("params", {}))
@@ -247,18 +264,22 @@ def gen_ids(start_id, end_id):
 
 
 def gen_values(data_type, vectors, ids, varchar_filled=False, field={}, default_value=None, other_params={}):
+    _field_element = data_type
+    if str(field["name"]).lower().startswith(pn.ARRAY):
+        _, _field_element = get_array_element_type(field["name"])
+
     values = None
     if default_value is not None and isinstance(default_value, list) and len(default_value) != 0:
-        values = default_value
-    elif data_type in [DataType.INT8, DataType.INT16, DataType.INT32, DataType.INT64]:
+        return default_value
+    elif _field_element in [DataType.INT8, DataType.INT16, DataType.INT32, DataType.INT64]:
         values = ids
-    elif data_type in [DataType.DOUBLE]:
+    elif _field_element in [DataType.DOUBLE]:
         values = [(i + 0.0) for i in ids]
-    elif data_type == DataType.FLOAT:
+    elif _field_element == DataType.FLOAT:
         values = pd.Series(data=[(i + 0.0) for i in ids], dtype="float32")
-    elif data_type in [DataType.FLOAT_VECTOR, DataType.BINARY_VECTOR]:
+    elif _field_element in [DataType.FLOAT_VECTOR, DataType.BINARY_VECTOR]:
         values = vectors
-    elif data_type in [DataType.VARCHAR]:
+    elif _field_element in [DataType.VARCHAR]:
         varchar_filled = other_params.get("varchar_filled", varchar_filled)
         if varchar_filled is False:
             values = [str(i) for i in ids]
@@ -269,10 +290,13 @@ def gen_values(data_type, vectors, ids, varchar_filled=False, field={}, default_
             for i in range(int(_len / len(_str))):
                 _s += _str
             values = [''.join(random.sample(_s, _len - 1)) for i in ids]
-    elif data_type in [DataType.BOOL]:
+    elif _field_element in [DataType.BOOL]:
         values = [bool(sum(np.fromstring(str(_id), dtype=np.uint8)) & 1) for _id in ids]
-    elif hasattr(DataType, "JSON") and data_type in [DataType.JSON]:
+    elif hasattr(DataType, "JSON") and _field_element in [DataType.JSON]:
         values = [{"id": i} for i in ids]
+
+    if str(field["name"]).lower().startswith(pn.ARRAY):
+        values = [[v] * int(field["params"]["max_capacity"]) for v in values]
     return values
 
 

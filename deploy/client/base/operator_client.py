@@ -167,7 +167,7 @@ class OperatorClient(BaseClient):
         log.info("[delete_pvc] Delete pvc:{0}, namespace:{1}".format(list(pvc_names), namespace))
         return results
 
-    def wait_for_healthy(self, release_name: str, namespace=None, timeout=600):
+    def wait_for_healthy(self, release_name: str, namespace=None, timeout=1800):
         release_name = release_name or self.release_name
         namespace = namespace or self.namespace
 

@@ -143,7 +143,7 @@ class ApiCollectionWrapper:
     def query(self, expr, output_fields=None, partition_names=None, timeout=None, check_task=None, check_items=None,
               **kwargs):
         func_name = sys._getframe().f_code.co_name
-        res, res_result = api_request([self.collection.query, expr, output_fields, partition_names, timeout])
+        res, res_result = api_request([self.collection.query, expr, output_fields, partition_names, timeout], **kwargs)
         check_result = ResponseChecker(res, func_name, check_task, check_items, res_result, expression=expr,
                                        partition_names=partition_names, output_fields=output_fields, timeout=timeout,
                                        **kwargs).run()

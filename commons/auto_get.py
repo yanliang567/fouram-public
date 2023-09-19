@@ -43,7 +43,8 @@ class AutoGetTag:
             res = self.req.get(url=url, headers=headers)
             for r in res:
                 t = r["tags"][0]["name"] if isinstance(r["tags"], list) else r["tags"]
-                if str(t).startswith(self.prefix) and t != self.tag_name and len(str(t).split('-')) == 3:
+                if str(t).startswith(self.prefix) and not str(t).startswith(self.tag_name) \
+                        and len(str(t).split('-')) == 3:
                     log.info("[AutoGetTag] The image name used is %s" % str(t))
                     return t
             return self.tag_name
