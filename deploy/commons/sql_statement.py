@@ -65,6 +65,14 @@ def sql_insert_cust_instance_node(mysql_client: ClientMySql, instance_id: str, c
     return mysql_client.insert(insert_sql)
 
 
+def sql_query_instance_class_oversold_class_id(
+        mysql_client: ClientMySql, class_id: str, db="resource.instance_class_oversold",
+        other_params: str = " and node_category is null and user_id is null and instance_id is null"):
+    sql = "SELECT * FROM {0} where class_id = '{1}' " + other_params + ";"
+    query_sql = sql.format(db, class_id)
+    return mysql_client.query(query_sql)
+
+
 def sql_query_instance_class_oversold(mysql_client: ClientMySql, instance_id: str,
                                       db="resource.instance_class_oversold"):
     sql = "SELECT * FROM {0} where instance_id = '{1}';"
@@ -125,6 +133,13 @@ def sql_insert_child_class_template(mysql_client: ClientMySql, child_class_id: s
 
 def sql_query_child_instance_class(mysql_client: ClientMySql, parent_class_id: str, region_id: int,
                                    db="resource.child_instance_class"):
+    sql = "SELECT * FROM {0} where parent_class_id = '{1}' and region_id = '{2}';"
+    query_sql = sql.format(db, parent_class_id, region_id)
+    return mysql_client.query(query_sql)
+
+
+def sql_query_child_instance_class_with_global(mysql_client: ClientMySql, parent_class_id: str, region_id: int,
+                                               db="resource.child_instance_class_with_global"):
     sql = "SELECT * FROM {0} where parent_class_id = '{1}' and region_id = '{2}';"
     query_sql = sql.format(db, parent_class_id, region_id)
     return mysql_client.query(query_sql)

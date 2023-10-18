@@ -40,7 +40,8 @@ class OperatorConfig(BaseConfig):
         self.kafka_local_path = self._dependencies(kafka, self.kafka_dict)
 
         # standalone rocksmq local-path
-        self.standalone_local_path = self._dependencies(rocksmq, self.standalone_dict)
+        self.standalone_local_path = {}
+        # self.standalone_local_path = self._dependencies(rocksmq, self.standalone_dict)
         # self.standalone_local_path = {"spec": self.standalone_dict}
 
         # base config

@@ -1,4 +1,5 @@
 import time
+import json
 import operator
 from datetime import datetime
 
@@ -13,8 +14,10 @@ from deploy.commons.sql_statement import (
     sql_query_instance_class, sql_insert_instance_class,
     sql_query_cust_instance_node, sql_delete_cust_instance_node, sql_insert_cust_instance_node,
     sql_query_instance_class_oversold, sql_delete_instance_class_oversold, sql_insert_instance_class_oversold,
+    sql_query_instance_class_oversold_class_id,
     sql_insert_child_class_template,
-    sql_query_child_instance_class)
+    sql_query_child_instance_class,
+    sql_query_child_instance_class_with_global)
 
 from commons.common_params import EnvVariable
 from commons.common_type import LogLevel
@@ -329,6 +332,9 @@ class VDCClientBase:
         # verify instance status is running after modify
         assert self.check_server_status()
 
+        # display server after modification
+        self.display_server(log_level=LogLevel.DEBUG)
+
         # verify milvus component resources upgrade
         assert self.check_instance_resources(class_mode=class_mode)
 
@@ -347,11 +353,22 @@ class VDCClientBase:
         # Record server init status
         self.display_server(log_level=LogLevel.DEBUG)
 
+        # get all values
+        res = self.cloud_rm_api.params_list(instance_id=self.real_instance_id)
+        if "list" in res.data and len(res.data["list"]) > 0 and isinstance(res.data["list"], list):
+            all_values = [i["paramName"] for i in res.data["list"]]
+        else:
+            all_values = []
+            self._raise(f"[VDCClientBase] Can't get instance's:{self.instance_name} config values:{res}")
+
         # modify instance parameters
         log.debug(f"[VDCClientBase] modify params: {modify_params}")
         for param_name, param_value in modify_params.items():
-            self.cloud_rm_api.modify_instance_params(self.real_instance_id, param_name, param_value,
-                                                     user_id=self.real_user_id)
+            obj = self.cloud_rm_api.params_modify if param_name in all_values else self.cloud_rm_api.params_add
+            res = obj(self.real_instance_id, param_name, param_value, user_id=self.real_user_id, check_result=False)
+            if res.code not in [RMErrorCode.INSTANCE_PARAM_NO_NEED_MODIFY, 0]:
+                self._raise(f"[VDCClientBase] Update milvus param {param_name}:{param_value} failed:{res}")
+
         if instance_type == InstanceType.Milvus:
             # stop instance and check stopped
             self.stop_server()
@@ -368,6 +385,21 @@ class VDCClientBase:
             log.info(f"[VDCClientBase] Modify serverless instance:{self.real_instance_id} parameters completed.")
         else:
             self._raise(f"[VDCClientBase] Unrecognized instance type {instance_type}")
+
+        # check values
+        res = self.cloud_rm_api.params_list(instance_id=self.real_instance_id)
+        if "list" in res.data and len(res.data["list"]) > 0 and isinstance(res.data["list"], list):
+            final_values = {i["paramName"]: i["currentValue"] for i in res.data["list"] if
+                            i["paramName"] in modify_params}
+            log.info(f"[VDCClientBase] Check modify params:{modify_params}, result:{final_values}")
+
+            for param_name, param_value in modify_params.items():
+                if isinstance(param_value, bool):
+                    param_value = "true" if param_value else "false"
+                assert final_values[param_name] == str(param_value)
+        else:
+            self._raise(
+                f"[VDCClientBase] Modify instance params failed, modify_params:{modify_params}, result:{res.data}")
 
     def infra_update_resource(self, resource: dict, instance_type: InstanceType = InstanceType.Milvus):
         """
@@ -595,11 +627,17 @@ class VDCClientBase:
 
     # Others
     def check_instance_resources(self, class_mode: str):
-        """ Check host instance """
+        """
+        Check host instance
+
+        Only check pod resource for modify class id in general
+        """
         class_id = eval(f"ClassID.{class_mode}")
 
         # get pod resources from mysql db
-        child_classes = deal_child_instance_class(sql_query_child_instance_class(self.mysql, class_id, self.region_id))
+        # deal_child_instance_class(sql_query_child_instance_class(self.mysql, class_id, self.region_id))
+        child_classes = deal_child_instance_class(
+            sql_query_child_instance_class_with_global(self.mysql, class_id, self.region_id))
 
         log.info("[VDCClientBase] Check resource for instance:%s, class_mode:%s, class_id:%s" % (
             self.instance_name, class_mode, class_id))
@@ -608,18 +646,29 @@ class VDCClientBase:
 
             res = self.get_specified_pod_resources(component=component, instance_id=self.real_instance_id,
                                                    namespace=self.ns)
-            pods = res["items"]
+            pods = self.filter_terminated_pods(res["items"])
 
             if 0 == len(pods):
                 self._raise(f"[VDCClientBase] Not pods need to check resources: {res}")
             # check pod numbers
             assert len(pods) == v['replicas']
 
+            # get pod resource from instance_class table
             sql_classes = sql_query_instance_class(self.mysql, class_id=v["child_class_id"], region_id=self.region_id)
             if len(sql_classes) != 1:
                 self._raise("[VDCClientBase] child_class_id:%s in the instance_class table isn't unique, len:%s, %s" % (
                     v["child_class_id"], len(sql_classes), sql_classes))
             cpu_cores, mem_size = sql_classes[0]["cpu_cores"], sql_classes[0]["mem_size"]
+
+            # get pod resource from instance_class_oversold table
+            sql_classes_oversold = sql_query_instance_class_oversold_class_id(self.mysql, class_id=v["child_class_id"])
+            if len(sql_classes_oversold) != 1:
+                self._raise(
+                    "[VDCClientBase] child_class_id:%s in instance_class_oversold table isn't unique, len:%s, %s" % (
+                        v["child_class_id"], len(sql_classes), sql_classes))
+            extend_fields = json.loads(sql_classes_oversold[0]["extend_fields"])
+            cpu_cores = extend_fields.get("limits.cpu", cpu_cores)
+            mem_size = extend_fields.get("limits.memory", mem_size)
 
             # check pod resource
             for pod in pods:
@@ -706,3 +755,13 @@ class VDCClientBase:
             label_selectors += "," + _instance_label if label_selectors else _instance_label
 
         return self.dc_pod_client.get(namespace=namespace, label_selector=label_selectors)
+
+    @staticmethod
+    def filter_terminated_pods(pod_list: list):
+        result_list = []
+        for p in pod_list:
+            if not ("metadata" in p and "deletionTimestamp" in p["metadata"]):
+                result_list.append(p)
+                log.debug("[VDCClientBase] Add not terminated pod: {0}".format(p["metadata"].keys()))
+        log.debug(f"[VDCClientBase] PodList:{len(pod_list)} after filter terminated pod:{len(result_list)}")
+        return result_list

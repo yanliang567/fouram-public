@@ -596,9 +596,10 @@ def gen_db_resource(source: dict, instance_id: str, class_id: list, db_raw: list
                     # set class id name
                     # fouram_id = "fouram-{0}c{1}g-{2}-{3}".format(
                     #     l_cpu, is_number(l_memory / 1024.0), eval(f"RMNodeCategory.{k}"), instance_id[-8:])
-                    fouram_id = parser_class_id_name(
-                        m_value="{0}c{1}g-{2}".format(l_cpu, is_number(l_memory / 1024.0), eval(f"RMNodeCategory.{k}")),
-                        l_value=instance_id)
+                    name_mem = is_number(l_memory / 1024.0)
+                    name_node_category = eval(f"RMNodeCategory.{k}")
+                    fouram_id = parser_class_id_name(m_value=f"{l_cpu}c{name_mem}g-{name_node_category}",
+                                                     l_value=instance_id)
 
                     class_id.append((fouram_id, l_cpu, l_memory))
                     db_raw.append((k, int(v["replicas"]), fouram_id, l_cpu, l_memory))

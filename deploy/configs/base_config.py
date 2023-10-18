@@ -16,30 +16,35 @@ class BaseConfig(metaclass=abc.ABCMeta):
         self.healthy_check_dict = {"livenessProbe": {"enabled": False}, "readinessProbe": {"enabled": False}}
 
         # minio local-path and metrics
-        self.storage_dict = {"persistence": {"storageClass": "local-path"},
-                             # "nodeSelector": {"disk": "large"},
-                             "metrics": {"podMonitor": {"enabled": True}},
-                             }
+        self.storage_dict = {
+            # "persistence": {"storageClass": "local-path"},
+            # "nodeSelector": {"disk": "large"},
+            "metrics": {"podMonitor": {"enabled": True}},
+        }
 
         # etcd local-path and metrics
-        self.etcd_dict = {"global": {"storageClass": "local-path"},
-                          "metrics": {"enabled": True,
-                                      "podMonitor": {"enabled": True}}}
+        self.etcd_dict = {
+            # "global": {"storageClass": "local-path"},
+            "metrics": {"enabled": True,
+                        "podMonitor": {"enabled": True}}}
 
         # etcd node selector
         self.etcd_node_selector_dict = {}
         # self.etcd_node_selector_dict = {"nodeSelector": {"node-role.kubernetes.io/etcd": "etcd"}}
 
         # pulsar local-path
-        self.pulsar_dict = {"bookkeeper": {"volumes": {"journal": {"storageClassName": "local-path"},
-                                                       "ledgers": {"storageClassName": "local-path"}}},
-                            "zookeeper": {"volumes": {"data": {"storageClassName": "local-path"}}}}
+        self.pulsar_dict = {}
+        # self.pulsar_dict = {"bookkeeper": {"volumes": {"journal": {"storageClassName": "local-path"},
+        #                                                "ledgers": {"storageClassName": "local-path"}}},
+        #                     "zookeeper": {"volumes": {"data": {"storageClassName": "local-path"}}}}
 
         # kafka local-path
-        self.kafka_dict = {"persistence": {"storageClass": "local-path"}}
+        self.kafka_dict = {}
+        # self.kafka_dict = {"persistence": {"storageClass": "local-path"}}
 
         # standalone local-path
-        self.standalone_dict = {"persistence": {"persistentVolumeClaim": {"storageClass": "local-path"}}}
+        self.standalone_dict = {}
+        # self.standalone_dict = {"persistence": {"persistentVolumeClaim": {"storageClass": "local-path"}}}
 
         # The value to reset after inheriting the class
         # set log level

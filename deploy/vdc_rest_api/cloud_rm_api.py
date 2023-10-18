@@ -136,7 +136,7 @@ class CloudRMApi:
         return self.req.get(url=url, headers=self.headers, log_level=log_level)
 
     @request_catch()
-    def modify_instance_params(self, instance_id: str,  parameter_name: str, parameter_value: str, user_id: str = "",
+    def modify_instance_params(self, instance_id: str, parameter_name: str, parameter_value: str, user_id: str = "",
                                log_level=Log_Level) -> RequestResponseParser:
         url = self.host + "/resource/v1/parameter/milvus/modifyInstanceParams"
         body = {
@@ -145,6 +145,40 @@ class CloudRMApi:
             "parameterValue": parameter_value
         }
         return self.req.post(url=url, body=body, headers=self.update_headers(user_id=user_id), log_level=log_level)
+
+    """ Params Manager """
+
+    @request_catch()
+    def params_add(self, instance_id: str, parameter_name: str, parameter_value: str, user_id: str = "",
+                   log_level=Log_Level) -> RequestResponseParser:
+        url = self.host + "/resource/v1/param/milvus/add"
+        body = {
+            "paramPropertyDisplay": False,
+            "instanceId": instance_id,
+            "paramName": parameter_name,
+            "paramValue": parameter_value,
+            "paramPropertyRestart": False
+        }
+        return self.req.post(url=url, body=body, headers=self.update_headers(user_id=user_id), log_level=log_level)
+
+    @request_catch()
+    def params_modify(self, instance_id: str, parameter_name: str, parameter_value: str, user_id: str = "",
+                      log_level=Log_Level) -> RequestResponseParser:
+        url = self.host + "/resource/v1/param/milvus/modify"
+        body = {
+            "backendModify": False,
+            "force": True,
+            "instanceId": instance_id,
+            "paramName": parameter_name,
+            "paramValue": parameter_value,
+            "switchType": 0
+        }
+        return self.req.post(url=url, body=body, headers=self.update_headers(user_id=user_id), log_level=log_level)
+
+    @request_catch()
+    def params_list(self, instance_id: str, log_level=Log_Level) -> RequestResponseParser:
+        url = self.host + "/resource/v1/param/milvus/list?all=true&instanceId={0}".format(instance_id)
+        return self.req.get(url=url, headers=self.headers, log_level=log_level)
 
     """ Inner Api Manager """
 

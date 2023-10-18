@@ -272,6 +272,8 @@ def gen_values(data_type, vectors, ids, varchar_filled=False, field={}, default_
     if default_value is not None and isinstance(default_value, list) and len(default_value) != 0:
         return default_value
     elif _field_element in [DataType.INT8, DataType.INT16, DataType.INT32, DataType.INT64]:
+        # int8: [-128, 127]
+        # int16: [-32768, 32767]
         values = ids
     elif _field_element in [DataType.DOUBLE]:
         values = [(i + 0.0) for i in ids]

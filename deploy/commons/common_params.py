@@ -124,7 +124,7 @@ class ClassID(ClassIDMem, ClassIDDisk):
     pass
 
 
-class RMNodeCategory(enum.Enum):
+class RMNodeCategory:
     proxy = 1
     RootCoord = 2
     QueryCoord = 3

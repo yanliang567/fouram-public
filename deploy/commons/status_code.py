@@ -5,6 +5,7 @@ class CloudServiceStatus:
 
 class RMErrorCode:
     RequestBusy = 15
+    INSTANCE_PARAM_NO_NEED_MODIFY = 40052
 
 
 class InstanceStatus:
