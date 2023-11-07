@@ -399,14 +399,22 @@ class ConcurrentTaskUpsert(ConcurrentTaskInsert):
 
 @dataclass
 class ConcurrentInputParamsDelete(DataClassBase):
+    expr: Optional[str] = None
     delete_length: Optional[int] = 1
     timeout: Optional[int] = DefaultValue.default_timeout
 
 
 @dataclass
 class ConcurrentTaskDelete(DataClassBase):
+    expr: Optional[str] = None
     delete_length: Optional[int] = 1
     timeout: Optional[int] = DefaultValue.default_timeout
+
+    @property
+    def get_expr(self):
+        if self.expr:
+            return self.expr
+        return "id in {}".format(self.get_ids)
 
     @property
     def get_ids(self):

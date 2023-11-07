@@ -804,7 +804,7 @@ class Base:
         return self.collection_wrap.upsert(entities, check_task=CheckTasks.assert_result, **params.obj_params)
 
     def concurrent_delete(self, params: ConcurrentTaskDelete):
-        return self.collection_wrap.delete(expr="id in {}".format(params.get_ids), check_task=CheckTasks.assert_result,
+        return self.collection_wrap.delete(expr=params.get_expr, check_task=CheckTasks.assert_result,
                                            **params.obj_params)
 
     @func_time_catch()

@@ -164,12 +164,14 @@ class ConcurrentParams(CommonParams):
                            "varchar_filled": varchar_filled}}
 
     @staticmethod
-    def params_delete(weight=1, delete_length=1, timeout: int = 30):
+    def params_delete(weight=1, expr: str = "", delete_length: int = 1, timeout: int = 30):
         """
+        expr: Optional[str] = None
         delete_length: Optional[int] = 1
         timeout: Optional[int] = 30
         """
-        return {"type": "delete", "weight": weight, "params": {"delete_length": delete_length, "timeout": timeout}}
+        return {"type": "delete", "weight": weight,
+                "params": {"expr": expr, "delete_length": delete_length, "timeout": timeout}}
 
     @staticmethod
     def params_scene_test(weight=1, dim=DefaultValue.default_dim, data_size=3000, nb=3000,
@@ -335,8 +337,8 @@ class ConcurrentParams(CommonParams):
 
         base_default_params = self.base(dataset_name=dataset_name, dim=dim, dataset_size=dataset_size, ni_per=ni_per,
                                         other_fields=other_fields, shards_num=shards_num, metric_type=metric_type,
-                                        index_type=index_type, index_param=index_param, reset_rg=reset_rg, groups=groups,
-                                        replica_number=replica_number, resource_groups=resource_groups,
+                                        index_type=index_type, index_param=index_param, reset_rg=reset_rg,
+                                        groups=groups, replica_number=replica_number, resource_groups=resource_groups,
                                         reset_rbac=reset_rbac, reset_db=reset_db)
         concurrent_default_params = self.concurrent_base(concurrent_number=concurrent_number, during_time=during_time,
                                                          interval=interval, concurrent_tasks=concurrent_tasks,
