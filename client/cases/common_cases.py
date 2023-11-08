@@ -10,7 +10,7 @@ from client.common.common_type import Precision, CaseIterParams
 from client.common.common_type import DefaultValue as dv
 from client.common.common_func import (
     gen_combinations, update_dict_value, get_vector_type, get_default_field_name, get_vectors_from_binary,
-    parser_search_params_expr, get_ground_truth_ids, get_search_ids, get_recall_value, get_input_params,
+    parser_search_params_expr, get_ground_truth_ids, get_search_ids, get_recall_value, ParserInputParams,
     write_json_file, gen_go_bench_json_file)
 
 from commons.common_params import EnvVariable
@@ -260,11 +260,11 @@ class InsertBatch(CommonCases):
         :return:
         """
         # params prepare
-        params, prepare, prepare_clean, _, clean_collection = get_input_params(**kwargs)
+        input_params = ParserInputParams(**kwargs)
         log.info("[InsertBatch] The detailed test steps are as follows: {}".format(self))
 
         # params parsing
-        self.parsing_params(params)
+        self.parsing_params(input_params.params)
         vector_type = get_vector_type(self.params_obj.dataset_params[pn.dataset_name])
         vector_default_field_name = get_default_field_name(
             vector_type, self.params_obj.dataset_params.get(pn.vector_field_name, ""))
@@ -272,7 +272,7 @@ class InsertBatch(CommonCases):
 
         def run(ni):
             try:
-                self.prepare_collection(vector_default_field_name, prepare, prepare_clean)
+                self.prepare_collection(vector_default_field_name, input_params.prepare, input_params.prepare_clean)
                 self.prepare_insert(data_type=self.params_obj.dataset_params[pn.dataset_name],
                                     dim=self.params_obj.dataset_params[pn.dim],
                                     size=self.params_obj.dataset_params[pn.dataset_size], ni=ni)
@@ -284,14 +284,14 @@ class InsertBatch(CommonCases):
 
         params_list = []
         for i in ni_per:
-            actual_params_used = update_dict_value({pn.dataset_params: {pn.ni_per: i}}, params)
+            actual_params_used = update_dict_value({pn.dataset_params: {pn.ni_per: i}}, input_params.params)
             p = CaseIterParams(callable_object=run, object_args=[i],
                                actual_params_used=actual_params_used, case_type=self.__class__.__name__)
             params_list.append(p)
         yield params_list
 
         # clear env
-        self.clear_collections(clean_collection=clean_collection)
+        self.clear_collections(clean_collection=input_params.clean_collection)
         yield True
 
 
@@ -319,18 +319,18 @@ class BuildIndex(CommonCases):
         :return:
         """
         # params prepare
-        params, prepare, prepare_clean, _, clean_collection = get_input_params(**kwargs)
+        input_params = ParserInputParams(**kwargs)
         log.info("[BuildIndex] The detailed test steps are as follows: {}".format(self))
 
         # params parsing
-        self.parsing_params(params)
+        self.parsing_params(input_params.params)
         vector_type = get_vector_type(self.params_obj.dataset_params[pn.dataset_name])
         vector_default_field_name = get_default_field_name(
             vector_type, self.params_obj.dataset_params.get(pn.vector_field_name, ""))
 
         # prepare data
-        self.prepare_collection(vector_default_field_name, prepare, prepare_clean)
-        if prepare:
+        self.prepare_collection(vector_default_field_name, input_params.prepare, input_params.prepare_clean)
+        if input_params.prepare:
             self.prepare_insert(data_type=self.params_obj.dataset_params[pn.dataset_name],
                                 dim=self.params_obj.dataset_params[pn.dim],
                                 size=self.params_obj.dataset_params[pn.dataset_size],
@@ -350,12 +350,13 @@ class BuildIndex(CommonCases):
                 return {}, False
 
         params_list = []
-        p = CaseIterParams(callable_object=run, actual_params_used=params, case_type=self.__class__.__name__)
+        p = CaseIterParams(callable_object=run, actual_params_used=input_params.params,
+                           case_type=self.__class__.__name__)
         params_list.append(p)
         yield params_list
 
         # clear env
-        self.clear_collections(clean_collection=clean_collection)
+        self.clear_collections(clean_collection=input_params.clean_collection)
         yield True
 
 
@@ -385,18 +386,18 @@ class Load(CommonCases):
         :return:
         """
         # params prepare
-        params, prepare, prepare_clean, rebuild_index, clean_collection = get_input_params(**kwargs)
+        input_params = ParserInputParams(**kwargs)
         log.info("[Load] The detailed test steps are as follows: {}".format(self))
 
         # params parsing
-        self.parsing_params(params)
+        self.parsing_params(input_params.params)
         vector_type = get_vector_type(self.params_obj.dataset_params[pn.dataset_name])
         vector_default_field_name = get_default_field_name(
             vector_type, self.params_obj.dataset_params.get(pn.vector_field_name, ""))
 
         # prepare data
-        self.prepare_collection(vector_default_field_name, prepare, prepare_clean)
-        if prepare:
+        self.prepare_collection(vector_default_field_name, input_params.prepare, input_params.prepare_clean)
+        if input_params.prepare:
             self.prepare_insert(data_type=self.params_obj.dataset_params[pn.dataset_name],
                                 dim=self.params_obj.dataset_params[pn.dim],
                                 size=self.params_obj.dataset_params[pn.dataset_size],
@@ -406,7 +407,7 @@ class Load(CommonCases):
         # if pass in rebuild_index, indexes of collection will be dropped before building index
         self.prepare_index(vector_field_name=vector_default_field_name,
                            metric_type=self.params_obj.dataset_params[pn.metric_type],
-                           clean_index_before=rebuild_index)
+                           clean_index_before=input_params.rebuild_index)
         self.count_entities()
 
         # load collection
@@ -419,12 +420,13 @@ class Load(CommonCases):
                 return {}, False
 
         params_list = []
-        p = CaseIterParams(callable_object=run, actual_params_used=params, case_type=self.__class__.__name__)
+        p = CaseIterParams(callable_object=run, actual_params_used=input_params.params,
+                           case_type=self.__class__.__name__)
         params_list.append(p)
         yield params_list
 
         # clear env
-        self.clear_collections(clean_collection=clean_collection)
+        self.clear_collections(clean_collection=input_params.clean_collection)
         yield True
 
 
@@ -454,18 +456,18 @@ class Query(CommonCases):
         :return:
         """
         # params prepare
-        params, prepare, prepare_clean, rebuild_index, clean_collection = get_input_params(**kwargs)
+        input_params = ParserInputParams(**kwargs)
         log.info("[Query] The detailed test steps are as follows: {}".format(self))
 
         # params parsing
-        self.parsing_params(params)
+        self.parsing_params(input_params.params)
         vector_type = get_vector_type(self.params_obj.dataset_params[pn.dataset_name])
         vector_default_field_name = get_default_field_name(
             vector_type, self.params_obj.dataset_params.get(pn.vector_field_name, ""))
 
         # prepare data
-        self.prepare_collection(vector_default_field_name, prepare, prepare_clean)
-        if prepare:
+        self.prepare_collection(vector_default_field_name, input_params.prepare, input_params.prepare_clean)
+        if input_params.prepare:
             self.prepare_insert(data_type=self.params_obj.dataset_params[pn.dataset_name],
                                 dim=self.params_obj.dataset_params[pn.dim],
                                 size=self.params_obj.dataset_params[pn.dataset_size],
@@ -475,7 +477,7 @@ class Query(CommonCases):
         # if pass in rebuild_index, indexes of collection will be dropped before building index
         self.prepare_index(vector_field_name=vector_default_field_name,
                            metric_type=self.params_obj.dataset_params[pn.metric_type],
-                           clean_index_before=rebuild_index)
+                           clean_index_before=input_params.rebuild_index)
         self.count_entities()
 
         # load collection
@@ -495,12 +497,13 @@ class Query(CommonCases):
                 return {}, False
 
         params_list = []
-        p = CaseIterParams(callable_object=run, actual_params_used=params, case_type=self.__class__.__name__)
+        p = CaseIterParams(callable_object=run, actual_params_used=input_params.params,
+                           case_type=self.__class__.__name__)
         params_list.append(p)
         yield params_list
 
         # clear env
-        self.clear_collections(clean_collection=clean_collection)
+        self.clear_collections(clean_collection=input_params.clean_collection)
         yield True
 
     @check_params(ParamsFormat.common_scene_query_expr)
@@ -541,18 +544,18 @@ class Search(CommonCases):
         """
 
         # params prepare
-        params, prepare, prepare_clean, rebuild_index, clean_collection = get_input_params(**kwargs)
+        input_params = ParserInputParams(**kwargs)
         log.info("[Search] The detailed test steps are as follows: {}".format(self))
 
         # params parsing
-        self.parsing_params(params)
+        self.parsing_params(input_params.params)
         vector_type = get_vector_type(self.params_obj.dataset_params[pn.dataset_name])
         vector_default_field_name = get_default_field_name(
             vector_type, self.params_obj.dataset_params.get(pn.vector_field_name, ""))
 
         # prepare data
-        self.prepare_collection(vector_default_field_name, prepare, prepare_clean)
-        if prepare is True:
+        self.prepare_collection(vector_default_field_name, input_params.prepare, input_params.prepare_clean)
+        if input_params.prepare is True:
             self.prepare_index(vector_field_name=vector_default_field_name,
                                metric_type=self.params_obj.dataset_params[pn.metric_type],
                                clean_index_before=True)
@@ -565,10 +568,10 @@ class Search(CommonCases):
                                metric_type=self.params_obj.dataset_params[pn.metric_type])
         else:
             # if pass in rebuild_index, indexes of collection will be dropped before building index
-            if rebuild_index:
+            if input_params.rebuild_index:
                 self.prepare_index(vector_field_name=vector_default_field_name,
                                    metric_type=self.params_obj.dataset_params[pn.metric_type],
-                                   clean_index_before=rebuild_index)
+                                   clean_index_before=input_params.rebuild_index)
         self.count_entities()
         # load collection
         self.prepare_load(**self.params_obj.load_params)
@@ -592,7 +595,7 @@ class Search(CommonCases):
             search_params, nq, top_k, expr, other_params = self.search_param_analysis(
                 s_p, vector_default_field_name, self.params_obj.dataset_params[pn.metric_type])
 
-            actual_params_used = copy.deepcopy(params)
+            actual_params_used = copy.deepcopy(input_params.params)
             actual_params_used[pn.search_params] = update_dict_value({
                 pn.nq: nq,
                 "param": search_params["param"],
@@ -605,7 +608,7 @@ class Search(CommonCases):
         yield params_list
 
         # clear env
-        self.clear_collections(clean_collection=clean_collection)
+        self.clear_collections(clean_collection=input_params.clean_collection)
         yield True
 
 
@@ -638,18 +641,18 @@ class SearchRecall(CommonCases):
         """
 
         # params prepare
-        params, prepare, prepare_clean, rebuild_index, clean_collection = get_input_params(**kwargs)
+        input_params = ParserInputParams(**kwargs)
         log.info("[SearchRecall] The detailed test steps are as follows: {}".format(self))
 
         # params parsing
-        self.parsing_params(params)
+        self.parsing_params(input_params.params)
         vector_type = get_vector_type(self.params_obj.dataset_params[pn.dataset_name])
         vector_default_field_name = get_default_field_name(
             vector_type, self.params_obj.dataset_params.get(pn.vector_field_name, ""))
 
         # prepare data
-        self.prepare_collection(vector_default_field_name, prepare, prepare_clean)
-        if prepare is True:
+        self.prepare_collection(vector_default_field_name, input_params.prepare, input_params.prepare_clean)
+        if input_params.prepare is True:
             self.prepare_index(vector_field_name=vector_default_field_name,
                                metric_type=self.params_obj.dataset_params[pn.metric_type],
                                clean_index_before=True)
@@ -662,10 +665,10 @@ class SearchRecall(CommonCases):
                                metric_type=self.params_obj.dataset_params[pn.metric_type])
         else:
             # if pass in rebuild_index, indexes of collection will be dropped before building index
-            if rebuild_index:
+            if input_params.rebuild_index:
                 self.prepare_index(vector_field_name=vector_default_field_name,
                                    metric_type=self.params_obj.dataset_params[pn.metric_type],
-                                   clean_index_before=rebuild_index)
+                                   clean_index_before=input_params.rebuild_index)
 
         self.count_entities()
         # load collection
@@ -690,7 +693,7 @@ class SearchRecall(CommonCases):
             search_params, nq, top_k, expr, other_params = self.search_param_analysis(
                 s_p, vector_default_field_name, self.params_obj.dataset_params[pn.metric_type])
 
-            actual_params_used = copy.deepcopy(params)
+            actual_params_used = copy.deepcopy(input_params.params)
             actual_params_used[pn.search_params] = update_dict_value({
                 pn.nq: nq,
                 "param": search_params["param"],
@@ -703,5 +706,5 @@ class SearchRecall(CommonCases):
         yield params_list
 
         # clear env
-        self.clear_collections(clean_collection=clean_collection)
+        self.clear_collections(clean_collection=input_params.clean_collection)
         yield True

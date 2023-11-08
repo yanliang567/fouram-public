@@ -266,12 +266,14 @@ class Base:
             log.info("[Base] Service deleted successfully: {0}".format(deploy_release_name))
 
     def run_perf_case(self, callable_obj: callable, default_case_params, case_params, case_prepare, case_prepare_clean,
-                      case_rebuild_index, case_clean_collection):
+                      case_rebuild_index, case_clean_collection, sub_callable_obj: callable = None):
         # parser case params
-        _case_params = parser_input_config(input_content=case_params)
+        case_parameters = parser_input_config(input_content=case_params)
 
         # update case params
-        case_parameters = update_dict_value(_case_params, default_case_params)
+        if not param_info.client_ignore_default_params:
+            case_parameters = update_dict_value(case_parameters, default_case_params)
 
         return callable_obj(params=case_parameters, prepare=case_prepare, prepare_clean=case_prepare_clean,
-                            rebuild_index=case_rebuild_index, clean_collection=case_clean_collection)
+                            rebuild_index=case_rebuild_index, clean_collection=case_clean_collection,
+                            sub_callable_obj=sub_callable_obj)

@@ -23,6 +23,7 @@ class ParamsBase:
     concurrent_tasks: Optional[list] = field(default_factory=lambda: [])
     resource_groups_params: Optional[dict] = field(default_factory=lambda: {})
     database_user_params: Optional[dict] = field(default_factory=lambda: {})
+    functional_params: Optional[dict] = field(default_factory=lambda: {})
 
     @staticmethod
     def search_params_parser(_params):
@@ -159,6 +160,11 @@ class ParamsFormat:
     }, common_scene_build_index)
 
     common_scene_go_bench = update_dict_value({}, common_concurrent)
+
+    common_functional = update_dict_value({
+        load_params: {prepare_load: ([type(bool())], OPTION)},
+        functional_params: ([type(dict())], MUST)
+    }, common_scene_build_index)
 
 
 # concurrent test parameters
@@ -756,30 +762,45 @@ class ConcurrentTasksParamsBase:
 
 @dataclass
 class ConcurrentTasksParams(ConcurrentTasksParamsBase):
-    debug: Optional[ConcurrentObjParams] = ConcurrentObjParams(**{"params": DataClassBase})
-    search: Optional[ConcurrentObjParams] = ConcurrentObjParams(**{"params": ConcurrentTaskSearch})
-    query: Optional[ConcurrentObjParams] = ConcurrentObjParams(**{"params": ConcurrentTaskQuery})
-    flush: Optional[ConcurrentObjParams] = ConcurrentObjParams(**{"params": ConcurrentTaskFlush})
-    load: Optional[ConcurrentObjParams] = ConcurrentObjParams(**{"params": ConcurrentTaskLoad})
-    release: Optional[ConcurrentObjParams] = ConcurrentObjParams(**{"params": ConcurrentTaskRelease})
-    load_release: Optional[ConcurrentObjParams] = ConcurrentObjParams(**{"params": ConcurrentTaskLoadRelease})
-    insert: Optional[ConcurrentObjParams] = ConcurrentObjParams(**{"params": ConcurrentTaskInsert})
-    upsert: Optional[ConcurrentObjParams] = ConcurrentObjParams(**{"params": ConcurrentTaskUpsert})
-    delete: Optional[ConcurrentObjParams] = ConcurrentObjParams(**{"params": ConcurrentTaskDelete})
-    scene_test: Optional[ConcurrentObjParams] = ConcurrentObjParams(**{"params": ConcurrentTaskSceneTest})
-    scene_insert_delete_flush: Optional[ConcurrentObjParams] = ConcurrentObjParams(
-        **{"params": ConcurrentTaskSceneInsertDeleteFlush})
-    scene_insert_partition: Optional[ConcurrentObjParams] = ConcurrentObjParams(
-        **{"params": ConcurrentTaskSceneInsertPartition})
-    scene_test_partition: Optional[ConcurrentObjParams] = ConcurrentObjParams(
-        **{"params": ConcurrentTaskSceneTestPartition})
-    iterate_search: Optional[ConcurrentObjParams] = ConcurrentObjParams(**{"params": ConcurrentTaskIterateSearch})
-    load_search_release: Optional[ConcurrentObjParams] = ConcurrentObjParams(
-        **{"params": ConcurrentTaskLoadSearchRelease})
-    scene_search_test: Optional[ConcurrentObjParams] = ConcurrentObjParams(**{"params": ConcurrentTaskSceneSearchTest})
+    debug: Optional[ConcurrentObjParams] = field(
+        default_factory=lambda: ConcurrentObjParams(**{"params": DataClassBase}))
+    search: Optional[ConcurrentObjParams] = field(
+        default_factory=lambda: ConcurrentObjParams(**{"params": ConcurrentTaskSearch}))
+    query: Optional[ConcurrentObjParams] = field(
+        default_factory=lambda: ConcurrentObjParams(**{"params": ConcurrentTaskQuery}))
+    flush: Optional[ConcurrentObjParams] = field(
+        default_factory=lambda: ConcurrentObjParams(**{"params": ConcurrentTaskFlush}))
+    load: Optional[ConcurrentObjParams] = field(
+        default_factory=lambda: ConcurrentObjParams(**{"params": ConcurrentTaskLoad}))
+    release: Optional[ConcurrentObjParams] = field(
+        default_factory=lambda: ConcurrentObjParams(**{"params": ConcurrentTaskRelease}))
+    load_release: Optional[ConcurrentObjParams] = field(
+        default_factory=lambda: ConcurrentObjParams(**{"params": ConcurrentTaskLoadRelease}))
+    insert: Optional[ConcurrentObjParams] = field(
+        default_factory=lambda: ConcurrentObjParams(**{"params": ConcurrentTaskInsert}))
+    upsert: Optional[ConcurrentObjParams] = field(
+        default_factory=lambda: ConcurrentObjParams(**{"params": ConcurrentTaskUpsert}))
+    delete: Optional[ConcurrentObjParams] = field(
+        default_factory=lambda: ConcurrentObjParams(**{"params": ConcurrentTaskDelete}))
+    scene_test: Optional[ConcurrentObjParams] = field(
+        default_factory=lambda: ConcurrentObjParams(**{"params": ConcurrentTaskSceneTest}))
+    scene_insert_delete_flush: Optional[ConcurrentObjParams] = field(
+        default_factory=lambda: ConcurrentObjParams(**{"params": ConcurrentTaskSceneInsertDeleteFlush}))
+    scene_insert_partition: Optional[ConcurrentObjParams] = field(
+        default_factory=lambda: ConcurrentObjParams(**{"params": ConcurrentTaskSceneInsertPartition}))
+    scene_test_partition: Optional[ConcurrentObjParams] = field(
+        default_factory=lambda: ConcurrentObjParams(**{"params": ConcurrentTaskSceneTestPartition}))
+    iterate_search: Optional[ConcurrentObjParams] = field(
+        default_factory=lambda: ConcurrentObjParams(**{"params": ConcurrentTaskIterateSearch}))
+    load_search_release: Optional[ConcurrentObjParams] = field(
+        default_factory=lambda: ConcurrentObjParams(**{"params": ConcurrentTaskLoadSearchRelease}))
+    scene_search_test: Optional[ConcurrentObjParams] = field(
+        default_factory=lambda: ConcurrentObjParams(**{"params": ConcurrentTaskSceneSearchTest}))
 
 
 @dataclass
 class ConcurrentGoBenchTasksParams(ConcurrentTasksParamsBase):
-    search: Optional[ConcurrentObjParams] = ConcurrentObjParams(**{"params": ConcurrentGoBenchParamsSearch})
-    query: Optional[ConcurrentObjParams] = ConcurrentObjParams(**{"params": ConcurrentGoBenchParamsQuery})
+    search: Optional[ConcurrentObjParams] = field(
+        default_factory=lambda: ConcurrentObjParams(**{"params": ConcurrentGoBenchParamsSearch}))
+    query: Optional[ConcurrentObjParams] = field(
+        default_factory=lambda: ConcurrentObjParams(**{"params": ConcurrentGoBenchParamsQuery}))

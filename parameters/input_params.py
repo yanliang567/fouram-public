@@ -33,6 +33,7 @@ class ParamInfo:
         self.deploy_retain = False
         self.deploy_retain_pvc = False
         self.client_test_skip = False
+        self.client_ignore_default_params = False
         self.release_name_prefix = ""
         self.release_name = ""
         self.sync_report = False
@@ -50,7 +51,7 @@ class ParamInfo:
             vdc_user="", vdc_env="", vdc_region_id="", vdc_serverless_host="",
             milvus_tag=None, milvus_tag_prefix="", tag_repository=None, release_name_prefix="", release_name="",
             update_helm_file=False, deploy_skip=False, deploy_retain=False, deploy_retain_pvc=False,
-            client_test_skip=False, replica_num=1,
+            client_test_skip=False, client_ignore_default_params=False, replica_num=1,
             run_id=None, sync_report=False, async_report=False,
             locust_patch_switch=False, go_bench_type="", concurrency_type=""):
         self.client_version = client_version
@@ -84,6 +85,7 @@ class ParamInfo:
 
         # client
         self.client_test_skip = client_test_skip or self.client_test_skip
+        self.client_ignore_default_params = client_ignore_default_params or self.client_ignore_default_params
         self.param_replica_num = replica_num
 
         # report

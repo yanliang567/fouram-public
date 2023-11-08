@@ -51,6 +51,8 @@ def pytest_addoption(parser):
                      help="skip deploy, use the incoming address or the default address")
     parser.addoption("--client_test_skip", action="store_true", default=False,
                      help="skip client test, only deploy or other test")
+    parser.addoption("--client_ignore_default_params", action="store_true", default=False,
+                     help="ignore client default params, only valid for client test is executed")
 
     # deploy
     parser.addoption("--deploy_tool", action="store", default=Helm, help="helm or operator or vdc")
@@ -134,6 +136,7 @@ def initialize_env(request):
 
         # client
         client_test_skip=request.config.getoption("--client_test_skip"),
+        client_ignore_default_params=request.config.getoption("--client_ignore_default_params"),
 
         # report
         run_id=request.config.getoption("--run_id"),

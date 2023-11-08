@@ -14,6 +14,7 @@ concurrent_params = "concurrent_params"
 concurrent_tasks = "concurrent_tasks"
 resource_groups_params = "resource_groups_params"
 database_user_params = "database_user_params"
+functional_params = "functional_params"
 
 # request type
 search = "search"

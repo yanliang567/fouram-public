@@ -35,7 +35,8 @@ class CloudRMApi:
 
     @request_catch()
     def create(self, class_id=ClassID.class1cu, db_version="v2.0.1", instance_name="fouram-benchmark-vdc", region_id="",
-               mock_tag=False, white_list_address="0.0.0.0/0", instance_type=1, project_id="000000000",
+               mock_tag=False, white_list_address="0.0.0.0/0", instance_type=1,
+               project_id="0",  # "000000000", reset to 0
                instance_description="fouram benchmark test instance", root_pwd="Milvus123",
                log_level=Log_Level) -> RequestResponseParser:
         url = self.host + "/resource/v1/instance/milvus/create"

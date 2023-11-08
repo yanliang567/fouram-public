@@ -10,7 +10,8 @@ from utils.util_log import log
 
 
 class InfoLogout:
-    _log_output = ["Collection.insert", "Index", "Collection.load", "Collection.search", "Collection.query"]
+    _log_output = ["Collection.insert", "Collection.delete", "Index", "Collection.load", "Collection.search",
+                   "Collection.query"]
     log_output = _log_output
     log_row_length = 3000
 
@@ -123,4 +124,11 @@ def func_time_catch():
 
         return inner_wrapper
 
+    return wrapper
+
+
+def docstring_decorator(func):
+    def wrapper(*args, **kwargs):
+        log.info("[docstring_decorator] Detailed test content is as follows: {}".format(func.__doc__))
+        return func(*args, **kwargs)
     return wrapper

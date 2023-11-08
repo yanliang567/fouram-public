@@ -9,10 +9,11 @@ import pandas as pd
 import h5py
 import tqdm
 import subprocess
-from typing import List
+from typing import Optional
 from sklearn import preprocessing
 import pyarrow.parquet as pq
 from itertools import product
+from dataclasses import dataclass
 
 from pymilvus import DataType
 
@@ -1120,13 +1121,14 @@ def get_default_search_params(index_type: str):
     return all_index_types.get(index_type, {})
 
 
-def get_input_params(**kwargs):
-    _params = kwargs.get("params", None)
-    _prepare = kwargs.get("prepare", True)
-    _prepare_clean = kwargs.get("prepare_clean", True)
-    _rebuild_index = kwargs.get("rebuild_index", False)
-    _clean_collection = kwargs.get("clean_collection", True)
-    return _params, _prepare, _prepare_clean, _rebuild_index, _clean_collection
+@dataclass
+class ParserInputParams:
+    params: Optional[dict] = None
+    prepare: Optional[bool] = True
+    prepare_clean: Optional[bool] = True
+    rebuild_index: Optional[bool] = False
+    clean_collection: Optional[bool] = True
+    sub_callable_obj: Optional[callable] = None
 
 
 def hide_value(source, keys):

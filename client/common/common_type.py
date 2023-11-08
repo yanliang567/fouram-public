@@ -62,6 +62,7 @@ class DefaultValue:
 
     SCALAR_FILE_PREFIX = "scalar"
 
+    default_expr = "id >= 0"
     default_timeout = 60
     default_resource_group = "__default_resource_group"
     default_database = "default"
@@ -107,6 +108,7 @@ class Precision:
     INDEX_PRECISION = 4
     SEARCH_PRECISION = 4
     INSERT_PRECISION = 4
+    DELETE_PRECISION = 4
     QUERY_PRECISION = 4
     COMMON_PRECISION = 4
     CONCURRENT_PRECISION = 2

@@ -10,7 +10,7 @@ from client.util.params_check import check_params
 from client.common.common_type import Precision, CaseIterParams
 from client.common.common_func import (
     get_source_file, read_ann_hdf5_file, normalize_data, get_acc_metric_type, gen_combinations, update_dict_value,
-    get_vector_type, get_default_field_name, get_search_ids, get_recall_value, get_input_params)
+    get_vector_type, get_default_field_name, get_search_ids, get_recall_value, ParserInputParams)
 
 from utils.util_log import log
 
@@ -246,29 +246,30 @@ class AccCases(CommonCases):
         :return:
         """
         # params prepare
-        params, prepare, prepare_clean, rebuild_index, clean_collection = get_input_params(**kwargs)
+        input_params = ParserInputParams(**kwargs)
         log.info("[AccCases] The detailed test steps are as follows: {}".format(self))
 
         # file parsing
-        self.parsing_params(params)
-        dataset_file_name = params[pn.dataset_params][pn.dataset_name]
+        self.parsing_params(input_params.params)
+        dataset_file_name = input_params.params[pn.dataset_params][pn.dataset_name]
         metric_type, vector_type = self.parsing_file(
             dataset_file_name, metric_type=self.params_obj.dataset_params.get(pn.metric_type, ""))
         self.params_obj.dataset_params[pn.metric_type] = metric_type
 
         # prepare collection
-        self.prepare_collection(metric_type, vector_type, prepare, rebuild_index, prepare_clean)
+        self.prepare_collection(metric_type, vector_type, input_params.prepare, input_params.rebuild_index,
+                                input_params.prepare_clean)
 
         # set test params
         s_params = self.parser_search_params()
         params_list = []
         for s_p in s_params:
-            actual_params_used = update_dict_value({pn.search_params: s_p}, params)
+            actual_params_used = update_dict_value({pn.search_params: s_p}, input_params.params)
             p = CaseIterParams(callable_object=self.search_recall, object_args=[s_p, vector_type, metric_type],
                                actual_params_used=actual_params_used, case_type=self.__class__.__name__)
             params_list.append(p)
         yield params_list
 
         # clear env
-        self.clear_collections(clean_collection=clean_collection)
+        self.clear_collections(clean_collection=input_params.clean_collection)
         yield True
