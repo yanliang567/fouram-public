@@ -1,7 +1,11 @@
 import copy
 import dacite
 from typing import Dict
+from pymilvus import DataType
+from pymilvus.orm import types
 
+from client.common.common_type import Precision, CaseIterParams, DefaultValue
+from client.common.common_func import get_vector_type, get_default_field_name, ParserInputParams, loop_ids
 from client.common.common_type import Precision, CaseIterParams
 from client.common.common_parser import (
     ParserInputParams, ParserFieldsParams
@@ -156,6 +160,13 @@ class FunctionalCases(CommonCases):
             self.set_report_data({"delete_RT": round(res.rt, Precision.DELETE_PRECISION)})
         return res
 
+    def collection_flush(self, report_data: bool = True, **kwargs):
+        log.info("[FunctionalCases] Flush params: {0}".format(kwargs))
+        res = self.collection_wrap.flush(**kwargs)
+        if report_data:
+            self.set_report_data({"flush_RT": round(res.rt, Precision.FLUSH_PRECISION)})
+        return res
+
     def collection_query(self, report_data: bool = True, **kwargs):
         log.info("[FunctionalCases] Query params: {0}".format(kwargs))
         res = self.collection_wrap.query(**kwargs)
@@ -283,3 +294,97 @@ class FunctionalCases(CommonCases):
         self.show_index()
 
         log.info(f"[FunctionalCases] Rebuild scalars:{scalars_field} vectors:{vectors_field} indexes done.")
+
+    @docstring_decorator
+    def scene_functional_query_all_deleted(self, **kwargs):
+        """
+        steps:
+            1. delete in loop based on expr in delete_expr_list, or in a loop based on range and batch.
+            Note: If choose expr, delete_expr_list can not be empty;
+                  If choose range+batch, delete_range must has the start and end, [0, 1000], and batch must > 0
+            2. query all deleted data and check result is empty
+
+        notice:
+            Do not choose to use default parameters unless necessary, please pass in from outside!
+        """
+        # parser input params for test case
+        params = self.parsing_functional_params(data_class=GetParamObj().scene_functional_query_all_deleted,
+                                                all_params=kwargs)
+        delete_expr_list = params.delete_expr_list
+        delete_range = params.delete_range
+        delete_batch = params.delete_batch
+        deleted_exprs = []
+        deleted_count = 0
+        actual_partition_names = [p.name for p in self.collection_wrap.partitions]
+
+        def delete_query_empty(_expr, partition_name=params.partition_name):
+            # delete
+            res_delete = self.collection_delete(expr=_expr, partition_name=partition_name)
+            assert res_delete.res_result
+            deleted_exprs.append(_expr)
+
+            if params.with_flush:
+                self.collection_flush()
+
+            # query all deleted expr
+            for deleted_expr in deleted_exprs:
+                res_query = self.collection_query(expr=deleted_expr, partition_names=[partition_name],
+                                                  consistency_level=types.CONSISTENCY_STRONG)
+                assert len(res_query.response) == 0
+
+            # verify query from other partitions
+            other_partitions = [p for p in actual_partition_names if p != partition_name]
+            if len(other_partitions) > 0:
+                repeated_data = self.params_obj.dataset_params.get(pn.extra_partitions, None).get("data_repeated",
+                                                                                                  False)
+                res_query = self.collection_query(expr=_expr, partition_names=other_partitions,
+                                                  consistency_level=types.CONSISTENCY_STRONG)
+                if repeated_data:
+                    assert len(res_query.response) > 0
+                else:
+                    assert len(res_query.response) == 0
+
+            return res_delete.response.delete_count
+
+        # before delete
+        count_before = self.collection_query(expr="", consistency_level=types.CONSISTENCY_STRONG,
+                                             output_fields=["count(*)"])
+        log.info(f"[scene_functional_query_all_deleted] Before delete, query count* is {count_before}")
+
+        # expr_list mode
+        if len(delete_expr_list) > 0:
+            for expr in delete_expr_list:
+                del_count = delete_query_empty(expr)
+                deleted_count += del_count
+
+        # range_batch mode
+        else:
+            if len(delete_range) < 2 or delete_batch <= 0:
+                raise Exception("You must choose one of the two modes expr_list and range_batch. "
+                                "If expr_list is selected, parameter delete_expr_list cannot be empty; "
+                                "if range_batch is selected, parameter delete_range must specify the deletion range, "
+                                "such as [0, 100], and parameter delete_batch is greater than 0.")
+            else:
+                delete_len = delete_range[1] - delete_range[0]
+                ni_count = int(delete_len / delete_batch)
+                last_delete = delete_len % delete_batch
+                log.info(f"delete_len={delete_len}, ni_count={ni_count}, last_delete={last_delete}")
+                delete_pks = loop_ids(delete_batch, start_id=delete_range[0])
+
+                # get pk field name
+                if self.collection_wrap.schema.primary_field.dtype != DataType.INT64:
+                    raise Exception(f"[scene_functional_query_all_deleted] Delete range batch only supported int64 pk.")
+                pk = self.collection_wrap.schema.primary_field.name
+
+                for i in range(0, ni_count):
+                    del_count = delete_query_empty(f"{pk} in {next(delete_pks)}")
+                    deleted_count += del_count
+
+                if last_delete > 0:
+                    del_count = delete_query_empty(f"{pk} in {next(delete_pks)[:last_delete]}")
+                    deleted_count += del_count
+
+        log.info(f"[scene_functional_query_all_deleted] Total delete count is {deleted_count}")
+        count_after = self.collection_query(expr="", consistency_level=types.CONSISTENCY_STRONG,
+                                            output_fields=["count(*)"])
+        log.info(f"[scene_functional_query_all_deleted] After delete, query count* is {count_after}")

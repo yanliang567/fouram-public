@@ -117,6 +117,15 @@ class ParamsQueryDeleted(ParamsBase):
 
 
 @dataclass
+class ParamsQueryAllDeleted(ParamsBase):
+    delete_expr_list: Optional[List[str]] = field(default_factory=lambda: [])
+    delete_range: Optional[List[int]] = field(default_factory=lambda: [])
+    delete_batch: Optional[int] = 0
+    with_flush: Optional[bool] = False
+    partition_name: Optional[str] = DefaultValue.default_partition_name
+
+
+@dataclass
 class ParamsRebuildPartialIndex(ParamsBase):
     vectors_index: Optional[Dict[str, FuncParamsVectorsIndex]] = field(default_factory=lambda: {})
     scalars_index: Optional[Dict[str, FuncParamsScalarsIndex]] = field(default_factory=lambda: {})
@@ -124,6 +133,7 @@ class ParamsRebuildPartialIndex(ParamsBase):
 
 class GetParamObj:
     scene_functional_query_deleted = ParamsQueryDeleted
+    scene_functional_query_all_deleted = ParamsQueryAllDeleted
     scene_functional_rebuild_partial_index = ParamsRebuildPartialIndex
 
     def get_obj(self, name):

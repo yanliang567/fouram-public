@@ -112,3 +112,55 @@ class TestFunctionalCases(PerfTemplate):
             input_params=input_params, cpu=dp.default_cpu, mem=dp.default_mem, deploy_mode=deploy_mode,
             case_callable_obj=obj.scene_functional_base, sub_callable_obj=obj.scene_functional_rebuild_partial_index,
             default_case_params=default_case_params)
+
+    @pytest.mark.parametrize("deploy_mode", [STANDALONE])
+    def test_functional_scene_delete_query_custom(self, input_params: InputParamsBase, deploy_mode):
+        """
+        :test steps:
+            1. Prepare data
+            2. delete half data with batch
+            3. query all deleted every time data and check result empty
+        """
+        obj = FunctionalCases()
+
+        default_case_params = FunctionalParams().params_scene_functional(
+            FunctionalParams.params_scene_functional_query_all_deleted(),
+            dataset_size="1k", ni_per=1000,
+            **cdp.DefaultIndexParams.HNSW)
+
+        self.functional_template(
+            input_params=input_params, cpu=dp.default_cpu, mem=dp.default_mem, deploy_mode=deploy_mode,
+            case_callable_obj=obj.scene_functional_base, sub_callable_obj=obj.scene_functional_query_all_deleted,
+            default_case_params=default_case_params)
+
+    @pytest.mark.parametrize("deploy_mode", [STANDALONE])
+    def test_functional_scene_delete_query(self, input_params: InputParamsBase, deploy_mode):
+        """
+        :test steps:
+            1. Prepare data
+            2. delete half data with batch
+            3. query all deleted every time data and check result empty
+        """
+        obj = FunctionalCases()
+
+        default_case_params = FunctionalParams().params_scene_functional(
+            FunctionalParams.params_scene_functional_query_all_deleted(
+                delete_expr_list=[
+                    "0 <= id < 10000",
+                    "10000 <= id < 20000",
+                    "20000 <= id < 40000",
+                    "40000 <= id < 70000",
+                    "70000 <= id < 110000",
+                    "110000 <= id < 160000",
+                    "160000 <= id < 220000",
+                    "220000 <= id < 290000",
+                    "290000 <= id < 370000",
+                    "370000 <= id < 460000",
+                ], delete_range=[0, 1000], delete_batch=200),
+            dataset_size="1m", ni_per=10000,
+            **cdp.DefaultIndexParams.HNSW)
+
+        self.functional_template(
+            input_params=input_params, cpu=dp.default_cpu, mem=dp.default_mem, deploy_mode=deploy_mode,
+            case_callable_obj=obj.scene_functional_base, sub_callable_obj=obj.scene_functional_query_all_deleted,
+            default_case_params=default_case_params)

@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import List, Union, Dict
 from client.common.common_func import dict_recursive_key, parser_data_size, update_dict_value
 from client.common.common_type import DefaultValue
 from client.parameters.input_params.input_params_common import CommonParams
@@ -28,6 +28,19 @@ class FunctionalParams(CommonParams):
         result: Optional[int] = 0
         """
         return {"delete": delete.to_dict, "query": query.to_dict, "result": result}
+
+    @staticmethod
+    def params_scene_functional_query_all_deleted(delete_expr_list: List[str] = [], delete_range: List[int] = [],
+                                                  delete_batch: int = 0, with_flush=False,
+                                                  partition_name: str = DefaultValue.default_partition_name):
+        """
+        delete_expr_list: Loop delete all expr in this list. Optional List[str]: ["id < 10", "id < 20"]
+        delete_range: Delete pk of the range delete_range[0] - delete_range[1] in delete_batch. Optional List[int]: [start, end]
+        delete_batch: delete batch. Optional int: 10
+        delete_range + delete_batch not supported varchar pk
+        """
+        return {"delete_expr_list": delete_expr_list, "delete_range": delete_range, "delete_batch": delete_batch,
+                partition_name: partition_name, "with_flush": with_flush}
 
     @staticmethod
     def params_scene_functional_rebuild_partial_index(
