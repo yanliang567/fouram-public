@@ -155,7 +155,7 @@ def get_ground_truth_ids(data_size, data_type: str):
     gnd_file_name = DatasetPath.get(data_type + "_ground_truth", "") + f"/idx_{size}.ivecs"
 
     if check_file_exist(gnd_file_name):
-        a = np.fromfile(gnd_file_name, dtype='int64')
+        a = np.fromfile(gnd_file_name, dtype='int32')
         d = a[0]
         true_ids = a.reshape(-1, d + 1)[:, 1:].copy()
         return true_ids
