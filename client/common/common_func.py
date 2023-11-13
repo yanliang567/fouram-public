@@ -184,7 +184,7 @@ def get_default_field_name(data_type=DataType.FLOAT_VECTOR, default_field_name: 
 
 def get_vector_type(data_type):
     if data_type in ["random", "sift", "deep", "glove", "local", "gist", "text2img", "laion", "embed",
-                     "cohere10m_parquet", "laion5b_parquet"]:
+                     "cohere10m_parquet", "laion1b_nolang", "laion2b_multi"]:
         vector_type = DataType.FLOAT_VECTOR
     elif data_type in ["binary", "kosarak"]:
         vector_type = DataType.BINARY_VECTOR
@@ -428,7 +428,7 @@ def parser_search_params_expr(expr):
 
 def get_vectors_from_binary(nq, dimension, dataset_name):
     if dataset_name in ["sift", "deep", "binary", "gist", "text2img", "laion", "embed", "cohere10m_parquet",
-                        "laion5b_parquet"]:
+                        "laion1b_nolang", "laion2b_multi"]:
         # dataset_name: local, sift, deep, binary
         file_name = DatasetPath[dataset_name] + "query.npy"
 

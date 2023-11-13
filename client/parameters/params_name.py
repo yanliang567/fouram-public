@@ -147,7 +147,8 @@ class DatasetsName:
 
     # parquet
     Cohere10mParquet = "cohere10m_parquet"
-    Laion5bParquet = "laion5b_parquet"
+    Laion1bNolang = "laion1b_nolang"
+    Laion2bMulti = "laion2b_multi"
 
 
 class MetricsTypeName:

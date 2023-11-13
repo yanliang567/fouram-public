@@ -6,7 +6,8 @@ import client.parameters.params_name as pn
 
 DatasetType = {
     "cohere10m_parquet": pn.PARQUET,
-    "laion5b_parquet": pn.PARQUET
+    "laion1b_nolang": pn.PARQUET,
+    "laion2b_multi": pn.PARQUET,
 }
 
 DatasetPath = {
@@ -28,8 +29,10 @@ DatasetPath = {
 
     "cohere10m_parquet": NAS.RAW_DATA_DIR + 'cohere10m_parquet/',
     "cohere10m_parquet_ground_truth": NAS.RAW_DATA_DIR + 'cohere10m_parquet/gnd',
-    "laion5b_parquet": NAS.RAW_DATA_DIR + 'laion5b_parquet/',
-    "laion5b_parquet_ground_truth": NAS.RAW_DATA_DIR + 'laion5b_parquet/gnd',
+    "laion1b_nolang": NAS.RAW_DATA_DIR + 'laion5b_parquet/laion1B_nolang/',
+    "laion2b_multi": NAS.RAW_DATA_DIR + 'laion5b_parquet/laion2B_multi/',
+    "laion1b_nolang_ground_truth": NAS.RAW_DATA_DIR + 'laion5b_parquet/laion1B_nolang/gnd',
+    "laion2b_multi_ground_truth": NAS.RAW_DATA_DIR + 'laion5b_parquet/laion2B_multi/gnd',
 }
 
 ScalarDatasetPath = {
@@ -38,7 +41,8 @@ ScalarDatasetPath = {
     "laion2b_json": NAS.SCALAR_DATA_DIR + "laion2b_json/",
 
     "cohere10m_parquet": NAS.RAW_DATA_DIR + 'cohere10m_parquet/',
-    "laion5b_parquet": NAS.RAW_DATA_DIR + 'laion5b_parquet/',
+    "laion1b_nolang": NAS.RAW_DATA_DIR + 'laion5b_parquet/laion1B_nolang/',
+    "laion2b_multi": NAS.RAW_DATA_DIR + 'laion5b_parquet/laion2B_multi/',
 }
 
 MetricsToIndexType = {
