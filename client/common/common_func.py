@@ -583,7 +583,9 @@ def read_parquet_file(file_name: str, column: str):
     file_list = []
     if check_file_exist(file_name):
         try:
-            file_list = pq.read_table(file_name, columns=[column])[column].to_pylist()
+            file_df = pq.read_table(file_name, columns=[column]).to_pandas()
+            file_list = list(file_df[column])
+            del file_df
         except Exception as e:
             log.error(f"[read_parquet_file] Can not read parquet file: {e}")
         return file_list
