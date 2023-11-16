@@ -51,6 +51,7 @@ class ParamsFormat:
         },
         collection_params: {other_fields: ([type(list())], OPTION),
                             shards_num: ([type(int())], OPTION),
+                            enable_dynamic_field: ([type(bool())], OPTION),
                             varchar_id: ([type(bool())], OPTION),
                             collection_name: ([type(str())], OPTION)},
         load_params: {replica_number: ([type(int())], OPTION),

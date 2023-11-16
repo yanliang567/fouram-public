@@ -9,12 +9,14 @@ class AccParams:
 
     @staticmethod
     def base(dataset_name, index_type, index_param, search_param, expr=None, top_k=[10], nq=[10000], metric_type="",
-             guarantee_timestamp=None, other_fields=[], replica_number=1, ni_per=10000, dim=dv.default_dim):
+             guarantee_timestamp=None, other_fields=[], replica_number=1, ni_per=10000, dim=dv.default_dim,
+             enable_dynamic_field=False):
         dataset_params = {pn.dataset_name: dataset_name,
                           pn.ni_per: ni_per,
                           pn.dim: dim,
                           pn.metric_type: metric_type}
-        collection_params = {pn.other_fields: other_fields}
+        collection_params = {pn.other_fields: other_fields,
+                             pn.enable_dynamic_field: enable_dynamic_field}
         load_params = {pn.replica_number: replica_number}
         index_params = {pn.index_type: index_type,
                         pn.index_param: index_param}

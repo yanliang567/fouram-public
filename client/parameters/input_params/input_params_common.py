@@ -15,7 +15,7 @@ class CommonParams:
              index_type=None, index_param=None,
              ids=None, query_expr=None, output_fields=None,
              search_param=None, search_expr=None, top_k=None, nq=None, guarantee_timestamp=None,
-             reset_rg=False, groups=None, reset_rbac=False, reset_db=False):
+             reset_rg=False, groups=None, reset_rbac=False, reset_db=False, enable_dynamic_field=False):
         dataset_params = {pn.dataset_name: dataset_name,
                           pn.dim: dim,
                           pn.dataset_size: dataset_size,
@@ -23,7 +23,8 @@ class CommonParams:
                           pn.metric_type: metric_type,
                           pn.req_run_counts: req_run_counts}
         collection_params = {pn.other_fields: other_fields,
-                             pn.shards_num: shards_num}
+                             pn.shards_num: shards_num,
+                             pn.enable_dynamic_field: enable_dynamic_field}
         load_params = {pn.replica_number: replica_number,
                        pn.resource_groups: resource_groups}
         index_params = {pn.index_type: index_type,

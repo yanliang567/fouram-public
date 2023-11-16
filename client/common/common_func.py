@@ -116,7 +116,8 @@ def gen_collection_schema(vector_field_name="", description=dv.default_desc, def
 
     log.debug("[gen_collection_schema] The generated field schema contains the following:{}".format(fields))
     return ApiCollectionSchemaWrapper().init_collection_schema(
-        fields=fields, description=description, auto_id=auto_id, primary_field=primary_field).response
+        fields=fields, description=description, auto_id=auto_id, primary_field=primary_field,
+        enable_dynamic_field=kwargs.get("enable_dynamic_field", False)).response
 
 
 """ param handling """

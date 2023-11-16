@@ -59,6 +59,7 @@ req_run_counts = "req_run_counts"
 
 # collection
 shards_num = "shards_num"
+enable_dynamic_field = "enable_dynamic_field"
 other_fields = "other_fields"
 varchar_id = "varchar_id"
 

@@ -17,7 +17,7 @@ from client.common.common_param import TransferNodesParams, TransferReplicasPara
 from client.common.common_type import Precision, CheckTasks
 from client.common.common_type import DefaultValue as dv
 from client.parameters.params_name import (
-    reset, groups, max_length, dim, transfer_nodes, transfer_replicas, resource_groups)
+    reset, groups, max_length, dim, transfer_nodes, transfer_replicas, resource_groups, enable_dynamic_field)
 from client.parameters.params import (
     DataClassBase,
     ConcurrentTaskSearch,
@@ -244,7 +244,8 @@ class Base:
         schema = gen_collection_schema(
             vector_field_name=vector_field_name, other_fields=other_fields, varchar_id=varchar_id,
             max_length=kwargs.pop(max_length, dv.default_max_length), dim=kwargs.pop(dim, dv.default_dim),
-            scalars_params=scalars_params) if schema is None else schema
+            scalars_params=scalars_params, enable_dynamic_field=kwargs.pop(enable_dynamic_field, False)) \
+            if schema is None else schema
 
         collection_name = collection_name or gen_unique_str()
         self.collection_name = self.collection_name or collection_name
