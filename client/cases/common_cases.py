@@ -1,5 +1,6 @@
 import numpy as np
 import copy
+import dacite
 
 from client.cases.base import Base
 from client.cases.case_report import CasesReport
@@ -11,7 +12,7 @@ from client.common.common_type import DefaultValue as dv
 from client.common.common_func import (
     gen_combinations, update_dict_value, get_vector_type, get_default_field_name, get_vectors_from_binary,
     parser_search_params_expr, get_ground_truth_ids, get_search_ids, get_recall_value, ParserInputParams,
-    write_json_file, gen_go_bench_json_file)
+    write_json_file, gen_go_bench_json_file, ExtraPartitionsParams, PrepareInsertParams, deal_insert_result)
 
 from commons.common_params import EnvVariable
 from utils.util_log import log
@@ -64,10 +65,39 @@ class CommonCases(Base):
 
     def prepare_insert(self, data_type, dim, size, ni, varchar_filled=False):
         varchar_filled = self.params_obj.dataset_params.get(pn.varchar_filled, varchar_filled)
-        res_insert = self.insert(data_type=data_type, dim=dim, size=size, ni=ni, varchar_filled=varchar_filled,
-                                 scalars_params=self.params_obj.dataset_params.get(pn.scalars_params, {}),
-                                 column_name=self.params_obj.dataset_params.get(pn.column_name, ""))
-        self.case_report.add_attr(**res_insert)
+
+        # insert to partitions
+        extra_partitions = self.params_obj.dataset_params.get(pn.extra_partitions, None)
+        if extra_partitions:
+            param_list = dacite.from_dict(data_class=ExtraPartitionsParams, data=extra_partitions).combination_params(
+                input_datasize=self.params_obj.dataset_params.get(pn.dataset_size, 0))
+            insert_obj = PrepareInsertParams(
+                ni=ni, dim=dim, data_type=data_type,
+                scalars_params=self.params_obj.dataset_params.get(pn.scalars_params, {}),
+                column_name=self.params_obj.dataset_params.get(pn.column_name, ""))
+
+            inert_time = []
+            for p in param_list:
+                insert_obj.refresh_data(p.data_repeated)
+
+                # create partition
+                self.collection_create_partition(p.partition_name)
+                log.info(f"[CommonCases] Start inserting into partition: {p.partition_name}")
+
+                # insert into the specified partition
+                inert_time.append(self.insert(
+                    data_type=data_type, dim=dim, size=p.data_size, ni=ni, varchar_filled=varchar_filled,
+                    scalars_params=self.params_obj.dataset_params.get(pn.scalars_params, {}),
+                    column_name=self.params_obj.dataset_params.get(pn.column_name, ""),
+                    input_obj=insert_obj, partition_name=p.partition_name))
+            self.case_report.add_attr(**deal_insert_result(inert_time))
+
+        else:
+            res_insert = self.insert(
+                data_type=data_type, dim=dim, size=size, ni=ni, varchar_filled=varchar_filled,
+                scalars_params=self.params_obj.dataset_params.get(pn.scalars_params, {}),
+                column_name=self.params_obj.dataset_params.get(pn.column_name, ""))
+            self.case_report.add_attr(**res_insert)
 
     def prepare_load(self, **kwargs):
         res_load = self.load_collection(**kwargs)

@@ -1,6 +1,7 @@
 import numpy as np
 import copy
 import time
+import dacite
 
 from client.cases.base import Base
 from client.cases.case_report import CasesReport
@@ -10,7 +11,8 @@ from client.util.params_check import check_params
 from client.common.common_type import Precision, CaseIterParams
 from client.common.common_func import (
     get_source_file, read_ann_hdf5_file, normalize_data, get_acc_metric_type, gen_combinations, update_dict_value,
-    get_vector_type, get_default_field_name, get_search_ids, get_recall_value, ParserInputParams)
+    get_vector_type, get_default_field_name, get_search_ids, get_recall_value, ParserInputParams, ExtraPartitionsParams,
+    PrepareInsertParams, deal_insert_result)
 
 from utils.util_log import log
 
@@ -75,10 +77,40 @@ class CommonCases(Base):
             self.get_collection_schema()
 
             # insert vectors
-            res_insert = self.ann_insert(source_vectors=self.dataset_train,
-                                         ni=self.params_obj.dataset_params[pn.ni_per],
-                                         scalars_params=self.params_obj.dataset_params.get(pn.scalars_params, {}))
-            self.case_report.add_attr(**res_insert)
+            extra_partitions = self.params_obj.dataset_params.get(pn.extra_partitions, None)
+            # insert to partitions
+            if extra_partitions:
+                param_list = dacite.from_dict(
+                    data_class=ExtraPartitionsParams,
+                    data=extra_partitions).combination_params(input_datasize=len(self.dataset_train))
+                insert_obj = PrepareInsertParams(
+                    ni=self.params_obj.dataset_params[pn.ni_per],
+                    scalars_params=self.params_obj.dataset_params.get(pn.scalars_params, {}),
+                    acc_dataset_train=self.dataset_train)
+
+                inert_time = []
+                for p in param_list:
+                    # not support refresh data
+                    # insert_obj.refresh_data(p.data_repeated)
+
+                    # create partition
+                    self.collection_create_partition(p.partition_name)
+                    log.info(f"[AccCases] Start inserting into partition: {p.partition_name}")
+
+                    # insert into the specified partition
+                    inert_time.append(self.ann_insert(
+                        source_vectors=self.dataset_train, size=p.data_size,
+                        ni=self.params_obj.dataset_params[pn.ni_per],
+                        scalars_params=self.params_obj.dataset_params.get(pn.scalars_params, {}),
+                        input_obj=insert_obj, partition_name=p.partition_name))
+                self.case_report.add_attr(**deal_insert_result(inert_time, acc=True))
+
+            else:
+                res_insert = self.ann_insert(
+                    source_vectors=self.dataset_train,
+                    ni=self.params_obj.dataset_params[pn.ni_per],
+                    scalars_params=self.params_obj.dataset_params.get(pn.scalars_params, {}))
+                self.case_report.add_attr(**res_insert)
 
             if self.params_obj.flush_params.get(pn.prepare_flush, True):
                 # flush collection

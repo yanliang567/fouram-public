@@ -47,7 +47,8 @@ class ParamsFormat:
             scalars_index: ([type(list())], OPTION),
             scalars_params: ([type(dict())], OPTION),
             show_resource_groups: ([type(bool())], OPTION),
-            show_db_user: ([type(bool())], OPTION)
+            show_db_user: ([type(bool())], OPTION),
+            extra_partitions: ([type(dict())], OPTION),
         },
         collection_params: {other_fields: ([type(list())], OPTION),
                             shards_num: ([type(int())], OPTION),

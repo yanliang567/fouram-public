@@ -50,6 +50,7 @@ scalars_index = "scalars_index"
 scalars_params = "scalars_params"
 show_resource_groups = "show_resource_groups"
 show_db_user = "show_db_user"
+extra_partitions = "extra_partitions"
 
 # common
 metric_type = "metric_type"

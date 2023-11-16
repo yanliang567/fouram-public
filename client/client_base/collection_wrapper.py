@@ -174,11 +174,11 @@ class ApiCollectionWrapper:
                                        partition_name=partition_name, **kwargs).run()
         return InterfaceResponse(*res, res_result, check_result)
 
-    def create_partition(self, partition_name, check_task=None, check_items=None, description=""):
+    def create_partition(self, partition_name, check_task=None, check_items=None, description="", **kwargs):
         func_name = sys._getframe().f_code.co_name
-        res, res_result = api_request([self.collection.create_partition, partition_name, description])
+        res, res_result = api_request([self.collection.create_partition, partition_name, description], **kwargs)
         check_result = ResponseChecker(res, func_name, check_task, check_items, res_result,
-                                       partition_name=partition_name).run()
+                                       partition_name=partition_name, **kwargs).run()
         return InterfaceResponse(*res, res_result, check_result)
 
     @property

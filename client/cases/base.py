@@ -9,10 +9,9 @@ from client.client_base import (
     ApiConnectionsWrapper, ApiCollectionWrapper, ApiIndexWrapper, ApiPartitionWrapper, ApiCollectionSchemaWrapper,
     ApiFieldSchemaWrapper, ApiUtilityWrapper, ApiRoleWrapper, ApiDBWrapper)
 from client.common.common_func import (
-    gen_collection_schema, gen_unique_str, get_file_list, read_npy_file, parser_data_size, loop_files, loop_ids,
-    gen_vectors, gen_entities, run_go_bench_process, go_bench, go_bench_refine, GoSearchParams, loop_gen_files,
-    remove_list_values, parser_segment_info, gen_scalar_values, update_dict_value, get_default_search_params,
-    parser_search_params_expr, hide_dict_value, gen_random_query_data, read_data_file)
+    gen_collection_schema, gen_unique_str, parser_data_size, gen_vectors, gen_entities, go_bench, go_bench_refine,
+    GoSearchParams, remove_list_values, parser_segment_info, update_dict_value, get_default_search_params,
+    parser_search_params_expr, hide_dict_value, gen_random_query_data, PrepareInsertParams)
 from client.common.common_param import TransferNodesParams, TransferReplicasParams
 from client.common.common_type import Precision, CheckTasks
 from client.common.common_type import DefaultValue as dv
@@ -308,6 +307,11 @@ class Base:
         self.collection_schema = self.collection_wrap.schema.to_dict()
         log.info("[Base] Collection schema: {0}".format(self.collection_schema))
 
+    def collection_create_partition(self, partition_name: str, **kwargs):
+        if not self.collection_wrap.has_partition(partition_name).response:
+            log.info(f"[Base] Start create partition:{partition_name} for collection:{self.collection_wrap.name}")
+            return self.collection_wrap.create_partition(partition_name=partition_name, **kwargs)
+
     def insert_batch(self, vectors, ids, data_size, varchar_filled=False, collection_obj: callable = None,
                      collection_schema=None, log_level=LogLevel.INFO, insert_scalars_params={}, **kwargs):
         if self.collection_schema is None and collection_schema is None:
@@ -329,7 +333,8 @@ class Base:
         return res.rt
 
     def insert(self, data_type, dim, size, ni, varchar_filled=False, collection_obj: callable = None, column_name="",
-               collection_schema=None, collection_name="", log_level=LogLevel.INFO, scalars_params={}, **kwargs):
+               collection_schema=None, collection_name="", log_level=LogLevel.INFO, scalars_params={},
+               input_obj: PrepareInsertParams = None, **kwargs):
         data_size = parser_data_size(size)
         data_size_format = str(format(data_size, ',d'))
         ni_cunt = int(data_size / int(ni)) if int(ni) != 0 else 0
@@ -342,52 +347,30 @@ class Base:
         log.customize(log_level)(
             "[Base] Start inserting {0} vectors to collection {1}".format(data_size, collection_name))
 
-        _loop_ids = loop_ids(int(ni))
-        insert_scalars_params = gen_scalar_values(scalars_params, ni)
+        p_i = input_obj or PrepareInsertParams(ni=ni, scalars_params=scalars_params, dim=dim, data_type=data_type,
+                                               column_name=column_name)
 
         if data_type == "local":
-
             for i in range(0, ni_cunt):
-                batch_rt += self.insert_batch(gen_vectors(ni, dim), next(_loop_ids), data_size_format, varchar_filled,
-                                              collection_obj, collection_schema, log_level, next(insert_scalars_params),
-                                              **kwargs)
+                batch_rt += self.insert_batch(
+                    gen_vectors(ni, dim), p_i.loop_ids(ni), data_size_format, varchar_filled, collection_obj,
+                    collection_schema, log_level, p_i.insert_scalars_params(ni), **kwargs)
 
             if last_insert > 0:
                 last_rt = self.insert_batch(
-                    gen_vectors(last_insert, dim), next(_loop_ids)[:last_insert], data_size_format,
-                    varchar_filled, collection_obj, collection_schema, log_level, next(insert_scalars_params), **kwargs)
+                    gen_vectors(last_insert, dim), p_i.loop_ids(last_insert), data_size_format, varchar_filled,
+                    collection_obj, collection_schema, log_level, p_i.insert_scalars_params(last_insert), **kwargs)
 
         else:
-            # files = get_file_list(data_size, dim, data_type)
-            # if len(files) == 0:
-            #     raise Exception("[insert] Can not get files, please check.")
-            #
-            # _loop_file = loop_files(files)
-            _loop_file = loop_gen_files(dim, data_type)
-            vectors = []
-
             for i in range(0, ni_cunt):
-                if len(vectors) < ni:
-                    while True:
-                        # vectors.extend(read_npy_file(next(_loop_file)))
-                        vectors.extend(read_data_file(next(_loop_file), column=column_name))
-                        if len(vectors) >= ni:
-                            break
-                batch_rt += self.insert_batch(vectors[:ni], next(_loop_ids), data_size_format, varchar_filled,
-                                              collection_obj, collection_schema, log_level, next(insert_scalars_params),
-                                              **kwargs)
-                vectors = vectors[ni:]
+                batch_rt += self.insert_batch(
+                    p_i.get_vectors(ni), p_i.loop_ids(ni), data_size_format, varchar_filled, collection_obj,
+                    collection_schema, log_level, p_i.insert_scalars_params(ni), **kwargs)
 
             if last_insert > 0:
-                if len(vectors) < last_insert:
-                    while True:
-                        # vectors.extend(read_npy_file(next(_loop_file)))
-                        vectors.extend(read_data_file(next(_loop_file), column=column_name))
-                        if len(vectors) >= last_insert:
-                            break
                 last_rt = self.insert_batch(
-                    vectors[:last_insert], next(_loop_ids)[:last_insert], data_size_format, varchar_filled,
-                    collection_obj, collection_schema, log_level, next(insert_scalars_params), **kwargs)
+                    p_i.get_vectors(last_insert), p_i.loop_ids(last_insert), data_size_format, varchar_filled,
+                    collection_obj, collection_schema, log_level, p_i.insert_scalars_params(last_insert), **kwargs)
 
         total_time = round((batch_rt + last_rt), Precision.COMMON_PRECISION)
         ips = round(int(data_size) / total_time, Precision.INSERT_PRECISION) if total_time != 0 else 0
@@ -404,8 +387,9 @@ class Base:
             }
         }
 
-    def ann_insert(self, source_vectors, ni=100, scalars_params={}):
-        size = len(source_vectors)
+    def ann_insert(self, source_vectors, ni=100, scalars_params={}, size: int = None,
+                   input_obj: PrepareInsertParams = None, **kwargs):
+        size = size if size is not None else len(source_vectors)
         data_size_format = str(format(size, ',d'))
         ni_cunt = int(size / int(ni))
         last_insert = size % int(ni)
@@ -413,18 +397,18 @@ class Base:
         batch_rt = 0
         last_rt = 0
 
-        _loop_ids = loop_ids(int(ni))
-        insert_scalars_params = gen_scalar_values(scalars_params, ni)
-
         log.info("[Base] Start inserting {} vectors".format(size))
+        p_i = input_obj or PrepareInsertParams(ni=ni, scalars_params=scalars_params, acc_dataset_train=source_vectors)
 
         for i in range(ni_cunt):
-            batch_rt += self.insert_batch(source_vectors[int(i * ni):int((i + 1) * ni)], next(_loop_ids),
-                                          data_size_format, insert_scalars_params=next(insert_scalars_params))
+            batch_rt += self.insert_batch(
+                p_i.get_acc_vectors(ni), p_i.loop_ids(ni), data_size_format,
+                insert_scalars_params=p_i.insert_scalars_params(ni), **kwargs)
 
         if last_insert > 0:
-            last_rt = self.insert_batch(source_vectors[-last_insert:], next(_loop_ids)[:last_insert], data_size_format,
-                                        insert_scalars_params=next(insert_scalars_params))
+            last_rt = self.insert_batch(
+                p_i.get_acc_vectors(last_insert), p_i.loop_ids(last_insert), data_size_format,
+                insert_scalars_params=p_i.insert_scalars_params(last_insert), **kwargs)
 
         total_time = round(batch_rt + last_rt, Precision.INSERT_PRECISION)
         log.info("[Base] Total time of ann insert: {}s".format(total_time))

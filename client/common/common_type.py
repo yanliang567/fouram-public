@@ -62,6 +62,8 @@ class DefaultValue:
 
     SCALAR_FILE_PREFIX = "scalar"
 
+    partition_name_prefix = "partition_"
+    default_partition_name = "_default"
     default_expr = "id >= 0"
     default_timeout = 60
     default_resource_group = "__default_resource_group"

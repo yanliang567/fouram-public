@@ -10,12 +10,12 @@ class CommonParams:
 
     @staticmethod
     def base(dataset_name, dim, dataset_size, ni_per, metric_type=None, req_run_counts=None,
-             other_fields=None, shards_num=2,
+             other_fields=None, shards_num=2, enable_dynamic_field=None,
              replica_number=None, resource_groups=None,
              index_type=None, index_param=None,
              ids=None, query_expr=None, output_fields=None,
              search_param=None, search_expr=None, top_k=None, nq=None, guarantee_timestamp=None,
-             reset_rg=False, groups=None, reset_rbac=False, reset_db=False, enable_dynamic_field=False):
+             reset_rg=None, groups=None, reset_rbac=None, reset_db=None):
         dataset_params = {pn.dataset_name: dataset_name,
                           pn.dim: dim,
                           pn.dataset_size: dataset_size,

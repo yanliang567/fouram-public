@@ -9,10 +9,10 @@ import pandas as pd
 import h5py
 import tqdm
 import subprocess
-from typing import Optional
+from typing import Optional, List, Union
 from sklearn import preprocessing
 import pyarrow.parquet as pq
-from itertools import product
+from itertools import product, zip_longest
 from dataclasses import dataclass
 
 from pymilvus import DataType
@@ -457,29 +457,6 @@ def gen_insert_scalars_params(scalars_params: dict):
         else:
             raise Exception(f"[gen_insert_scalars_params] Value:{v} of key:{k} isn't dict type:{type(v)}, please check")
     return insert_scalars_params
-
-
-def gen_scalar_values(scalars_params: dict, insert_length: int):
-    _loop_files = {k: loop_gen_scalar_files(scalars_params[k]["other_params"].get("dataset"),
-                                            dim=scalars_params[k]["other_params"].get("dim", dv.default_dim)) for k in
-                   scalars_params.keys() if scalars_params[k].get("other_params", {}).get("dataset", False)}
-    _insert_scalars_params = gen_insert_scalars_params(scalars_params)
-    _loop_dict = copy.deepcopy(_insert_scalars_params)
-
-    for k in _loop_dict.keys():
-        _loop_dict[k]["default_value"] = []
-
-    while True:
-        for k, v in _loop_files.items():
-            while len(_loop_dict[k]["default_value"]) < insert_length:
-                # _loop_dict[k]["default_value"].extend(read_npy_file(next(v), allow_pickle=True))
-                _loop_dict[k]["default_value"].extend(read_data_file(
-                    next(v), column=_loop_dict[k].get("other_params", {}).get("column_name", ""), allow_pickle=True))
-
-        for k, v in _loop_dict.items():
-            _insert_scalars_params[k]["default_value"] = _loop_dict[k]["default_value"][:insert_length]
-            _loop_dict[k]["default_value"] = _loop_dict[k]["default_value"][insert_length:]
-        yield _insert_scalars_params
 
 
 def gen_random_query_data(random_count: int, random_range: list, query_field_name: str, query_field_type: str):
@@ -1149,3 +1126,244 @@ def hide_dict_value(source, keys):
     _s = copy.deepcopy(source)
     target = hide_value(_s, keys)
     return target
+
+
+def deal_insert_result(data: List[dict], acc: bool = False) -> dict:
+    """
+    :param data: [{
+            "insert": {
+                "total_time": total_time,
+                "VPS": ips,
+                "batch_time": ni_time,
+                "batch": ni
+            }
+        }, ...]
+    :param acc: bool, acc type result only has total_time
+
+    After supporting the insertion of different ni, please rewrite this method
+    """
+    if len(data) == 0:
+        return {}
+    elif len(data) == 1:
+        return data[0]
+    try:
+        log.debug(
+            f"[deal_insert_result] Processing insert results that only have reference effects for the same batch:{data}")
+        if acc:
+            return {
+                "ann_insert": {
+                    "total_time": round(sum([d["ann_insert"]["total_time"] for d in data]), Precision.COMMON_PRECISION)
+                }
+            }
+
+        return {
+            "insert": {
+                "total_time": round(sum([d["insert"]["total_time"] for d in data]), Precision.COMMON_PRECISION),
+                "VPS": round(sum([d["insert"]["VPS"] for d in data]) / len(data), Precision.COMMON_PRECISION),
+                "batch_time": round(sum([d["insert"]["batch_time"] for d in data]) / len(data),
+                                    Precision.COMMON_PRECISION),
+                "batch": round(sum([d["insert"]["batch"] for d in data]) / len(data), Precision.COMMON_PRECISION)
+            }
+        }
+    except Exception as e:
+        log.error(f"[deal_insert_result] Can't parser insert result: {data}, error:{e}")
+        return {"insert_result": data}
+
+
+""" Parser input params """
+
+
+@dataclass
+class SubPartitionsParams:
+    partition_name: str
+    data_size: int
+    data_repeated: bool
+
+
+@dataclass
+class ExtraPartitionsParams:
+    partitions: Union[int, List[str]] = 1
+    datasizes: Union[str, int, List[Union[str, int]]] = None
+    data_repeated: Optional[bool] = True
+
+    def combination_params(self, input_datasize: int) -> List[SubPartitionsParams]:
+        log.info(f"[ExtraPartitionsParams] Combination extra partition params: {vars(self)}")
+        _input_data_size = parser_data_size(input_datasize)
+
+        # parser partition names
+        partition_names = self.partitions
+        if isinstance(self.partitions, int):
+            if self.partitions < 1:
+                raise ValueError(f"[ExtraPartitionsParams] Partitions can't be less than 1: {self.partitions}")
+            partition_names = [dv.default_partition_name]
+            partition_names.extend([f"{dv.partition_name_prefix}{i}" for i in range(1, self.partitions)])
+
+        # parser data sizes
+        data_sizes = self.datasizes
+        if not isinstance(self.datasizes, list):
+            if self.datasizes:
+                data_sizes = [self.datasizes for i in partition_names]
+            else:
+                d = int(_input_data_size / len(partition_names))
+                data_sizes = [d for i in partition_names]
+                for i in range(int(_input_data_size % len(partition_names))):
+                    data_sizes[i] += 1
+
+        # check params len
+        if len(partition_names) != len(data_sizes):
+            log.error(f"[ExtraPartitionsParams] Partitions:{partition_names}, total datasizes:{input_datasize}")
+            raise ValueError(
+                f"[ExtraPartitionsParams] Len of partitions:{len(partition_names)} != datasizes:{len(data_sizes)}")
+
+        # check total size
+        data_sizes = [parser_data_size(i) for i in data_sizes]
+        if sum(data_sizes) != _input_data_size:
+            log.error(f"[ExtraPartitionsParams] Partitions datasizes:{data_sizes}, total datasizes:{input_datasize}")
+            raise ValueError(
+                f"[ExtraPartitionsParams] Total partitions data sizes:{sum(data_sizes)} != datasizes:{input_datasize}")
+
+        zip_data = self.zip_data([partition_names, data_sizes])
+        partition_number = {i[0]: i[1] for i in zip_data}
+        log.info(f"[ExtraPartitionsParams] The data size for each partition: {partition_number}")
+        # return partition param obj list
+        return [SubPartitionsParams(*i, data_repeated=self.data_repeated) for i in zip_data]
+
+    @staticmethod
+    def zip_data(data: List[list]):
+        return [list(x) for x in zip_longest(*data)]
+
+
+class GenIterValues:
+    def __init__(self):
+        self.insert_length = 0
+        self.ids_step = 0
+
+    def set_ids_step(self, num: int):
+        self.ids_step = num
+        return self
+
+    def loop_ids(self, step=50000, start_id=0):
+        self.set_ids_step(step)
+
+        while True:
+            ids = [k for k in range(start_id, start_id + int(self.ids_step))]
+            start_id = start_id + int(self.ids_step)
+            if start_id + int(self.ids_step) > 2 ** 63 - 1:
+                start_id = 0
+            yield ids
+
+    def set_insert_length(self, num: int):
+        self.insert_length = num
+        return self
+
+    def gen_scalar_values(self, scalars_params: dict, insert_length: int):
+        self.set_insert_length(insert_length)
+
+        _loop_files = {k: loop_gen_scalar_files(
+            scalars_params[k]["other_params"].get("dataset"),
+            dim=scalars_params[k]["other_params"].get("dim", dv.default_dim)) for k in scalars_params.keys() if
+            scalars_params[k].get("other_params", {}).get("dataset", False)}
+        _insert_scalars_params = gen_insert_scalars_params(scalars_params)
+        _loop_dict = copy.deepcopy(_insert_scalars_params)
+
+        for k in _loop_dict.keys():
+            _loop_dict[k]["default_value"] = []
+
+        while True:
+            for k, v in _loop_files.items():
+                while len(_loop_dict[k]["default_value"]) < self.insert_length:
+                    # _loop_dict[k]["default_value"].extend(read_npy_file(next(v), allow_pickle=True))
+                    _loop_dict[k]["default_value"].extend(read_data_file(
+                        next(v), column=_loop_dict[k].get("other_params", {}).get("column_name", ""),
+                        allow_pickle=True))
+
+            for k, v in _loop_dict.items():
+                _insert_scalars_params[k]["default_value"] = _loop_dict[k]["default_value"][:self.insert_length]
+                _loop_dict[k]["default_value"] = _loop_dict[k]["default_value"][self.insert_length:]
+            yield _insert_scalars_params
+
+
+@dataclass
+class PrepareInsertParams:
+    GenScalarValuesObj = GenIterValues()
+    iter_loop_ids = iter([])
+    _loop_ids = []
+    iter_insert_scalars_params = iter([])
+    _insert_scalars_params = []
+    _loop_file = iter([])
+    _vectors = []
+
+    def __init__(self, ni: int, scalars_params: dict, dim: int = dv.default_dim, data_type: str = "",
+                 acc_dataset_train: list = [], column_name: str = "", data_repeated: bool = True):
+        """
+        :param ni: batch of insert
+        :param scalars_params: scalar params
+        :param dim: dim for insert vector
+        :param data_type: data type for vector
+        :param acc_dataset_train: training vectors for recall test
+        :param column_name: column_name for vector file
+        :param data_repeated: repeated vectors when insert into different partitions
+        """
+        self._ni = int(ni)
+        self._scalars_params = scalars_params
+        self._dim = int(dim)
+        self._data_type = data_type
+        self._acc_dataset_train = acc_dataset_train
+        self._column_name = column_name
+        self._data_repeated = data_repeated
+
+        self.vectors_ni = self._ni
+
+        # init data
+        self.refresh_data()
+
+    def refresh_data(self, reset: bool = True):
+        if reset:
+            self.GenScalarValuesObj = GenIterValues()
+
+            self.iter_loop_ids = self.GenScalarValuesObj.loop_ids(int(self._ni))
+            self._loop_ids = []
+
+            self.iter_insert_scalars_params = self.GenScalarValuesObj.gen_scalar_values(self._scalars_params, self._ni)
+            self._insert_scalars_params = []
+
+            if self._data_type:
+                self._loop_file = loop_gen_files(self._dim, self._data_type)
+            self._vectors = []
+
+    def set_data_repeated(self, _flag: bool):
+        self._data_repeated = _flag
+
+    @property
+    def vectors(self):
+        if len(self._vectors) < self.vectors_ni:
+            while True:
+                self._vectors.extend(read_data_file(next(self._loop_file), column=self._column_name))
+                if len(self._vectors) >= self.vectors_ni:
+                    break
+        return self._vectors
+
+    @vectors.setter
+    def vectors(self, data: list):
+        self._vectors = data
+
+    """ iter to get all values """
+
+    def get_acc_vectors(self, ni: int):
+        _v = self._acc_dataset_train[:ni]
+        self._acc_dataset_train = self._acc_dataset_train[ni:]
+        return _v
+
+    def get_vectors(self, ni: int):
+        self.vectors_ni = ni
+        _v = self.vectors[:ni]
+        self.vectors = self.vectors[ni:]
+        return _v
+
+    def loop_ids(self, ni: int):
+        self.GenScalarValuesObj.set_ids_step(ni)
+        return next(self.iter_loop_ids)
+
+    def insert_scalars_params(self, ni: int):
+        self.GenScalarValuesObj.set_insert_length(ni)
+        return next(self.iter_insert_scalars_params)
