@@ -1,0 +1,419 @@
+# This configuration lists all parameters that can be passed.
+# Please select the required parameters according to the corresponding test case.
+
+dataset_params:
+  # metric type of index and search
+  metric_type: L2 / IP / COSINE / <str>
+  # specify the name of the vector column: when creating the collection, or for an existing collection
+  vector_field_name: float_vector / binary_vector / <str>
+  # for parquet data sets, specify which column in the parquet data set is used to insert the vector column
+  # `float32_vector` is the column_name on laion dataset
+  column_name: float32_vector / <str>
+  # vector dimensions for vector field, make sure it is consistent with the dim of the specified dataset
+  dim: 128 / <int>
+  # dataset names currently support:
+  # random: `local`
+  # npy: `deep`, `jaccard`, `hamming`, `sift`, `text2img`, `laion`, `embed`, `gist`, `structure`, `binary`
+  # parquet: `cohere10m_parquet`, `laion1b_nolang`, `laion2b_multi`
+  dataset_name: sift
+  # The size of the data set to be inserted
+  dataset_size: 1b / <str or int>
+  # the amount of data for each insert during data preparation
+  ni_per: 50000 / <int>
+
+  # for `search` and `query`, number of serial execution requests
+  req_run_counts: 10 / <int>
+
+  # max_length for generating `varchar` schema,  which takes effect globally
+  max_length: 256 / <int>
+  # generating varchar data, whether to fill the length of `max_length`
+  # false: convert id column to string; true: pad to length of `max_length`-1 with `ascii_letters` and `digits`
+  varchar_filled: false / <bool>
+
+  # create index on the already created scalar column: <List[<scalar field name>...]>
+  scalars_index: ["int64_1", "float_1", "json_1", "varchar_1", "varchar_2", "array_varchar_1", "array_int64_1"]
+  # parameters required to create scalars: {<field_name>: {<params>: {}, <other_params>: {} }}
+  scalars_params:
+    # `params` for creating collection
+    # `other_params` for inserting values
+
+    # default column: float_vector, id
+    # Do not modify the vector field dataset from here, this is just an example of passing parameters !!!
+    float_vector:
+      other_params:
+        dataset: laion2b_multi
+        column_name: float32_vector
+        dim: 768
+    id:
+      other_params:
+        dataset: laion2b_multi
+        column_name: pk  # for int64 primary key
+    # Scalar naming rules: `DataType` as prefix
+    int64_1:
+      other_params:
+        dataset: laion2b_int64
+    json_1:
+      other_params:
+        dataset: laion2b_json
+    varchar_1:
+      params:
+        max_length: 65535
+      other_params:
+        dataset: laion2b_url
+    varchar_2:
+      params:
+        max_length: 10
+      other_params:
+        varchar_filled: true
+    # `array` data type naming rules: array_`DataType` as prefix
+    array_varchar_1:
+      params:
+        max_length: 2
+        max_capacity: 5
+      other_params:
+        varchar_filled: false
+    array_int64_1:
+       params:
+         max_capacity: 9999
+
+  # list resource groups after preparing data
+  show_resource_groups: False / <bool>
+  # removed code
+  show_db_user: False / <bool>
+
+  # Partitions can be inserted during the data preparation phase
+  extra_partitions:
+    # `int` type contains `_default` partition by default; you can also directly specify the partition name
+    partitions: 2 / ["partition_1", "partition_2"]
+    # the amount of data in each partition
+    # `int` or `str`: indicating that the data amount of each partition is the same
+    # `List[str or int]`: the data amount of the specified partition can be corresponded one-to-one in the list
+    # `None`: `dataset_params.dataset_size` will be equally divided among all partitions
+    # Notice: The total amount of data in all partitions needs to be equal to the total `dataset_params.dataset_size`
+    datasizes: 10 / "1m" / [5, "1k"]
+    # whether the data of all partitions is repeated
+    # `true`: each partition insertion starts from the beginning of the data
+    # `false`: the dataset is inserted sequentially in the order of partitions, and the data is not repeated.
+    data_repeated: true / <bool>
+
+collection_params:
+  # for creating collection
+  # select the collection by name if there is more than one collection in `Milvus`
+  collection_name: <str>
+  # create scalars: <List[<scalar field name>...]>
+  # Notice: scalars are created here so that operations on scalar can take effect.
+  other_fields: ["int64_1", "float_1", "json_1", "varchar_1", "varchar_2", "array_varchar_1", "array_int64_1"]
+  shards_num: 2 / <int>
+  # the default pk is `int64`, you can set `true` to set the primary key column to `varchar` type
+  # parameters of the `varchar` pk column can be set in `dataset_params.scalars_params.id`
+  varchar_id: false / <bool>
+  enable_dynamic_field: false / <bool>
+
+flush_params:
+  # after inserting data, whether to call `flush`, `false` can create growing data
+  prepare_flush: true / <bool>
+
+index_params:
+  index_type: IVF_SQ8 / FLAT/ HNSW / <str>
+  # `index_param` can be dynamically adjusted according to `index_type`
+  index_param:
+    nlist: 1024
+
+load_params:
+  replica_number: 1 / <int>
+  _refresh: false / <bool>
+  # int: the number needs to be equal to the existing resource group number
+  # List[str]: select resource groups needed
+  _resource_groups: <int or list>
+
+  # support for `GoBenchCases`, `ConcurrentClientBase`, `FunctionalCases`
+  prepare_load: false / <bool>
+
+# `scene_search`, `scene_search_recall`, `scene_go_search` these three scenes use this set of search parameters
+search_params:
+  # search vectors number
+  nq: 1 / <int>
+  # search limit
+  top_k: 1 / <int>
+  # `search_param` can be dynamically adjusted according to `index_type`
+  search_param:
+    nprobe: 64
+  expr: "int64_1 > 10" / <str>
+  output_fields: ["int64_1", "float_vector"] / <list>
+  timeout: 60 / <int>
+  ignore_growing: <bool>
+  guarantee_timestamp: <int>
+
+query_params:
+  # `ids` will be converted to `expr`: "id in {dis}"
+  # ids will overwrite expr after being set
+  ids: [1, 2] / <list>
+  expr: "int64_1 > 10" / <str>
+  output_fields: [ "int64_1", "float_vector" ] / <list>
+  ignore_growing: <bool>
+
+database_user_params:
+  # reset rbac before testing
+  reset_rbac: false / <bool>
+  # remove all databases before testing, except default db `default`
+  reset_db: false / <bool>
+
+resource_groups_params:
+  # remove all resource group, revert to default status
+  reset: false / <bool>
+  # int: [1, 2, 4] just for nodes, create RG_1: 1 queryNode, RG_2: 2 queryNodes, RG_3: 4 queryNodes
+  groups:
+    transfer_nodes:
+      - source: "__default_resource_group" / <name>
+        target: 'RG_00' / <name>
+        num_node: 1 / <int>
+      - source: '__default_resource_group'
+         target: 'RG_01'
+         num_node: 2
+    transfer_replicas:
+      - source: '__default_resource_group'
+       target: 'RG_00'
+       collection_name: 'collection_name_1'
+       num_replica: 1
+      - source: '__default_resource_group'
+       target: 'RG_01'
+       collection_name: 'collection_name_2'
+       num_replica: 2
+
+# the parameters of each case are different, please pass them according to actual use.
+# refer to `GetParamObj` in the file `fouram/client/parameters/functional_params.py` to map parameter objects.
+# if there is no parameter mapping in the case, it means that there is no need to pass parameters.
+functional_params: {}
+
+# used with `search` parameters, the old single-search for go bench concurrency parameters
+go_search_params:
+  # go bench concurrent number
+  concurrent_number: 10 / [10, 20] / <int or list>
+  # concurrency duration time: seconds
+  during_time: 100 / "10m" / <int or str>
+  # print the time interval between intermediate states
+  interval: 20 / <int>
+
+concurrent_params:
+  # concurrent number
+  concurrent_number: 10 / [10, 20] / <int or list>
+  # concurrency duration time: seconds
+  during_time: 100 / "10m" / <int or str>
+  # print the time interval between intermediate states
+  interval: 20 / <int>
+  # for locust
+  spawn_rate: null / <int>
+
+concurrent_tasks:
+  # List[{"type": <name>, "weight": <int>, "params": {}}]
+
+  # The calculation formula for the number of concurrency of the corresponding interface is:
+  # (weight / sum_all_weight) * `concurrent_params.concurrent_number`
+
+  - type: search
+    weight: 1
+    params:
+      nq: int
+      top_k: int
+      search_param: dict
+      expr: Optional[str] = None
+      guarantee_timestamp: Optional[int] = None
+      output_fields: Optional[list] = None
+      ignore_growing: Optional[bool] = False
+      timeout: Optional[int] = 60
+      # false: use the top nq vectors of the query.npy file of the dataset
+      # true: randomly generate search vectors every time
+      random_data: Optional[bool] = False
+
+  - type: query
+    weight: 1
+    params:
+      # choose one setting between `ids` and `expr`, and ids will be converted to "id in {ids}"
+      # if two are set, `ids` will be selected
+      ids: Optional[list] = None
+      expr: Optional[str] = None
+      output_fields: Optional[list] = None
+      ignore_growing: Optional[bool] = False
+      offset: Optional[int] = None
+      limit: Optional[int] = None
+      timeout: Optional[int] = 60
+
+      # other params
+      # random_data=true will enable random expr, append it to the `expr` above
+      # `expr` above can be set to "", or endswith "&&" and "||", only when random_data is enabled
+      random_data: Optional[bool] = False
+      # select `random_count` elements from `random_range` and generate an expr
+      random_count: Optional[int] = 0
+      # length of `random_range` must be equal to 2
+      random_range: Optional[list] = [0, 1]
+      field_name: Optional[str] = id
+      # `field_type` only support "int64" and "varchar"
+      field_type: Optional[str] = int64
+
+  - type: flush
+    weight: 1
+    params:
+      timeout: Optional[int] = 60
+
+  - type: load
+    weight: 1
+    params:
+      replica_number: Optional[int] = 1
+      timeout: Optional[int] = 60
+
+  - type: release
+    weight: 1
+    params:
+      timeout: Optional[int] = 60
+
+  # load and release collection, you can only set concurrent_number=1
+  - type: load_release
+    weight: 1
+    params:
+      replica_number: Optional[int] = 1
+      timeout: Optional[int] = 60
+
+  - type: insert
+    weight: 1
+    params:
+      nb: Optional[int] = 1  # number of batch insert
+      timeout: Optional[int] = 60
+
+      # random id or vectors
+      # the inserted data will be retained and can be deleted later
+      random_id: Optional[bool] = False
+      random_vector: Optional[bool] = False
+      # according to `dataset_params.varchar_filled`
+      varchar_filled: Optional[bool] = False
+
+  - type: upsert
+    weight: 1
+    params:
+      nb: Optional[int] = 1  # number of batch insert
+      timeout: Optional[int] = 60
+
+      # random id or vectors
+      # data that upsert will be retained and can be deleted later
+      random_id: Optional[bool] = False
+      random_vector: Optional[bool] = False
+      # according to `dataset_params.varchar_filled`
+      varchar_filled: Optional[bool] = False
+
+  - type: delete
+    weight: 1
+    params:
+      # choose one setting between `expr` and `delete_length`
+      # if two are set, `expr` will be selected
+      expr: Optional[str] = None
+      # `delete_length` data for deleted will be obtained from the inserted or upserted data
+      # it will be filled in from 0 when the data is insufficient
+      delete_length: Optional[int] = 1
+      timeout: Optional[int] = 60
+
+  - type: scene_test
+    weight: 1
+    params:
+      # create `dim` collection -> insert `data_size` vectors, batch `nb` -> flush -> count vectors -> index -> drop
+      dim: Optional[int] = 128
+      data_size: Optional[int] = 3000
+      nb: Optional[int] = 3000
+      index_type: Optional[str] = "IVF_SQ8"
+      index_param: {"nlist": 2048}  # Optional[dict]
+      metric_type: Optional[str] = "L2"
+
+  - type: scene_insert_delete_flush
+    weight: 1
+    params:
+      # insert `insert_length` data -> delete data that be inserted -> flush collection
+      # `insert_length` < `delete_length`: deleted data will be filled in from 0
+      insert_length: Optional[int] = 1
+      delete_length: Optional[int] = 1
+
+      # random id or vectors
+      random_id: Optional[bool] = False
+      random_vector: Optional[bool] = False
+      varchar_filled: Optional[bool] = False
+
+  - type: scene_insert_partition
+    weight: 1
+    params:
+      # create partition -> insert `data_size` vectors, batch `ni` -> flush partition when with_flush=true -> drop partition
+      data_size: Optional[str] = "1m"
+      ni: Optional[int] = 5
+      with_flush: Optional[bool] = False
+      timeout: Optional[int] = 60
+
+  - type: scene_test_partition
+    weight: 1
+    params:
+      # collection and insert
+      data_size: Optional[int] = 3000
+      ni: Optional[int] = 3000
+
+      # search
+      nq: Optional[int] = 10
+      search_param: {'nprobe': 16} # Optional[dict]
+      limit: Optional[int] = 10
+      expr: Optional[str] = None
+      output_fields: Optional[list] = None
+      guarantee_timestamp: Optional[int] = None
+      timeout: Optional[int] = 60
+
+  - type: iterate_search
+    weight: 1
+    params:
+      # only for checking collections that can be searched
+      nq: Optional[int] = 1
+      top_k: Optional[int] = 10
+      search_param: {} # Optional[dict]
+      guarantee_timestamp: Optional[int] = None
+      timeout: Optional[int] = 60
+
+      # other params
+      collection_names: Optional[list] = None
+
+  - type: load_search_release
+    weight: 1
+    params:
+      # load collection -> search collection -> release collection, can only set concurrent_number=1
+      nq: int
+      top_k: int
+      search_param: dict
+      expr: Optional[str] = None
+      guarantee_timestamp: Optional[int] = None
+      random_data: Optional[bool] = False
+
+      replica_number: Optional[int] = 1
+      timeout: Optional[int] = 60
+
+  - type: scene_search_test
+    weight: 1
+    params:
+      # create user and role when new_user=true -> connect with new alias when new_connect=true ->
+      # create collection -> index and load when prepare_before_insert=true -> insert -> flush -> count vectors ->
+      # build index -> load collection -> serial search `search_counts` times -> drop collection ->
+      # delete role and user when new_user=true -> remove new alias connect when new_connect=true
+      dataset: Optional[str] = local
+      dim: Optional[int] = 128
+      shards_num: Optional[int] = 2
+      data_size: Optional[int] = 3000
+      nb: Optional[int] = 3000
+      index_type: Optional[str] = "IVF_SQ8"
+      index_param: {'nlist': 2048} # Optional[dict]
+      metric_type: Optional[str] = "L2"
+
+      # load
+      replica_number: Optional[int] = 1
+
+      # search
+      nq: Optional[int] = 1
+      top_k: Optional[int] = 10
+      search_param: {'nprobe': 16} # Optional[dict]
+
+      # other
+      prepare_before_insert: Optional[bool] = False
+      search_counts: Optional[int] = 1
+      new_connect: Optional[bool] = False
+
+      # use db and user
+      new_user: Optional[bool] = False
