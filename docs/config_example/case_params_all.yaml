@@ -285,6 +285,7 @@ concurrent_tasks:
       random_vector: Optional[bool] = False
       # according to `dataset_params.varchar_filled`
       varchar_filled: Optional[bool] = False
+      start_id: Optional[int] = 0 # number of start id
 
   - type: upsert
     weight: 1
@@ -298,6 +299,7 @@ concurrent_tasks:
       random_vector: Optional[bool] = False
       # according to `dataset_params.varchar_filled`
       varchar_filled: Optional[bool] = False
+      start_id: Optional[int] = 0 # number of start id
 
   - type: delete
     weight: 1
@@ -325,9 +327,10 @@ concurrent_tasks:
     weight: 1
     params:
       # insert `insert_length` data -> delete data that be inserted -> flush collection
-      # `insert_length` < `delete_length`: deleted data will be filled in from 0
+      # `insert_length` < `delete_length`: deleted data will be filled in from `start_id`
       insert_length: Optional[int] = 1
       delete_length: Optional[int] = 1
+      start_id: Optional[int] = 0
 
       # random id or vectors
       random_id: Optional[bool] = False

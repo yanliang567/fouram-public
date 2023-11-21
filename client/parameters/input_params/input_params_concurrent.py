@@ -149,7 +149,8 @@ class ConcurrentParams(CommonParams):
         return {"type": "release", "weight": weight, "params": {"timeout": timeout}}
 
     @staticmethod
-    def params_insert(weight=1, nb=1, timeout: int = 30, random_id=False, random_vector=False, varchar_filled=False):
+    def params_insert(weight=1, nb=1, timeout: int = 30, random_id=False, random_vector=False, varchar_filled=False,
+                      start_id=0):
         """
         nb: Optional[int] = 1  # number of batch insert
         timeout: Optional[int] = 30
@@ -161,7 +162,7 @@ class ConcurrentParams(CommonParams):
         """
         return {"type": "insert", "weight": weight,
                 "params": {"nb": nb, "timeout": timeout, "random_id": random_id, "random_vector": random_vector,
-                           "varchar_filled": varchar_filled}}
+                           "varchar_filled": varchar_filled, "start_id": start_id}}
 
     @staticmethod
     def params_delete(weight=1, expr: str = "", delete_length: int = 1, timeout: int = 30):
@@ -209,7 +210,7 @@ class ConcurrentParams(CommonParams):
 
     @staticmethod
     def params_scene_insert_delete_flush(weight=1, insert_length=1, delete_length=1, random_id=False,
-                                         random_vector=False, varchar_filled=False):
+                                         random_vector=False, varchar_filled=False, start_id=0):
         """
         insert_length: Optional[int] = 1
         delete_length: Optional[int] = 1
@@ -220,7 +221,7 @@ class ConcurrentParams(CommonParams):
         varchar_filled: Optional[bool] = False
         """
         return {"type": "scene_insert_delete_flush", "weight": weight,
-                "params": {"insert_length": insert_length, "delete_length": delete_length,
+                "params": {"insert_length": insert_length, "delete_length": delete_length, "start_id": start_id,
                            "random_id": random_id, "random_vector": random_vector, "varchar_filled": varchar_filled}}
 
     @staticmethod

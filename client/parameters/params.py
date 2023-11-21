@@ -352,6 +352,7 @@ class ConcurrentInputParamsInsert(DataClassBase):
     random_id: Optional[bool] = False
     random_vector: Optional[bool] = False
     varchar_filled: Optional[bool] = False
+    start_id: Optional[int] = 0
 
 
 @dataclass
@@ -364,14 +365,15 @@ class ConcurrentTaskInsert(DataClassBase):
     random_id: Optional[bool] = False
     random_vector: Optional[bool] = False
     varchar_filled: Optional[bool] = False
+    start_id: Optional[int] = 0
 
     _loop_ids = None
     fixed_ids = None
     fixed_vectors = None
 
     def set_params(self):
-        self._loop_ids = loop_ids(step=self.nb)
-        self.fixed_ids = [k for k in range(self.nb)]
+        self._loop_ids = loop_ids(step=self.nb, start_id=self.start_id)
+        self.fixed_ids = [k for k in range(self.start_id, self.start_id + self.nb)]
         self.fixed_vectors = gen_vectors(self.nb, self.dim)
 
     @property
@@ -459,6 +461,7 @@ class ConcurrentTaskSceneTest(DataClassBase):
 class ConcurrentInputParamsSceneInsertDeleteFlush(DataClassBase):
     insert_length: Optional[int] = 1
     delete_length: Optional[int] = 1
+    start_id: Optional[int] = 0
 
     # random id or vectors
     random_id: Optional[bool] = False
@@ -471,6 +474,7 @@ class ConcurrentTaskSceneInsertDeleteFlush(DataClassBase):
     dim: Optional[int]
     insert_length: Optional[int] = 1
     delete_length: Optional[int] = 1
+    start_id: Optional[int] = 0
 
     # random id or vectors
     random_id: Optional[bool] = False
@@ -482,8 +486,8 @@ class ConcurrentTaskSceneInsertDeleteFlush(DataClassBase):
     fixed_vectors = None
 
     def set_params(self):
-        self._loop_ids = loop_ids(step=self.insert_length)
-        self.fixed_ids = [k for k in range(self.insert_length)]
+        self._loop_ids = loop_ids(step=self.insert_length, start_id=self.start_id)
+        self.fixed_ids = [k for k in range(self.start_id, self.start_id + self.insert_length)]
         self.fixed_vectors = gen_vectors(self.insert_length, self.dim)
 
     @property
