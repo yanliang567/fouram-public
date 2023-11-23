@@ -24,12 +24,16 @@ class ClientTask:
         func = getattr(self.obj, "concurrent_{0}".format(name))
 
         def wrapper(*args, **kwargs):
-            result = func(*args, **kwargs)
-            exception = None if result.check_result else "False"
-            rt = result.rt * 1000
-            events.request.fire(request_type=concurrent_global_params.request_type, name=name,
-                                response_time=rt, response_length=0, exception=exception, context=User.context)
-
+            try:
+                result = func(*args, **kwargs)
+                exception = None if result.check_result else "False"
+                rt = result.rt * 1000
+                events.request.fire(request_type=concurrent_global_params.request_type, name=name,
+                                    response_time=rt, response_length=0, exception=exception, context=User.context)
+            except Exception as e:
+                events.request.fire(request_type=concurrent_global_params.request_type, name=name,
+                                    response_time=0, response_length=0, exception="False", context=User.context)
+                raise Exception(f"[ClientTask] {e}")
         return wrapper
 
 
