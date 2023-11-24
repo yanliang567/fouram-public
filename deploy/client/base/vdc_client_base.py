@@ -151,7 +151,7 @@ class VDCClientBase:
         if set_real_instance_id:
             self.real_instance_id, self.real_user_id = self.get_real_instance_id_and_userid(self.instance_id)
         else:
-            self.real_instance_id, self.real_user_id = self.instance_id, self.user_id
+            self.real_instance_id, self.real_user_id = self.instance_id, self.proxy_user_id
 
         self.ns = self.get_ns(self.real_instance_id)
         self.infra_api.reset_ns(self.ns)
@@ -169,7 +169,7 @@ class VDCClientBase:
     def get_real_instance_id_and_userid(self, instance_id=""):
         instance_id = instance_id or self.instance_id
         if self.rm_get_instance_type(instance_id=instance_id) == InstanceType.Milvus:
-            return instance_id, self.user_id
+            return instance_id, self.proxy_user_id
         res = self.cloud_rm_api.get_host(instance_id=instance_id)
         return check_multi_keys_exist(res.data, ["instanceId"]), check_multi_keys_exist(res.data, ["userId"])
 
@@ -359,7 +359,7 @@ class VDCClientBase:
             all_values = [i["paramName"] for i in res.data["list"]]
         else:
             all_values = []
-            self._raise(f"[VDCClientBase] Can't get instance's:{self.instance_name} config values:{res}")
+            self._raise(f"[VDCClientBase] Can't get instance's:{self.instance_name} config values:{res.to_dict}")
 
         # modify instance parameters
         log.debug(f"[VDCClientBase] modify params: {modify_params}")
@@ -367,7 +367,7 @@ class VDCClientBase:
             obj = self.cloud_rm_api.params_modify if param_name in all_values else self.cloud_rm_api.params_add
             res = obj(self.real_instance_id, param_name, param_value, user_id=self.real_user_id, check_result=False)
             if res.code not in [RMErrorCode.INSTANCE_PARAM_NO_NEED_MODIFY, 0]:
-                self._raise(f"[VDCClientBase] Update milvus param {param_name}:{param_value} failed:{res}")
+                self._raise(f"[VDCClientBase] Update milvus param {param_name}:{param_value} failed:{res.to_dict}")
 
         if instance_type == InstanceType.Milvus:
             # stop instance and check stopped
