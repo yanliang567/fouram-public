@@ -103,6 +103,10 @@ class CommonCases(Base):
         res_load = self.load_collection(**kwargs)
         self.case_report.add_attr(**{"load": {"RT": round(res_load.rt, Precision.LOAD_PRECISION)}})
 
+    def prepare_release(self, **kwargs):
+        res_release = self.release_collection(**kwargs)
+        self.case_report.add_attr(**{"release": {"RT": round(res_release.rt, Precision.RELEASE_PRECISION)}})
+
     def prepare_flush(self):
         if self.params_obj.flush_params.get(pn.prepare_flush, True):
             res_flush = self.flush_collection()

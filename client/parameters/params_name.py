@@ -5,6 +5,7 @@ OPTION = "option"
 dataset_params = "dataset_params"
 collection_params = "collection_params"
 load_params = "load_params"
+release_params = "release_params"
 flush_params = "flush_params"
 index_params = "index_params"
 search_params = "search_params"
@@ -69,6 +70,9 @@ replica_number = "replica_number"
 refresh = "_refresh"
 resource_groups = "_resource_groups"
 prepare_load = "prepare_load"
+
+# release
+release_of_reload = "release_of_reload"
 
 # flush
 prepare_flush = "prepare_flush"

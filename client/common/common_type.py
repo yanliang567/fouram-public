@@ -106,6 +106,7 @@ class AccMetrics:
 class Precision:
     # precision of params
     LOAD_PRECISION = 4
+    RELEASE_PRECISION = 4
     FLUSH_PRECISION = 4
     INDEX_PRECISION = 4
     SEARCH_PRECISION = 4

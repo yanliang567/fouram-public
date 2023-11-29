@@ -204,6 +204,7 @@ class GoBenchCases(CommonCases):
 
         # load prepare params
         _prepare_load = self.params_obj.load_params.pop("prepare_load", False)
+        _release_of_reload = self.params_obj.release_params.pop(pn.release_of_reload, False)
 
         # prepare data
         self.prepare_collection(vector_default_field_name, input_params.prepare, input_params.prepare_clean)
@@ -228,6 +229,8 @@ class GoBenchCases(CommonCases):
                 self.prepare_index(vector_field_name=vector_default_field_name,
                                    metric_type=self.params_obj.dataset_params[pn.metric_type],
                                    clean_index_before=input_params.rebuild_index)
+            if _release_of_reload:
+                self.prepare_release(**self.params_obj.release_params)
 
         self.count_entities()
         # load collection
@@ -399,7 +402,8 @@ class ConcurrentClientBase(CommonCases):
                                                   self.params_obj.dataset_params[pn.metric_type])
 
         # load prepare params
-        _prepare_load = self.params_obj.load_params.pop("prepare_load", False)
+        _prepare_load = self.params_obj.load_params.pop(pn.prepare_load, False)
+        _release_of_reload = self.params_obj.release_params.pop(pn.release_of_reload, False)
 
         # prepare data
         self.prepare_collection(vector_default_field_name, input_params.prepare, input_params.prepare_clean)
@@ -419,11 +423,13 @@ class ConcurrentClientBase(CommonCases):
             self.prepare_index(vector_field_name=vector_default_field_name,
                                metric_type=self.params_obj.dataset_params[pn.metric_type])
         else:
-            # if pass in rebuild_index, indexes of collection will be dropped before building index
+            # if pass in rebuild_index, collection will be released, indexes will be dropped before building index
             if input_params.rebuild_index:
                 self.prepare_index(vector_field_name=vector_default_field_name,
                                    metric_type=self.params_obj.dataset_params[pn.metric_type],
                                    clean_index_before=input_params.rebuild_index)
+            if _release_of_reload:
+                self.prepare_release(**self.params_obj.release_params)
 
         self.count_entities()
         # load collection

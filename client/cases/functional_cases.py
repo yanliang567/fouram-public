@@ -61,6 +61,7 @@ class FunctionalCases(CommonCases):
 
         # load prepare params
         _prepare_load = self.params_obj.load_params.pop("prepare_load", False)
+        _release_of_reload = self.params_obj.release_params.pop(pn.release_of_reload, False)
 
         # prepare data
         self.prepare_collection(vector_default_field_name, input_params.prepare, input_params.prepare_clean)
@@ -85,6 +86,8 @@ class FunctionalCases(CommonCases):
                 self.prepare_index(vector_field_name=vector_default_field_name,
                                    metric_type=self.params_obj.dataset_params[pn.metric_type],
                                    clean_index_before=input_params.rebuild_index)
+            if _release_of_reload:
+                self.prepare_release(**self.params_obj.release_params)
 
         self.count_entities()
         # load collection

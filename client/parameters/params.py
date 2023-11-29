@@ -14,6 +14,7 @@ class ParamsBase:
     dataset_params: Optional[dict] = field(default_factory=lambda: {})
     collection_params: Optional[dict] = field(default_factory=lambda: {})
     load_params: Optional[dict] = field(default_factory=lambda: {})
+    release_params: Optional[dict] = field(default_factory=lambda: {})
     flush_params: Optional[dict] = field(default_factory=lambda: {})
     index_params: Optional[dict] = field(default_factory=lambda: {})
     search_params: Optional[dict] = field(default_factory=lambda: {})
@@ -58,6 +59,7 @@ class ParamsFormat:
         load_params: {replica_number: ([type(int())], OPTION),
                       refresh: ([type(bool())], OPTION),
                       resource_groups: ([type(int()), type(list())], OPTION)},
+        release_params: {},
         flush_params: {prepare_flush: ([type(bool())], OPTION)},
         query_params: {output_fields: ([type(list()), type(None)], OPTION),
                        ignore_growing: ([type(bool())], OPTION)},
@@ -153,6 +155,7 @@ class ParamsFormat:
 
     common_concurrent = update_dict_value({
         load_params: {prepare_load: ([type(bool())], OPTION)},
+        release_params: {release_of_reload: ([type(bool())], OPTION)},
         concurrent_params: {concurrent_number: ([type((int())), type(list())], MUST),
                             during_time: ([type((int())), type((str()))], MUST),
                             interval: ([type((int()))], MUST),
@@ -165,6 +168,7 @@ class ParamsFormat:
 
     common_functional = update_dict_value({
         load_params: {prepare_load: ([type(bool())], OPTION)},
+        release_params: {release_of_reload: ([type(bool())], OPTION)},
         functional_params: ([type(dict())], MUST)
     }, common_scene_build_index)
 

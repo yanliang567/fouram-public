@@ -129,6 +129,11 @@ load_params:
   # support for `GoBenchCases`, `ConcurrentClientBase`, `FunctionalCases`
   prepare_load: false / <bool>
 
+release_params:
+  # whether to release collection when case_skip_prepare. support for `GoBenchCases`, `ConcurrentClientBase`, FunctionalCases
+  # Notice: By default, collection will be loaded after preparing
+  release_of_reload: false / <bool>
+
 # `scene_search`, `scene_search_recall`, `scene_go_search` these three scenes use this set of search parameters
 search_params:
   # search vectors number

@@ -27,6 +27,7 @@ class CommonParams:
                              pn.enable_dynamic_field: enable_dynamic_field}
         load_params = {pn.replica_number: replica_number,
                        pn.resource_groups: resource_groups}
+        release_params = {}
         index_params = {pn.index_type: index_type,
                         pn.index_param: index_param}
         query_params = {pn.ids: ids,
@@ -49,6 +50,7 @@ class CommonParams:
             pn.dataset_params: dataset_params,
             pn.collection_params: collection_params,
             pn.load_params: load_params,
+            pn.release_params: release_params,
             pn.index_params: index_params,
             pn.query_params: query_params,
             pn.search_params: search_params,
