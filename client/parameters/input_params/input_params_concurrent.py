@@ -210,7 +210,7 @@ class ConcurrentParams(CommonParams):
 
     @staticmethod
     def params_scene_insert_delete_flush(weight=1, insert_length=1, delete_length=1, random_id=False,
-                                         random_vector=False, varchar_filled=False, start_id=0):
+                                         random_vector=False, varchar_filled=False, start_id=0, timeout=None):
         """
         insert_length: Optional[int] = 1
         delete_length: Optional[int] = 1
@@ -222,7 +222,8 @@ class ConcurrentParams(CommonParams):
         """
         return {"type": "scene_insert_delete_flush", "weight": weight,
                 "params": {"insert_length": insert_length, "delete_length": delete_length, "start_id": start_id,
-                           "random_id": random_id, "random_vector": random_vector, "varchar_filled": varchar_filled}}
+                           "random_id": random_id, "random_vector": random_vector, "varchar_filled": varchar_filled,
+                           "timeout": timeout}}
 
     @staticmethod
     def params_scene_insert_partition(weight=1, data_size="1m", ni=5, with_flush=False, timeout: int = 30):

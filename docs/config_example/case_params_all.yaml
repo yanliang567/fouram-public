@@ -336,6 +336,7 @@ concurrent_tasks:
       random_id: Optional[bool] = False
       random_vector: Optional[bool] = False
       varchar_filled: Optional[bool] = False
+      timeout: Optional[int] = None # timeout for insert, delete and flush
 
   - type: scene_insert_partition
     weight: 1

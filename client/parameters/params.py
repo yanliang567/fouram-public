@@ -467,6 +467,7 @@ class ConcurrentInputParamsSceneInsertDeleteFlush(DataClassBase):
     random_id: Optional[bool] = False
     random_vector: Optional[bool] = False
     varchar_filled: Optional[bool] = False
+    timeout: Optional[int] = None
 
 
 @dataclass
@@ -480,6 +481,7 @@ class ConcurrentTaskSceneInsertDeleteFlush(DataClassBase):
     random_id: Optional[bool] = False
     random_vector: Optional[bool] = False
     varchar_filled: Optional[bool] = False
+    timeout: Optional[int] = None
 
     _loop_ids = None
     fixed_ids = None
@@ -511,6 +513,10 @@ class ConcurrentTaskSceneInsertDeleteFlush(DataClassBase):
     def get_delete_ids(self):
         return concurrent_global_params.get_data_from_insert_queue(
             concurrent_global_params.concurrent_insert_delete_flush, self.delete_length)
+
+    @property
+    def obj_params(self):
+        return {"timeout": self.timeout}
 
 
 @dataclass

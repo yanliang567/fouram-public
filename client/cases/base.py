@@ -834,13 +834,13 @@ class Base:
         # insert vectors
         entities = gen_entities(self.collection_schema, params.get_vectors, params.get_insert_ids,
                                 params.varchar_filled)
-        self.collection_wrap.insert(entities)
+        self.collection_wrap.insert(entities, **params.obj_params)
 
         # delete vectors
-        self.collection_wrap.delete(expr="id in {}".format(params.get_delete_ids))
+        self.collection_wrap.delete(expr="id in {}".format(params.get_delete_ids), **params.obj_params)
 
         # flush collection
-        self.flush_collection(log_level=log_level)
+        self.flush_collection(log_level=log_level, **params.obj_params)
         return "[Base] concurrent_scene_insert_delete_flush finished."
 
     @func_time_catch()
