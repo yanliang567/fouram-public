@@ -287,10 +287,10 @@ class Base:
         log.info("[Base] Start disconnect connection.")
         self.remove_connect()
 
-    def flush_collection(self, collection_obj: callable = None, log_level=LogLevel.INFO):
+    def flush_collection(self, collection_obj: callable = None, log_level=LogLevel.INFO, **kwargs):
         collection_obj = collection_obj or self.collection_wrap
         log.customize(log_level)("[Base] Start flush collection {}".format(collection_obj.name))
-        return collection_obj.flush()
+        return collection_obj.flush(**kwargs)
 
     def load_collection(self, replica_number=1, collection_obj: callable = None, log_level=LogLevel.INFO, **kwargs):
         collection_obj = collection_obj or self.collection_wrap
@@ -299,9 +299,9 @@ class Base:
             f"[Base] Start load collection {collection_obj.name},replica_number:{replica_number},kwargs:{kwargs}")
         return collection_obj.load(replica_number=replica_number, **kwargs)
 
-    def release_collection(self):
+    def release_collection(self, **kwargs):
         log.info("[Base] Start release collection {}".format(self.collection_wrap.name))
-        return self.collection_wrap.release()
+        return self.collection_wrap.release(**kwargs)
 
     def get_collection_schema(self):
         self.collection_schema = self.collection_wrap.schema.to_dict()
@@ -840,7 +840,7 @@ class Base:
         self.collection_wrap.delete(expr="id in {}".format(params.get_delete_ids), **params.obj_params)
 
         # flush collection
-        self.flush_collection(log_level=log_level, **params.obj_params)
+        self.collection_wrap.flush(**params.obj_params)
         return "[Base] concurrent_scene_insert_delete_flush finished."
 
     @func_time_catch()
