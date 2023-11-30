@@ -38,16 +38,35 @@ dataset_params:
     # `other_params` for inserting values
 
     # default column: float_vector, id
-    # Do not modify the vector field dataset from here, this is just an example of passing parameters !!!
+    # Do not modify the vector field `float_vector` dataset from here, this is just an example of passing parameters !!!
     float_vector:
       other_params:
         dataset: laion2b_multi
         column_name: float32_vector
         dim: 768
+    # After milvus supports multiple vectors, parameters can be passed
+    float_vector_1:
+      params:
+        dim: 768
+      other_params:
+        dataset: cohere10m_parquet
+        column_name: emb
+        dim: 768
+    float_vector_2:
+      params:
+        dim: 768
+      other_params:
+        dataset: sift
+    binary_vector_1:
+      params:
+        dim: 512
+      other_params:
+        dataset: binary
     id:
       other_params:
         dataset: laion2b_multi
         column_name: pk  # for int64 primary key
+        dim: 768
     # Scalar naming rules: `DataType` as prefix
     int64_1:
       other_params:

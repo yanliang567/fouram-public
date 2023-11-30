@@ -126,6 +126,10 @@ PARQUET = "parquet"
 # data type name lower
 ARRAY = "array"
 
+# dataset config
+VECTOR = "vector"
+SCALAR = "scalar"
+
 
 class AccDatasetsName:
     sift_128_euclidean = "sift-128-euclidean"

@@ -21,9 +21,9 @@ from client.client_base.schema_wrapper import ApiCollectionSchemaWrapper, ApiFie
 from client.parameters import params_name as pn
 from client.common.common_type import DefaultValue as dv
 from client.common.common_type import NAS, SimilarityMetrics, AccMetrics, Precision
-from client.common.common_param import DatasetType, DatasetPath, ScalarDatasetPath, GoBenchIndex, SegmentsAnalysis
-
+from client.common.common_param import GoBenchIndex, SegmentsAnalysis
 from commons.common_params import EnvVariable
+from configs.config_info import config_info
 from utils.util_log import log
 
 """API func"""
@@ -153,7 +153,7 @@ def get_search_ids(result):
 
 def get_ground_truth_ids(data_size, data_type: str):
     size = str(int(parser_data_size(data_size) / 1000000)) + "M"
-    gnd_file_name = DatasetPath.get(data_type + "_ground_truth", "") + f"/idx_{size}.ivecs"
+    gnd_file_name = config_info.dataset_config.ground_truth_dir(data_type) + f"/idx_{size}.ivecs"
 
     if check_file_exist(gnd_file_name):
         a = np.fromfile(gnd_file_name, dtype='int32')
@@ -184,33 +184,31 @@ def get_default_field_name(data_type=DataType.FLOAT_VECTOR, default_field_name: 
 
 
 def get_vector_type(data_type):
-    if data_type in ["random", "sift", "deep", "glove", "local", "gist", "text2img", "laion", "embed",
-                     "cohere10m_parquet", "laion1b_nolang", "laion2b_multi"]:
-        vector_type = DataType.FLOAT_VECTOR
-    elif data_type in ["binary", "kosarak"]:
-        vector_type = DataType.BINARY_VECTOR
-    else:
+    vector_type = getattr(DataType, config_info.dataset_config.vector_type(data_type), None)
+    if vector_type is None:
         raise Exception("Data type: %s not defined" % data_type)
     return vector_type
 
 
 def gen_file_name(file_id, dim, data_type):
-    file_name = "%s_%sd_%05d.%s" % (dv.FILE_PREFIX, str(dim), int(file_id), DatasetType.get(data_type, pn.NUMPY))
+    file_name = "%s_%sd_%05d.%s" % (
+    dv.FILE_PREFIX, str(dim), int(file_id), config_info.dataset_config.dataset_type(data_type))
 
-    if data_type in DatasetPath.keys():
-        return DatasetPath[data_type] + file_name
+    if data_type in config_info.dataset_config.vector_to_list:
+        return config_info.dataset_config.dir(data_type) + file_name
     else:
         log.error("[gen_file_name] data type not supported: {}".format(data_type))
         return ""
 
 
 def gen_scalar_file_name(file_id, dataset_name: str, dim=dv.default_dim):
-    if DatasetType.get(dataset_name, pn.NUMPY) == pn.NUMPY:
+    if config_info.dataset_config.dataset_type(dataset_name) == pn.NUMPY:
         file_name = "%s_%05d.npy" % (dv.SCALAR_FILE_PREFIX, int(file_id))
     else:
         file_name = "%s_%sd_%05d.parquet" % (dv.FILE_PREFIX, int(dim), int(file_id))
-    if dataset_name in ScalarDatasetPath.keys():
-        return ScalarDatasetPath[dataset_name] + file_name
+
+    if dataset_name in config_info.dataset_config.scalar_to_list:
+        return config_info.dataset_config.dir(dataset_name) + file_name
     else:
         log.error("[gen_scalar_file_name] data type not supported: {}".format(dataset_name))
         return ""
@@ -428,25 +426,20 @@ def parser_search_params_expr(expr):
 
 
 def get_vectors_from_binary(nq, dimension, dataset_name):
-    if dataset_name in ["sift", "deep", "binary", "gist", "text2img", "laion", "embed", "cohere10m_parquet",
-                        "laion1b_nolang", "laion2b_multi"]:
-        # dataset_name: local, sift, deep, binary
-        file_name = DatasetPath[dataset_name] + "query.npy"
-
-    elif dataset_name in ["random"]:
-        file_name = DatasetPath[dataset_name] + "query_%d.npy" % dimension
-
+    if dataset_name in ["random"]:
+        file_name = config_info.dataset_config.dir(dataset_name) + "query_%d.npy" % dimension
     elif dataset_name == "local":
         return gen_vectors(nq, dimension)
-
     else:
-        raise Exception("[get_vectors_from_binary] Not support dataset: {0}, please check".format(dataset_name))
+        file_name = config_info.dataset_config.query_file_dir(dataset_name)
 
-    data = np.load(file_name, allow_pickle=True)
-    if nq > len(data):
-        raise Exception("[get_vectors_from_binary] nq large than file support({0})".format(len(data)))
-    vectors = data[0:nq].tolist()
-    return vectors
+    if file_name:
+        data = np.load(file_name, allow_pickle=True)
+        if nq > len(data):
+            raise Exception("[get_vectors_from_binary] nq large than file support({0})".format(len(data)))
+        vectors = data[0:nq].tolist()
+        return vectors
+    raise Exception("[get_vectors_from_binary] Not support dataset: {0}, please check".format(dataset_name))
 
 
 def gen_insert_scalars_params(scalars_params: dict):
