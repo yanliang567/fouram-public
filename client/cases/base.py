@@ -238,10 +238,10 @@ class Base:
 
     def create_collection(self, collection_name="", vector_field_name="", schema=None, other_fields=[], shards_num=2,
                           collection_obj: callable = None, log_level=LogLevel.INFO, varchar_id=False, scalars_params={},
-                          **kwargs):
+                          auto_id=False, **kwargs):
         """ Create a collection with default schema """
         schema = gen_collection_schema(
-            vector_field_name=vector_field_name, other_fields=other_fields, varchar_id=varchar_id,
+            vector_field_name=vector_field_name, other_fields=other_fields, varchar_id=varchar_id, auto_id=auto_id,
             max_length=kwargs.pop(max_length, dv.default_max_length), dim=kwargs.pop(dim, dv.default_dim),
             scalars_params=scalars_params, enable_dynamic_field=kwargs.pop(enable_dynamic_field, False)) \
             if schema is None else schema
@@ -313,17 +313,16 @@ class Base:
             return self.collection_wrap.create_partition(partition_name=partition_name, **kwargs)
 
     def insert_batch(self, vectors, ids, data_size, varchar_filled=False, collection_obj: callable = None,
-                     collection_schema=None, log_level=LogLevel.INFO, insert_scalars_params={}, **kwargs):
+                     collection_schema=None, log_level=LogLevel.INFO, insert_scalars_params={}, anns_field: str = None,
+                     **kwargs):
         if self.collection_schema is None and collection_schema is None:
             self.get_collection_schema()
             collection_schema = self.collection_schema
         else:
             collection_schema = collection_schema or self.collection_schema
 
-        if isinstance(vectors, list):
-            entities = gen_entities(collection_schema, vectors, ids, varchar_filled, insert_scalars_params)
-        else:
-            entities = gen_entities(collection_schema, vectors.tolist(), ids, varchar_filled, insert_scalars_params)
+        v = vectors if isinstance(vectors, list) else vectors.tolist()
+        entities = gen_entities(collection_schema, v, ids, varchar_filled, insert_scalars_params, anns_field)
 
         log.customize(log_level)(
             "[Base] Start inserting, ids: {0} - {1}, data size: {2}".format(ids[0], ids[-1], data_size))
@@ -334,7 +333,7 @@ class Base:
 
     def insert(self, data_type, dim, size, ni, varchar_filled=False, collection_obj: callable = None, column_name="",
                collection_schema=None, collection_name="", log_level=LogLevel.INFO, scalars_params={},
-               input_obj: PrepareInsertParams = None, **kwargs):
+               input_obj: PrepareInsertParams = None, anns_field: str = None, **kwargs):
         data_size = parser_data_size(size)
         data_size_format = str(format(data_size, ',d'))
         ni_cunt = int(data_size / int(ni)) if int(ni) != 0 else 0
@@ -353,24 +352,26 @@ class Base:
         if data_type == "local":
             for i in range(0, ni_cunt):
                 batch_rt += self.insert_batch(
-                    gen_vectors(ni, dim), p_i.loop_ids(ni), data_size_format, varchar_filled, collection_obj,
-                    collection_schema, log_level, p_i.insert_scalars_params(ni), **kwargs)
+                    gen_vectors(ni, dim, field_name=anns_field), p_i.loop_ids(ni), data_size_format, varchar_filled,
+                    collection_obj, collection_schema, log_level, p_i.insert_scalars_params(ni), anns_field, **kwargs)
 
             if last_insert > 0:
                 last_rt = self.insert_batch(
-                    gen_vectors(last_insert, dim), p_i.loop_ids(last_insert), data_size_format, varchar_filled,
-                    collection_obj, collection_schema, log_level, p_i.insert_scalars_params(last_insert), **kwargs)
+                    gen_vectors(last_insert, dim, field_name=anns_field), p_i.loop_ids(last_insert), data_size_format,
+                    varchar_filled, collection_obj, collection_schema, log_level,
+                    p_i.insert_scalars_params(last_insert), anns_field, **kwargs)
 
         else:
             for i in range(0, ni_cunt):
                 batch_rt += self.insert_batch(
                     p_i.get_vectors(ni), p_i.loop_ids(ni), data_size_format, varchar_filled, collection_obj,
-                    collection_schema, log_level, p_i.insert_scalars_params(ni), **kwargs)
+                    collection_schema, log_level, p_i.insert_scalars_params(ni), anns_field, **kwargs)
 
             if last_insert > 0:
                 last_rt = self.insert_batch(
                     p_i.get_vectors(last_insert), p_i.loop_ids(last_insert), data_size_format, varchar_filled,
-                    collection_obj, collection_schema, log_level, p_i.insert_scalars_params(last_insert), **kwargs)
+                    collection_obj, collection_schema, log_level, p_i.insert_scalars_params(last_insert), anns_field,
+                    **kwargs)
 
         total_time = round((batch_rt + last_rt), Precision.COMMON_PRECISION)
         ips = round(int(data_size) / total_time, Precision.INSERT_PRECISION) if total_time != 0 else 0
@@ -388,7 +389,7 @@ class Base:
         }
 
     def ann_insert(self, source_vectors, ni=100, scalars_params={}, size: int = None,
-                   input_obj: PrepareInsertParams = None, **kwargs):
+                   input_obj: PrepareInsertParams = None, anns_field: str = None, **kwargs):
         size = size if size is not None else len(source_vectors)
         data_size_format = str(format(size, ',d'))
         ni_cunt = int(size / int(ni))
@@ -403,12 +404,12 @@ class Base:
         for i in range(ni_cunt):
             batch_rt += self.insert_batch(
                 p_i.get_acc_vectors(ni), p_i.loop_ids(ni), data_size_format,
-                insert_scalars_params=p_i.insert_scalars_params(ni), **kwargs)
+                insert_scalars_params=p_i.insert_scalars_params(ni), anns_field=anns_field, **kwargs)
 
         if last_insert > 0:
             last_rt = self.insert_batch(
                 p_i.get_acc_vectors(last_insert), p_i.loop_ids(last_insert), data_size_format,
-                insert_scalars_params=p_i.insert_scalars_params(last_insert), **kwargs)
+                insert_scalars_params=p_i.insert_scalars_params(last_insert), anns_field=anns_field, **kwargs)
 
         total_time = round(batch_rt + last_rt, Precision.INSERT_PRECISION)
         log.info("[Base] Total time of ann insert: {}s".format(total_time))
@@ -419,7 +420,7 @@ class Base:
         }
 
     def build_index(self, field_name, index_type, metric_type, index_param, collection_obj: callable = None,
-                    collection_name="", log_level=LogLevel.INFO):
+                    collection_name="", log_level=LogLevel.INFO, **kwargs):
         """
         {"index_type": "IVF_FLAT", "metric_type": "L2", "params": {"nlist": 128}}
         """
@@ -427,20 +428,21 @@ class Base:
         collection_name = collection_name or self.collection_name
 
         log.customize(log_level)(
-            "[Base] Start build index of {0} for collection {1}, params:{2}".format(
-                index_type, collection_name, index_params))
+            "[Base] Start build index of {0} for field:{1} collection:{2}, params:{3}".format(
+                index_type, field_name, collection_name, index_params))
         collection_obj = collection_obj or self.collection_wrap
-        return self.index_wrap.init_index(collection_obj.collection, field_name, index_params)
+        return self.index_wrap.init_index(collection_obj.collection, field_name, index_params, **kwargs)
 
     def build_scalar_index(self, field_name):
         log.info("[Base] Start build scalar index of {0}".format(field_name))
         return self.index_wrap.init_index(self.collection_wrap.collection, field_name, index_params={})
 
-    def show_index(self):
+    def show_index(self, collection_name=""):
+        collection_name = collection_name or self.collection_name
         check_indexes = self.collection_wrap.indexes
         if check_indexes:
             _indexes_result = [{i.field_name: i.params} for i in check_indexes]
-            log.info("[Base] Params of index: {}".format(_indexes_result))
+            log.info("[Base] Index params of {0}:{1}".format(collection_name, _indexes_result))
             return _indexes_result
 
         log.info("[Base] Collection:{0} is not building index".format(self.collection_wrap.name))
@@ -448,7 +450,7 @@ class Base:
 
     def describe_collection_index(self):
         indexes = self.collection_wrap.indexes
-        log.info("[Base] Collection:{0} indexes".format(self.collection_wrap.name, indexes))
+        log.info("[Base] Collection:{0} indexes: {1}".format(self.collection_wrap.name, indexes))
         return indexes
 
     def clean_index(self):
@@ -748,7 +750,7 @@ class Base:
 
     def concurrent_search(self, params: ConcurrentTaskSearch):
         if params.random_data:
-            params.data = gen_vectors(nb=len(params.data), dim=len(params.data[0]))
+            params.data = gen_vectors(nb=len(params.data), dim=params.dim, field_name=params.anns_field)
         return self.collection_wrap.search(check_task=CheckTasks.assert_result, **params.obj_params)
 
     def concurrent_query(self, params: ConcurrentTaskQuery):
@@ -781,11 +783,13 @@ class Base:
         return "[Base] concurrent_load_release finished."
 
     def concurrent_insert(self, params: ConcurrentTaskInsert):
-        entities = gen_entities(self.collection_schema, params.get_vectors, params.get_ids, params.varchar_filled)
+        entities = gen_entities(self.collection_schema, params.get_vectors, params.get_ids, params.varchar_filled,
+                                anns_field=params.anns_field)
         return self.collection_wrap.insert(entities, check_task=CheckTasks.assert_result, **params.obj_params)
 
     def concurrent_upsert(self, params: ConcurrentTaskUpsert):
-        entities = gen_entities(self.collection_schema, params.get_vectors, params.get_ids, params.varchar_filled)
+        entities = gen_entities(self.collection_schema, params.get_vectors, params.get_ids, params.varchar_filled,
+                                anns_field=params.anns_field)
         return self.collection_wrap.upsert(entities, check_task=CheckTasks.assert_result, **params.obj_params)
 
     def concurrent_delete(self, params: ConcurrentTaskDelete):
@@ -806,7 +810,8 @@ class Base:
         # insert vectors
         self.insert(data_type="local", dim=params.dim, size=params.data_size, ni=params.nb,
                     collection_obj=collection_obj, collection_name=collection_name,
-                    collection_schema=collection_obj.schema.to_dict(), log_level=log_level)
+                    collection_schema=collection_obj.schema.to_dict(), log_level=log_level,
+                    anns_field=params.vector_field_name)
 
         # flush collection
         self.flush_collection(collection_obj=collection_obj, log_level=log_level)
@@ -833,7 +838,7 @@ class Base:
 
         # insert vectors
         entities = gen_entities(self.collection_schema, params.get_vectors, params.get_insert_ids,
-                                params.varchar_filled)
+                                params.varchar_filled, anns_field=params.anns_field)
         self.collection_wrap.insert(entities, **params.obj_params)
 
         # delete vectors
@@ -846,7 +851,7 @@ class Base:
     @func_time_catch()
     def concurrent_scene_insert_partition(self, params: ConcurrentTaskSceneInsertPartition):
         log_level = LogLevel.DEBUG
-        _dim = self.get_collection_params(self.collection_wrap)[1]
+        _vector_field_name, _dim, _, _, _ = self.get_collection_params(self.collection_wrap)
         partition_obj = ApiPartitionWrapper()
         partition_name = gen_unique_str("p")
 
@@ -858,11 +863,14 @@ class Base:
         self.insert(data_type="local", dim=_dim, size=params.data_size, ni=params.ni,
                     collection_obj=self.collection_wrap, collection_name=self.collection_wrap.name,
                     collection_schema=self.collection_schema, log_level=log_level, partition_name=partition_name,
-                    **params.obj_params)
+                    anns_field=_vector_field_name, **params.obj_params)
 
         if params.with_flush:
             self.flush_partition(partition_obj, log_level)
 
+        # release before dropping
+        self.release_partition(partition_obj, log_level=log_level, timeout=params.timeout,
+                               check_task=CheckTasks.assert_result)
         # drop partition
         self.drop_partition(partition_obj, log_level)
         return "[Base] concurrent_scene_insert_partition finished."
@@ -883,7 +891,7 @@ class Base:
         self.insert(data_type="local", dim=_dim, size=params.data_size, ni=params.ni,
                     collection_obj=self.collection_wrap, collection_name=self.collection_wrap.name,
                     collection_schema=self.collection_schema, log_level=log_level, partition_name=partition_name,
-                    **params.obj_params)
+                    anns_field=_vector_field_name, **params.obj_params)
 
         # flush partition
         self.flush_partition(partition_obj, log_level=log_level)
@@ -899,7 +907,7 @@ class Base:
         self.load_partition(partition_obj, log_level=log_level)
 
         # search partition
-        data = gen_vectors(nb=params.nq, dim=_dim)
+        data = gen_vectors(nb=params.nq, dim=_dim, field_name=_vector_field_name)
         self.search_partition(data=data, anns_field=_vector_field_name, param=params.search_param, limit=params.limit,
                               partition_obj=partition_obj, check_task=CheckTasks.assert_result, log_level=log_level,
                               **params.obj_params)
@@ -909,7 +917,7 @@ class Base:
                                check_task=CheckTasks.assert_result)
         self.search_partition(data=data, anns_field=_vector_field_name, param=params.search_param, limit=params.limit,
                               partition_obj=partition_obj, check_task=CheckTasks.err_res,
-                              check_items={dv.err_code: 0, dv.err_msg: f"was not loaded into memory"},
+                              check_items={dv.err_code: 65535, dv.err_msg: f"partition not loaded"},
                               log_level=log_level, **params.obj_params)
 
         # drop partition
@@ -941,7 +949,7 @@ class Base:
 
                 if params.anns_field and dim and metric_type and index_type:
                     # set search vectors
-                    params.data = gen_vectors(nb=params.nq, dim=dim)
+                    params.data = gen_vectors(nb=params.nq, dim=dim, field_name=params.anns_field)
                     params.param = update_dict_value(params.param,
                                                      {"metric_type": metric_type,
                                                       "params": get_default_search_params(index_type=index_type)})
@@ -957,7 +965,7 @@ class Base:
                                   timeout=params.timeout)
 
         if params.random_data:
-            params.data = gen_vectors(nb=len(params.data), dim=len(params.data[0]))
+            params.data = gen_vectors(nb=len(params.data), dim=params.dim, field_name=params.anns_field)
         self.collection_wrap.search(check_task=CheckTasks.assert_result, **params.obj_params)
 
         self.collection_wrap.release(check_task=CheckTasks.assert_result, timeout=params.timeout)
@@ -981,14 +989,14 @@ class Base:
 
         # create collection
         self.create_collection(collection_obj=collection_obj, collection_name=collection_name,
-                               shards_num=params.shards_num, vector_field_name=params.vector_field_name, dim=params.dim,
+                               shards_num=params.shards_num, vector_field_name=params.anns_field, dim=params.dim,
                                using=connect_using, log_level=log_level)
         time.sleep(1)
 
         # prepare before inserting
         if params.prepare_before_insert:
             # build index
-            self.build_index(field_name=params.vector_field_name, index_type=params.index_type,
+            self.build_index(field_name=params.anns_field, index_type=params.index_type,
                              metric_type=params.metric_type, index_param=params.index_param,
                              collection_name=collection_name, collection_obj=collection_obj, log_level=log_level)
 
@@ -999,7 +1007,8 @@ class Base:
         # insert vectors
         self.insert(data_type=params.dataset, dim=params.dim, size=params.data_size, ni=params.nb,
                     collection_obj=collection_obj, collection_name=collection_name,
-                    collection_schema=collection_obj.schema.to_dict(), log_level=log_level)
+                    collection_schema=collection_obj.schema.to_dict(), log_level=log_level,
+                    anns_field=params.anns_field)
 
         # flush collection
         self.flush_collection(collection_obj=collection_obj, log_level=log_level)
@@ -1008,7 +1017,7 @@ class Base:
         self.count_entities(collection_obj=collection_obj, log_level=log_level)
 
         # build index
-        self.build_index(field_name=params.vector_field_name, index_type=params.index_type,
+        self.build_index(field_name=params.anns_field, index_type=params.index_type,
                          metric_type=params.metric_type, index_param=params.index_param,
                          collection_name=collection_name, collection_obj=collection_obj, log_level=log_level)
 
@@ -1020,7 +1029,7 @@ class Base:
         log.customize(log_level)("[Base] Search collection {}.".format(collection_obj.name))
         for i in range(params.search_counts):
             res = collection_obj.search(
-                gen_vectors(nb=params.nq, dim=params.dim), anns_field=params.vector_field_name,
+                gen_vectors(nb=params.nq, dim=params.dim, field_name=params.anns_field), anns_field=params.anns_field,
                 param={"metric_type": params.metric_type, "params": params.search_param},
                 limit=params.top_k, check_task=CheckTasks.assert_result)
             search_results.append(res.check_result)

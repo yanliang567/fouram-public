@@ -68,10 +68,11 @@ class GoBenchCases(CommonCases):
         result_check = True if "response" in res_go and res_go["response"] is True else False
         return self.case_report.to_dict(), result_check
 
-    def parser_go_bench_tasks_params(self, req_type, req_params):
+    def parser_go_bench_tasks_params(self, req_type, req_params, vector_field_name: str = None):
         if req_type == pn.search:
             params = ConcurrentInputParamsSearch(**req_params)
-            result = self.go_bench_search_param_analysis(_search_params=params.to_dict)
+            result = self.go_bench_search_param_analysis(
+                _search_params=params.to_dict, vector_field_name=vector_field_name)
             return dacite.from_dict(data_class=ConcurrentGoBenchParamsSearch, data=result)
 
         elif req_type == pn.query:
@@ -81,14 +82,15 @@ class GoBenchCases(CommonCases):
 
         return DataClassBase()
 
-    def parser_concurrent_tasks(self, tasks: list) -> list:
+    def parser_concurrent_tasks(self, tasks: list, vector_field_name: str = None) -> list:
         tasks_dict = {}
         all_support_obj = ConcurrentGoBenchTasksParams().all_obj
         for task in tasks:
             if task["type"] not in all_support_obj:
                 log.error(f"[parser_concurrent_tasks] Task type:{task['type']} is not supported, please check!!!")
             else:
-                task["params"] = self.parser_go_bench_tasks_params(task["type"], task["params"])
+                task["params"] = self.parser_go_bench_tasks_params(
+                    task["type"], task["params"], vector_field_name=vector_field_name)
                 tasks_dict.update({task["type"]: ConcurrentObjParams(**task)})
         p = ConcurrentGoBenchTasksParams(**tasks_dict).to_list
         if len(p) == 0:
@@ -126,7 +128,8 @@ class GoBenchCases(CommonCases):
             self.prepare_insert(data_type=self.params_obj.dataset_params[pn.dataset_name],
                                 dim=self.params_obj.dataset_params[pn.dim],
                                 size=self.params_obj.dataset_params[pn.dataset_size],
-                                ni=self.params_obj.dataset_params[pn.ni_per])
+                                ni=self.params_obj.dataset_params[pn.ni_per],
+                                vector_field_name=vector_default_field_name)
             self.prepare_flush()
             self.prepare_index(vector_field_name=vector_default_field_name,
                                metric_type=self.params_obj.dataset_params[pn.metric_type])
@@ -200,7 +203,8 @@ class GoBenchCases(CommonCases):
         vector_default_field_name = get_default_field_name(
             vector_type, self.params_obj.dataset_params.get(pn.vector_field_name, ""))
 
-        input_params.params[pn.concurrent_tasks] = self.parser_concurrent_tasks(self.params_obj.concurrent_tasks)
+        input_params.params[pn.concurrent_tasks] = self.parser_concurrent_tasks(
+            self.params_obj.concurrent_tasks, vector_field_name=vector_default_field_name)
 
         # load prepare params
         _prepare_load = self.params_obj.load_params.pop("prepare_load", False)
@@ -219,7 +223,8 @@ class GoBenchCases(CommonCases):
             self.prepare_insert(data_type=self.params_obj.dataset_params[pn.dataset_name],
                                 dim=self.params_obj.dataset_params[pn.dim],
                                 size=self.params_obj.dataset_params[pn.dataset_size],
-                                ni=self.params_obj.dataset_params[pn.ni_per])
+                                ni=self.params_obj.dataset_params[pn.ni_per],
+                                vector_field_name=vector_default_field_name)
             self.prepare_flush()
             self.prepare_index(vector_field_name=vector_default_field_name,
                                metric_type=self.params_obj.dataset_params[pn.metric_type])
@@ -303,6 +308,7 @@ class ConcurrentClientBase(CommonCases):
             result, nq, top_k, expr, other_params = \
                 self.search_param_analysis(_search_params=params.to_dict, default_field_name=vector_field_name,
                                            metric_type=metric_type)
+            result.update({"dim": self.params_obj.dataset_params[pn.dim]})
             return ConcurrentTaskSearch(**result)
 
         elif req_type == pn.query:
@@ -312,7 +318,8 @@ class ConcurrentClientBase(CommonCases):
 
         elif req_type in [pn.insert, pn.upsert]:
             params = eval("ConcurrentInputParams{0}(**req_params).to_dict".format(req_type.capitalize()))
-            params.update({"dim": self.params_obj.dataset_params[pn.dim]})
+            params.update({"dim": self.params_obj.dataset_params[pn.dim],
+                           "anns_field": vector_field_name})
             _p = eval("ConcurrentTask{0}(**params)".format(req_type.capitalize()))
             _p.set_params()
             return _p
@@ -326,7 +333,8 @@ class ConcurrentClientBase(CommonCases):
 
         elif req_type == pn.scene_insert_delete_flush:
             params = ConcurrentInputParamsSceneInsertDeleteFlush(**req_params).to_dict
-            params.update({"dim": self.params_obj.dataset_params[pn.dim]})
+            params.update({"dim": self.params_obj.dataset_params[pn.dim],
+                           "anns_field": vector_field_name})
             _p = ConcurrentTaskSceneInsertDeleteFlush(**params)
             _p.set_params()
             return _p
@@ -352,6 +360,7 @@ class ConcurrentClientBase(CommonCases):
             result, nq, top_k, expr, other_params = \
                 self.search_param_analysis(_search_params=params.to_dict, default_field_name=vector_field_name,
                                            metric_type=metric_type)
+            result.update({"dim": self.params_obj.dataset_params[pn.dim]})
             return ConcurrentTaskLoadSearchRelease(**result)
 
         elif req_type == pn.scene_search_test:
@@ -418,7 +427,8 @@ class ConcurrentClientBase(CommonCases):
             self.prepare_insert(data_type=self.params_obj.dataset_params[pn.dataset_name],
                                 dim=self.params_obj.dataset_params[pn.dim],
                                 size=self.params_obj.dataset_params[pn.dataset_size],
-                                ni=self.params_obj.dataset_params[pn.ni_per])
+                                ni=self.params_obj.dataset_params[pn.ni_per],
+                                vector_field_name=vector_default_field_name)
             self.prepare_flush()
             self.prepare_index(vector_field_name=vector_default_field_name,
                                metric_type=self.params_obj.dataset_params[pn.metric_type])

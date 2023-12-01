@@ -9,9 +9,9 @@ from commons.common_params import EnvVariable
 class Error:
     """ define error class """
 
-    def __init__(self, error):
-        self.code = getattr(error, 'code', -1)
-        self.message = getattr(error, 'message', str(error))
+    def __init__(self, res: dict):
+        self.code = res.get("code", -1)
+        self.message = res.get("message", str(res))
 
 
 class CheckTasks:

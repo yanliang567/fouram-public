@@ -3,10 +3,14 @@ import random
 from dataclasses import dataclass, field
 from typing import Optional, Union, List
 
+from pymilvus import DataType
+
 from client.common.common_func import (
     gen_combinations, update_dict_value, loop_ids, gen_vectors, get_default_field_name, gen_unique_str)
 from client.common.common_type import concurrent_global_params, DefaultValue
 from client.parameters.params_name import *
+
+from configs.config_info import config_info
 
 
 @dataclass
@@ -46,6 +50,7 @@ class ParamsFormat:
             max_length: ([type(int())], OPTION),
             varchar_filled: ([type(bool())], OPTION),
             scalars_index: ([type(list())], OPTION),
+            vectors_index: ([type(dict())], OPTION),
             scalars_params: ([type(dict())], OPTION),
             show_resource_groups: ([type(bool())], OPTION),
             show_db_user: ([type(bool())], OPTION),
@@ -55,7 +60,8 @@ class ParamsFormat:
                             shards_num: ([type(int())], OPTION),
                             enable_dynamic_field: ([type(bool())], OPTION),
                             varchar_id: ([type(bool())], OPTION),
-                            collection_name: ([type(str())], OPTION)},
+                            collection_name: ([type(str())], OPTION),
+                            auto_id: ([type(bool())], OPTION)},
         load_params: {replica_number: ([type(int())], OPTION),
                       refresh: ([type(bool())], OPTION),
                       resource_groups: ([type(int()), type(list())], OPTION)},
@@ -212,6 +218,7 @@ class ConcurrentInputParamsSearch(DataClassBase):
 
 @dataclass
 class ConcurrentTaskSearch(DataClassBase):
+    dim: int
     data: list
     anns_field: str
     param: dict
@@ -364,6 +371,7 @@ class ConcurrentTaskInsert(DataClassBase):
     dim: int
     nb: Optional[int] = 1
     timeout: Optional[int] = DefaultValue.default_timeout
+    anns_field: Optional[str] = None
 
     # random id or vectors
     random_id: Optional[bool] = False
@@ -378,7 +386,7 @@ class ConcurrentTaskInsert(DataClassBase):
     def set_params(self):
         self._loop_ids = loop_ids(step=self.nb, start_id=self.start_id)
         self.fixed_ids = [k for k in range(self.start_id, self.start_id + self.nb)]
-        self.fixed_vectors = gen_vectors(self.nb, self.dim)
+        self.fixed_vectors = gen_vectors(self.nb, self.dim, field_name=self.anns_field)
 
     @property
     def get_ids(self):
@@ -393,7 +401,7 @@ class ConcurrentTaskInsert(DataClassBase):
     @property
     def get_vectors(self):
         if self.random_vector:
-            return gen_vectors(self.nb, self.dim)
+            return gen_vectors(self.nb, self.dim, field_name=self.anns_field)
         return self.fixed_vectors
 
     @property
@@ -480,6 +488,7 @@ class ConcurrentTaskSceneInsertDeleteFlush(DataClassBase):
     insert_length: Optional[int] = 1
     delete_length: Optional[int] = 1
     start_id: Optional[int] = 0
+    anns_field: Optional[str] = None
 
     # random id or vectors
     random_id: Optional[bool] = False
@@ -494,7 +503,7 @@ class ConcurrentTaskSceneInsertDeleteFlush(DataClassBase):
     def set_params(self):
         self._loop_ids = loop_ids(step=self.insert_length, start_id=self.start_id)
         self.fixed_ids = [k for k in range(self.start_id, self.start_id + self.insert_length)]
-        self.fixed_vectors = gen_vectors(self.insert_length, self.dim)
+        self.fixed_vectors = gen_vectors(self.insert_length, self.dim, field_name=self.anns_field)
 
     @property
     def get_insert_ids(self):
@@ -510,7 +519,7 @@ class ConcurrentTaskSceneInsertDeleteFlush(DataClassBase):
     @property
     def get_vectors(self):
         if self.random_vector:
-            return gen_vectors(self.insert_length, self.dim)
+            return gen_vectors(self.insert_length, self.dim, field_name=self.anns_field)
         return self.fixed_vectors
 
     @property
@@ -640,6 +649,7 @@ class ConcurrentInputParamsLoadSearchRelease(DataClassBase):
 
 @dataclass
 class ConcurrentTaskLoadSearchRelease(DataClassBase):
+    dim: int
     data: list
     anns_field: str
     param: dict
@@ -702,7 +712,6 @@ class ConcurrentTaskSceneSearchTest(DataClassBase):
     index_type: Optional[str] = IndexTypeName.IVF_SQ8
     index_param: Optional[dict] = field(default_factory=lambda: {'nlist': 2048})
     metric_type: Optional[str] = MetricsTypeName.L2
-    vector_field_name: Optional[str] = get_default_field_name()
 
     # load
     replica_number: Optional[int] = 1
@@ -719,6 +728,11 @@ class ConcurrentTaskSceneSearchTest(DataClassBase):
 
     # use user
     new_user: Optional[bool] = False
+
+    @property
+    def anns_field(self):
+        data_type = getattr(DataType, config_info.dataset_config.vector_type(self.dataset), DataType.FLOAT_VECTOR)
+        return get_default_field_name(data_type=data_type)
 
 
 @dataclass

@@ -12,7 +12,8 @@ from client.common.common_type import DefaultValue as dv
 from client.common.common_func import (
     gen_combinations, update_dict_value, get_vector_type, get_default_field_name, get_vectors_from_binary,
     parser_search_params_expr, get_ground_truth_ids, get_search_ids, get_recall_value, ParserInputParams,
-    write_json_file, gen_go_bench_json_file, ExtraPartitionsParams, PrepareInsertParams, deal_insert_result)
+    write_json_file, gen_go_bench_json_file, ExtraPartitionsParams, PrepareInsertParams, deal_insert_result,
+    check_vector_index_params)
 
 from commons.common_params import EnvVariable
 from utils.util_log import log
@@ -63,7 +64,7 @@ class CommonCases(Base):
         self.get_collection_schema()
         log.info("[CommonCases] Prepare collection {0} done.".format(self.collection_wrap.name))
 
-    def prepare_insert(self, data_type, dim, size, ni, varchar_filled=False):
+    def prepare_insert(self, data_type, dim, size, ni, varchar_filled=False, vector_field_name: str = None):
         varchar_filled = self.params_obj.dataset_params.get(pn.varchar_filled, varchar_filled)
 
         # insert to partitions
@@ -89,14 +90,14 @@ class CommonCases(Base):
                     data_type=data_type, dim=dim, size=p.data_size, ni=ni, varchar_filled=varchar_filled,
                     scalars_params=self.params_obj.dataset_params.get(pn.scalars_params, {}),
                     column_name=self.params_obj.dataset_params.get(pn.column_name, ""),
-                    input_obj=insert_obj, partition_name=p.partition_name))
+                    input_obj=insert_obj, partition_name=p.partition_name, anns_field=vector_field_name))
             self.case_report.add_attr(**deal_insert_result(inert_time))
 
         else:
             res_insert = self.insert(
                 data_type=data_type, dim=dim, size=size, ni=ni, varchar_filled=varchar_filled,
                 scalars_params=self.params_obj.dataset_params.get(pn.scalars_params, {}),
-                column_name=self.params_obj.dataset_params.get(pn.column_name, ""))
+                column_name=self.params_obj.dataset_params.get(pn.column_name, ""), anns_field=vector_field_name)
             self.case_report.add_attr(**res_insert)
 
     def prepare_load(self, **kwargs):
@@ -143,26 +144,40 @@ class CommonCases(Base):
 
     def prepare_scalars_index(self, update_report_data=True):
         scalars = self.params_obj.dataset_params.get(pn.scalars_index, [])
-        if len(scalars) == 0:
-            log.info("[CommonCases] No scalars need to be indexed.")
+        vectors_index = self.params_obj.dataset_params.get(pn.vectors_index, {})
+        vectors_field = list(vectors_index.keys())
+
+        if len(scalars) + len(vectors_field) == 0:
+            log.info("[CommonCases] No scalar and vector fields need to be indexed.")
             return True
+        log.info(f"[CommonCases] Start building other fields index.")
 
         other_fields = self.params_obj.collection_params.get(pn.other_fields, [])
-        for scalar in scalars:
+        for scalar in scalars + vectors_field:
             if scalar not in other_fields:
-                log.error("[CommonCases] The scalar {0} is not in the collection {1}.".format(scalar, other_fields))
+                log.error("[CommonCases] The field `{0}` is not in the collection {1}.".format(scalar, other_fields))
                 return False
 
         self.show_index()
 
+        # build vector index
+        for k, v in vectors_index.items():
+            if check_vector_index_params(field_name=k, params=v):
+                result = self.build_index(k, **v)
+                rt = round(result.rt, Precision.INDEX_PRECISION)
+                # set report data
+                self.case_report.add_attr(update_report_data, **{"index": {k: {"RT": rt}}})
+                log.info("[CommonCases] RT of build vector field index `{1}`: {0}s".format(rt, k))
+        # build scalar index
         for scalar in scalars:
             result = self.build_scalar_index(scalar)
             rt = round(result.rt, Precision.INDEX_PRECISION)
             # set report data
             self.case_report.add_attr(update_report_data, **{"index": {scalar: {"RT": rt}}})
-            log.info("[CommonCases] RT of build scalar index {1}: {0}s".format(rt, scalar))
-        self.describe_collection_index()
-        log.info("[CommonCases] Prepare scalars {0} index done.".format(scalars))
+            log.info("[CommonCases] RT of build scalar field index `{1}`: {0}s".format(rt, scalar))
+
+        log.info("[CommonCases] Prepare scalars:{0} vectors:{1} index done.".format(scalars, vectors_field))
+        self.show_index()
 
     def prepare_query(self, req_run_counts, **kwargs):
         query_rt = []
@@ -223,7 +238,8 @@ class CommonCases(Base):
         expr = parser_search_params_expr(_params.pop(pn.expr)) if pn.expr in _params else None
 
         data = get_vectors_from_binary(nq=nq, dimension=self.params_obj.dataset_params[pn.dim],
-                                       dataset_name=self.params_obj.dataset_params[pn.dataset_name])
+                                       dataset_name=self.params_obj.dataset_params[pn.dataset_name],
+                                       field_name=default_field_name)
         limit = top_k
 
         result = update_dict_value({
@@ -235,13 +251,14 @@ class CommonCases(Base):
         }, _params)
         return result, nq, top_k, expr, _params
 
-    def go_bench_search_param_analysis(self, _search_params: dict):
+    def go_bench_search_param_analysis(self, _search_params: dict, vector_field_name: str = None):
         _params = copy.deepcopy(_search_params)
         nq = _params.get(pn.nq)
         expr = parser_search_params_expr(_params.pop(pn.expr)) if pn.expr in _params else None
 
         data = get_vectors_from_binary(nq=nq, dimension=self.params_obj.dataset_params[pn.dim],
-                                       dataset_name=self.params_obj.dataset_params[pn.dataset_name])
+                                       dataset_name=self.params_obj.dataset_params[pn.dataset_name],
+                                       field_name=vector_field_name)
 
         query_file = write_json_file(data, json_file_path=gen_go_bench_json_file(
             f"{EnvVariable.FOURAM_TEMPORARY_DIR}/query_vector"))
@@ -309,7 +326,8 @@ class InsertBatch(CommonCases):
                 self.prepare_collection(vector_default_field_name, input_params.prepare, input_params.prepare_clean)
                 self.prepare_insert(data_type=self.params_obj.dataset_params[pn.dataset_name],
                                     dim=self.params_obj.dataset_params[pn.dim],
-                                    size=self.params_obj.dataset_params[pn.dataset_size], ni=ni)
+                                    size=self.params_obj.dataset_params[pn.dataset_size], ni=ni,
+                                    vector_field_name=vector_default_field_name)
                 self.count_entities()
                 return self.case_report.to_dict(), True
             except Exception as e:
@@ -368,7 +386,8 @@ class BuildIndex(CommonCases):
             self.prepare_insert(data_type=self.params_obj.dataset_params[pn.dataset_name],
                                 dim=self.params_obj.dataset_params[pn.dim],
                                 size=self.params_obj.dataset_params[pn.dataset_size],
-                                ni=self.params_obj.dataset_params[pn.ni_per])
+                                ni=self.params_obj.dataset_params[pn.ni_per],
+                                vector_field_name=vector_default_field_name)
         self.prepare_flush()
         self.count_entities()
 
@@ -435,7 +454,8 @@ class Load(CommonCases):
             self.prepare_insert(data_type=self.params_obj.dataset_params[pn.dataset_name],
                                 dim=self.params_obj.dataset_params[pn.dim],
                                 size=self.params_obj.dataset_params[pn.dataset_size],
-                                ni=self.params_obj.dataset_params[pn.ni_per])
+                                ni=self.params_obj.dataset_params[pn.ni_per],
+                                vector_field_name=vector_default_field_name)
 
         self.prepare_flush()
         # if pass in rebuild_index, indexes of collection will be dropped before building index
@@ -505,7 +525,8 @@ class Query(CommonCases):
             self.prepare_insert(data_type=self.params_obj.dataset_params[pn.dataset_name],
                                 dim=self.params_obj.dataset_params[pn.dim],
                                 size=self.params_obj.dataset_params[pn.dataset_size],
-                                ni=self.params_obj.dataset_params[pn.ni_per])
+                                ni=self.params_obj.dataset_params[pn.ni_per],
+                                vector_field_name=vector_default_field_name)
 
         self.prepare_flush()
         # if pass in rebuild_index, indexes of collection will be dropped before building index
@@ -596,7 +617,8 @@ class Search(CommonCases):
             self.prepare_insert(data_type=self.params_obj.dataset_params[pn.dataset_name],
                                 dim=self.params_obj.dataset_params[pn.dim],
                                 size=self.params_obj.dataset_params[pn.dataset_size],
-                                ni=self.params_obj.dataset_params[pn.ni_per])
+                                ni=self.params_obj.dataset_params[pn.ni_per],
+                                vector_field_name=vector_default_field_name)
             self.prepare_flush()
             self.prepare_index(vector_field_name=vector_default_field_name,
                                metric_type=self.params_obj.dataset_params[pn.metric_type])
@@ -693,7 +715,8 @@ class SearchRecall(CommonCases):
             self.prepare_insert(data_type=self.params_obj.dataset_params[pn.dataset_name],
                                 dim=self.params_obj.dataset_params[pn.dim],
                                 size=self.params_obj.dataset_params[pn.dataset_size],
-                                ni=self.params_obj.dataset_params[pn.ni_per])
+                                ni=self.params_obj.dataset_params[pn.ni_per],
+                                vector_field_name=vector_default_field_name)
             self.prepare_flush()
             self.prepare_index(vector_field_name=vector_default_field_name,
                                metric_type=self.params_obj.dataset_params[pn.metric_type])

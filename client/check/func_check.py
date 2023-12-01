@@ -1,3 +1,5 @@
+from pymilvus.exceptions import MilvusException
+
 from client.common.common_type import DefaultValue as dv
 from client.common.common_type import Error, CheckTasks
 import client.check.param_check as pc
@@ -58,7 +60,7 @@ class ResponseChecker:
         assert actual is False
         assert len(error_dict) > 0
 
-        if isinstance(res, Error):
+        if isinstance(res, MilvusException):
             assert res.code == error_dict[dv.err_code] or error_dict[dv.err_msg] in res.message
         else:
             log.error("[CheckFunc] Response of API is not an error: %s" % str(res))

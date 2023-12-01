@@ -3,7 +3,7 @@
 
 dataset_params:
   # metric type of index and search
-  metric_type: L2 / IP / COSINE / <str>
+  metric_type: L2 / IP / COSINE / JACCARD / <str>
   # specify the name of the vector column: when creating the collection, or for an existing collection
   vector_field_name: float_vector / binary_vector / <str>
   # for parquet data sets, specify which column in the parquet data set is used to insert the vector column
@@ -13,7 +13,9 @@ dataset_params:
   dim: 128 / <int>
   # dataset names currently support:
   # random: `local`
-  # npy: `deep`, `jaccard`, `hamming`, `sift`, `text2img`, `laion`, `embed`, `gist`, `structure`, `binary`
+  #      1. vector will automatically generate corresponding data based on the `dataset_params.vector_field_name` prefix
+  #      2. if the prefix is not "binary_vector", "float_vector" type data will be generated
+  # npy: `deep`, `sift`, `text2img`, `laion`, `embed`, `gist`, `glove`, `binary`, `random`
   # parquet: `cohere10m_parquet`, `laion1b_nolang`, `laion2b_multi`
   dataset_name: sift
   # The size of the data set to be inserted
@@ -30,6 +32,25 @@ dataset_params:
   # false: convert id column to string; true: pad to length of `max_length`-1 with `ascii_letters` and `digits`
   varchar_filled: false / <bool>
 
+  # create index on the already created vector column:
+  # {"<vector field name>": {"metric_type": "", "index_type": "", "index_param": {}}, ...}
+  vectors_index:
+    float_vector_1:
+        metric_type: L2
+        index_type: IVF_FLAT
+        index_param:
+            nlist: 2048
+    float_vector_2:
+      metric_type: IP
+      index_type: HNSW
+      index_param:
+        M: 16
+        efConstruction: 500
+    binary_vector_1:
+      metric_type: JACCARD
+      index_type: BIN_IVF_FLAT
+      index_param:
+        nlist: 2048
   # create index on the already created scalar column: <List[<scalar field name>...]>
   scalars_index: ["int64_1", "float_1", "json_1", "varchar_1", "varchar_2", "array_varchar_1", "array_int64_1"]
   # parameters required to create scalars: {<field_name>: {<params>: {}, <other_params>: {} }}
@@ -119,6 +140,8 @@ collection_params:
   # for creating collection
   # select the collection by name if there is more than one collection in `Milvus`
   collection_name: <str>
+  # whether the primary key column `id` is auto_id when creating collection, default value is `false`
+  auto_id: false / <bool>
   # create scalars: <List[<scalar field name>...]>
   # Notice: scalars are created here so that operations on scalar can take effect.
   other_fields: ["int64_1", "float_1", "json_1", "varchar_1", "varchar_2", "array_varchar_1", "array_int64_1"]

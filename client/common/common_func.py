@@ -192,7 +192,7 @@ def get_vector_type(data_type):
 
 def gen_file_name(file_id, dim, data_type):
     file_name = "%s_%sd_%05d.%s" % (
-    dv.FILE_PREFIX, str(dim), int(file_id), config_info.dataset_config.dataset_type(data_type))
+        dv.FILE_PREFIX, str(dim), int(file_id), config_info.dataset_config.dataset_type(data_type))
 
     if data_type in config_info.dataset_config.vector_to_list:
         return config_info.dataset_config.dir(data_type) + file_name
@@ -211,6 +211,22 @@ def gen_scalar_file_name(file_id, dataset_name: str, dim=dv.default_dim):
         return config_info.dataset_config.dir(dataset_name) + file_name
     else:
         log.error("[gen_scalar_file_name] data type not supported: {}".format(dataset_name))
+        return ""
+
+
+def gen_data_file_name(file_id, dataset_name: str, dim=dv.default_dim):
+    if config_info.dataset_config.dataset_type(dataset_name) == pn.NUMPY:
+        if config_info.dataset_config.data_type(dataset_name) == pn.SCALAR:
+            file_name = "%s_%05d.npy" % (dv.SCALAR_FILE_PREFIX, int(file_id))
+        else:
+            file_name = "%s_%sd_%05d.npy" % (dv.FILE_PREFIX, str(dim), int(file_id))
+    else:
+        file_name = "%s_%sd_%05d.parquet" % (dv.FILE_PREFIX, int(dim), int(file_id))
+
+    if dataset_name in config_info.dataset_config.to_list:
+        return config_info.dataset_config.dir(dataset_name) + file_name
+    else:
+        log.error("[gen_data_file_name] data type not supported: {}".format(dataset_name))
         return ""
 
 
@@ -254,7 +270,18 @@ def get_file_list(data_size, dim, data_type):
     return file_names
 
 
-def gen_vectors(nb, dim):
+def gen_vectors(nb, dim, field_name: str = None):
+    if field_name and str(field_name).startswith("binary_vector"):
+        return gen_binary_vectors(nb, dim)
+    return gen_float_vectors(nb, dim)
+
+
+def gen_binary_vectors(nb, dim):
+    # packs a binary-valued array into bits in a unit8 array, and bytes array_of_ints
+    return [bytes(np.packbits([random.randint(0, 1) for _ in range(dim)], axis=-1).tolist()) for _ in range(nb)]
+
+
+def gen_float_vectors(nb, dim):
     return [[random.random() for _ in range(int(dim))] for _ in range(int(nb))]
 
 
@@ -263,7 +290,8 @@ def gen_ids(start_id, end_id):
     return [k for k in range(start_id, end_id)]
 
 
-def gen_values(data_type, vectors, ids, varchar_filled=False, field={}, default_value=None, other_params={}):
+def gen_values(data_type, vectors, ids, varchar_filled=False, field: dict = {}, default_value=None, other_params={},
+               anns_field_bool: bool = True):
     _field_element = data_type
     if str(field["name"]).lower().startswith(pn.ARRAY):
         _, _field_element = get_array_element_type(field["name"])
@@ -271,16 +299,24 @@ def gen_values(data_type, vectors, ids, varchar_filled=False, field={}, default_
     values = None
     if default_value is not None and isinstance(default_value, list) and len(default_value) != 0:
         return default_value
-    elif _field_element in [DataType.INT8, DataType.INT16, DataType.INT32, DataType.INT64]:
+    elif _field_element in [DataType.FLOAT_VECTOR]:
+        _dim = field.get("params", {}).get("dim")
+        values = vectors if anns_field_bool else gen_float_vectors(nb=len(ids), dim=_dim)
+    elif _field_element in [DataType.BINARY_VECTOR]:
+        _dim = field.get("params", {}).get("dim")
+        values = vectors if anns_field_bool else gen_binary_vectors(nb=len(ids), dim=_dim)
+    elif _field_element in [DataType.INT8]:
         # int8: [-128, 127]
+        values = [i % 128 for i in ids]
+    elif _field_element in [DataType.INT16]:
         # int16: [-32768, 32767]
+        values = [i % 32768 for i in ids]
+    elif _field_element in [DataType.INT32, DataType.INT64]:
         values = ids
     elif _field_element in [DataType.DOUBLE]:
         values = [(i + 0.0) for i in ids]
     elif _field_element == DataType.FLOAT:
         values = pd.Series(data=[(i + 0.0) for i in ids], dtype="float32")
-    elif _field_element in [DataType.FLOAT_VECTOR, DataType.BINARY_VECTOR]:
-        values = vectors
     elif _field_element in [DataType.VARCHAR]:
         varchar_filled = other_params.get("varchar_filled", varchar_filled)
         if varchar_filled is False:
@@ -302,7 +338,7 @@ def gen_values(data_type, vectors, ids, varchar_filled=False, field={}, default_
     return values
 
 
-def gen_entities(info, vectors=None, ids=None, varchar_filled=False, insert_scalars_params={}):
+def gen_entities(info, vectors=None, ids=None, varchar_filled=False, insert_scalars_params={}, anns_field: str = None):
     """
     insert_scalars_params = {<field name>: {"default_value": [], other_params: {}}...}
     """
@@ -316,8 +352,10 @@ def gen_entities(info, vectors=None, ids=None, varchar_filled=False, insert_scal
     entities = {}
     for field in info["fields"]:
         _type = field["type"]
-        entities.update({field["name"]: gen_values(_type, vectors, ids, varchar_filled, field,
-                                                   **insert_scalars_params.get(field["name"], {}))})
+        if not (field["name"] == "id" and info["auto_id"]):
+            entities.update({field["name"]: gen_values(
+                _type, vectors, ids, varchar_filled, field, **insert_scalars_params.get(field["name"], {}),
+                anns_field_bool=(field["name"] == anns_field))})
     return pd.DataFrame(entities)
 
 
@@ -425,11 +463,11 @@ def parser_search_params_expr(expr):
     return expression
 
 
-def get_vectors_from_binary(nq, dimension, dataset_name):
+def get_vectors_from_binary(nq, dimension, dataset_name, field_name: str = None):
     if dataset_name in ["random"]:
         file_name = config_info.dataset_config.dir(dataset_name) + "query_%d.npy" % dimension
     elif dataset_name == "local":
-        return gen_vectors(nq, dimension)
+        return gen_vectors(nq, dimension, field_name=field_name)
     else:
         file_name = config_info.dataset_config.query_file_dir(dataset_name)
 
@@ -631,7 +669,8 @@ def loop_gen_files(dim, data_type):
 
 def loop_gen_scalar_files(dataset_name, dim=dv.default_dim):
     for i in range(dv.Max_file_count):
-        yield gen_scalar_file_name(i, dataset_name, dim)
+        # yield gen_scalar_file_name(i, dataset_name, dim)
+        yield gen_data_file_name(i, dataset_name, dim)
 
 
 def loop_ids(step=50000, start_id=0):
@@ -789,6 +828,17 @@ def check_params_exist(target: dict, keys: list):
         if i not in k:
             raise Exception("[check_params_exist] Key:{0} not in target:{1}".format(i, target))
     return True
+
+
+def check_vector_index_params(field_name: str, params):
+    if isinstance(params, dict):
+        _check = [i for i in ["index_type", "metric_type", "index_param"] if i not in params.keys()]
+        if not _check:
+            return True
+        log.error(f"[check_vector_index_params] Vector field:{field_name} index params does not contain:{_check}")
+    else:
+        log.error(f"[check_vector_index_params] Vector field:{field_name} index params is not dict:{params}")
+    return False
 
 
 def gen_go_bench_json_file(prefix_file_path: str, retry_counts: int = 99999):

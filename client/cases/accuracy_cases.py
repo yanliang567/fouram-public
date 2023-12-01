@@ -12,7 +12,7 @@ from client.common.common_type import Precision, CaseIterParams
 from client.common.common_func import (
     get_source_file, read_ann_hdf5_file, normalize_data, get_acc_metric_type, gen_combinations, update_dict_value,
     get_vector_type, get_default_field_name, get_search_ids, get_recall_value, ParserInputParams, ExtraPartitionsParams,
-    PrepareInsertParams, deal_insert_result)
+    PrepareInsertParams, deal_insert_result, check_vector_index_params)
 
 from utils.util_log import log
 
@@ -102,14 +102,15 @@ class CommonCases(Base):
                         source_vectors=self.dataset_train, size=p.data_size,
                         ni=self.params_obj.dataset_params[pn.ni_per],
                         scalars_params=self.params_obj.dataset_params.get(pn.scalars_params, {}),
-                        input_obj=insert_obj, partition_name=p.partition_name))
+                        input_obj=insert_obj, partition_name=p.partition_name, anns_field=vector_default_field_name))
                 self.case_report.add_attr(**deal_insert_result(inert_time, acc=True))
 
             else:
                 res_insert = self.ann_insert(
                     source_vectors=self.dataset_train,
                     ni=self.params_obj.dataset_params[pn.ni_per],
-                    scalars_params=self.params_obj.dataset_params.get(pn.scalars_params, {}))
+                    scalars_params=self.params_obj.dataset_params.get(pn.scalars_params, {}),
+                    anns_field=vector_default_field_name)
                 self.case_report.add_attr(**res_insert)
 
             if self.params_obj.flush_params.get(pn.prepare_flush, True):
@@ -160,26 +161,41 @@ class CommonCases(Base):
 
     def prepare_scalars_index(self, update_report_data=True):
         scalars = self.params_obj.dataset_params.get(pn.scalars_index, [])
-        if len(scalars) == 0:
-            log.info("[AccCases] No scalars need to be indexed.")
+        vectors_index = self.params_obj.dataset_params.get(pn.vectors_index, {})
+        vectors_field = list(vectors_index.keys())
+
+        if len(scalars) + len(vectors_field) == 0:
+            log.info("[AccCases] No scalar and vector fields need to be indexed.")
             return True
+        log.info(f"[AccCases] Start building other fields index.")
 
         other_fields = self.params_obj.collection_params.get(pn.other_fields, [])
         for scalar in scalars:
             if scalar not in other_fields:
-                log.error("[AccCases] The scalar {0} is not in the collection {1}.".format(scalar, other_fields))
+                log.error("[AccCases] The field `{0}` is not in the collection {1}.".format(scalar, other_fields))
                 return False
 
         self.show_index()
 
+        # build vector index
+        for k, v in vectors_index.items():
+            if check_vector_index_params(field_name=k, params=v):
+                result = self.build_index(k, **v)
+                rt = round(result.rt, Precision.INDEX_PRECISION)
+                # set report data
+                self.case_report.add_attr(update_report_data, **{"index": {k: {"RT": rt}}})
+                log.info("[AccCases] RT of build vector field index `{1}`: {0}s".format(rt, k))
+
+        # build scalar index
         for scalar in scalars:
             result = self.build_scalar_index(scalar)
             rt = round(result.rt, Precision.INDEX_PRECISION)
             # set report data
             self.case_report.add_attr(update_report_data, **{"index": {scalar: {"RT": rt}}})
-            log.info("[AccCases] RT of build scalar index {1}: {0}s".format(rt, scalar))
-        self.describe_collection_index()
-        log.info("[AccCases] Prepare scalars {0} index done.".format(scalars))
+            log.info("[AccCases] RT of build scalar index `{1}`: {0}s".format(rt, scalar))
+
+        log.info("[AccCases] Prepare scalars:{0} vectors:{1} index done.".format(scalars, vectors_field))
+        self.show_index()
 
     def parser_search_params(self):
         search_params = copy.deepcopy(self.params_obj.search_params_parser(self.params_obj.search_params))

@@ -76,7 +76,8 @@ class FunctionalCases(CommonCases):
             self.prepare_insert(data_type=self.params_obj.dataset_params[pn.dataset_name],
                                 dim=self.params_obj.dataset_params[pn.dim],
                                 size=self.params_obj.dataset_params[pn.dataset_size],
-                                ni=self.params_obj.dataset_params[pn.ni_per])
+                                ni=self.params_obj.dataset_params[pn.ni_per],
+                                vector_field_name=vector_default_field_name)
             self.prepare_flush()
             self.prepare_index(vector_field_name=vector_default_field_name,
                                metric_type=self.params_obj.dataset_params[pn.metric_type])
