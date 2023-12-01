@@ -96,6 +96,8 @@ class DatasetConfig(ParamsBase):
 
 @dataclass
 class DatasetConfigs(ParamsBase):
+    local = DatasetConfig(vector_type="FLOAT_VECTOR")
+
     def set_attr(self, attr_name: str, attr_value: DatasetConfig):
         try:
             exec(f"self.{attr_name} = {attr_value}")
