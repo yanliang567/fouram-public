@@ -11,12 +11,13 @@ class CloudRMApi:
     CHECK_RESULT = True
     Log_Level = LogLevel.DEBUG
 
-    def __init__(self, host: str, user_id: str, region_id="", source_app="Cloud-Meta"):
+    def __init__(self, host: str, user_id: str, region_id="", source_app="Cloud-Meta", project_id: str = "0"):
         self.host = host
         self.UserId = user_id
         self.region_id = region_id
         self.SourceApp = source_app
         self.req = Request()
+        self.project_id = project_id
 
     @property
     def headers(self):
@@ -36,7 +37,7 @@ class CloudRMApi:
     @request_catch()
     def create(self, class_id=ClassID.class1cu, db_version="v2.0.1", instance_name="fouram-benchmark-vdc", region_id="",
                mock_tag=False, white_list_address="0.0.0.0/0", instance_type=1,
-               project_id="0",  # "000000000", reset to 0
+               project_id=None,  # "000000000", reset to 0
                instance_description="fouram benchmark test instance", root_pwd="Milvus123",
                log_level=Log_Level) -> RequestResponseParser:
         url = self.host + "/resource/v1/instance/milvus/create"
@@ -50,7 +51,7 @@ class CloudRMApi:
             "instanceName": instance_name,
             "instanceType": instance_type,
             "mockTag": mock_tag,
-            "projectId": project_id,
+            "projectId": project_id or self.project_id,
             "regionId": region_id,
             "rootPwd": root_pwd,
             "whitelistAddress": white_list_address

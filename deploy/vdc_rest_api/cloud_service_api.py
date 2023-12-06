@@ -15,7 +15,7 @@ class CloudServiceApi:
     Log_Level = LogLevel.DEBUG
 
     def __init__(self, host: str, user_id: str = config_info.vdc_user.user_id,
-                 email=config_info.vdc_user.email, password=config_info.vdc_user.password):
+                 email=config_info.vdc_user.email, password=config_info.vdc_user.password, project_id: str = "0"):
         self.email = email
         self.password = password
         self.host = host
@@ -25,6 +25,7 @@ class CloudServiceApi:
         self.current_time = time.perf_counter()
         self.TOKEN = self.get_token()
         self.org_id = self.get_org_id()
+        self.project_id = project_id
 
     @property
     def headers(self):
@@ -42,26 +43,26 @@ class CloudServiceApi:
     """ API Key API"""
 
     @request_catch()
-    def apikey_add(self, name="", project_id="0", log_level=Log_Level) -> RequestResponseParser:
+    def apikey_add(self, name="", project_id=None, log_level=Log_Level) -> RequestResponseParser:
         url = self.host + "/cloud/v1/apikey/add"
         body = {
             "name": name or ("fouramf-" + gen_str(3)),
-            "projectId": project_id
+            "projectId": project_id or self.project_id
         }
         return self.req.post(url=url, body=body, headers=self.headers, log_level=log_level)
 
     @request_catch()
-    def apikey_delete(self, key_id: str, project_id="0", log_level=Log_Level) -> RequestResponseParser:
+    def apikey_delete(self, key_id: str, project_id=None, log_level=Log_Level) -> RequestResponseParser:
         url = self.host + "/cloud/v1/apikey/delete"
         body = {
             "keyId": key_id,
-            "projectId": project_id
+            "projectId": project_id or self.project_id
         }
         return self.req.post(url=url, body=body, headers=self.headers, log_level=log_level)
 
     @request_catch()
-    def apikey_list(self, project_id="0", log_level=Log_Level) -> RequestResponseParser:
-        url = self.host + "/cloud/v1/apikey/list?projectId={0}".format(project_id)
+    def apikey_list(self, project_id=None, log_level=Log_Level) -> RequestResponseParser:
+        url = self.host + "/cloud/v1/apikey/list?projectId={0}".format(project_id or self.project_id)
         return self.req.get(url=url, headers=self.headers, log_level=log_level)
 
     """ Serverless Basic API """
@@ -69,7 +70,7 @@ class CloudServiceApi:
     @request_catch()
     def serverless_create(self, region_id: str, instance_name: str, ap_point_host_id: str = "", collection_name="xxx",
                           create_collection=False, create_example_collection=False, description="", dim=768,
-                          metric_type="IP", project_id="0", log_level=Log_Level) -> RequestResponseParser:
+                          metric_type="IP", project_id=None, log_level=Log_Level) -> RequestResponseParser:
         url = self.host + "/cloud/v1/serverless/create"
         body = {
             "appointHostId": ap_point_host_id,
@@ -80,7 +81,7 @@ class CloudServiceApi:
             "dim": dim,
             "instanceName": instance_name,
             "metricType": metric_type,
-            "projectId": project_id,
+            "projectId": project_id or self.project_id,
             "regionId": region_id
         }
         return self.req.post(url=url, body=body, headers=self.headers, log_level=log_level)
@@ -105,10 +106,10 @@ class CloudServiceApi:
         return self.req.get(url=url, headers=self.headers, log_level=log_level)
 
     @request_catch()
-    def list(self, current_page: int = 1, page_size: int = 50, search_key=None, project_id=0,
+    def list(self, current_page: int = 1, page_size: int = 50, search_key=None, project_id=None,
              log_level=Log_Level) -> RequestResponseParser:
         url = self.host + "/cloud/v1/instance/list?CurrentPage={0}&PageSize={1}&ProjectId={2}".format(
-            current_page, page_size, project_id)
+            current_page, page_size, project_id or self.project_id)
 
         # if search_key is not None:
         if search_key:
