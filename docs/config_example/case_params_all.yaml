@@ -192,7 +192,7 @@ search_params:
   guarantee_timestamp: <int>
 
 query_params:
-  # `ids` will be converted to `expr`: "id in {dis}"
+  # `ids` will be converted to `expr`: "id in {ids}"
   # ids will overwrite expr after being set
   ids: [1, 2] / <list>
   expr: "int64_1 > 10" / <str>

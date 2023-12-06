@@ -31,22 +31,27 @@ class AutoGetTag:
         return t
 
     def get_image_tag_idc(self, addr="https://harbor.milvus.io", limit=100):
-
-        url = addr + "/api/v2.0/projects/milvus/repositories/milvus/artifacts?page=1&page_size=" + str(limit) + \
-              "&with_tag=true&with_label=false&with_scan_overview=false&with_signature=false" + \
-              "&with_immutable_status=false"
+        _url = addr + "/api/v2.0/projects/milvus/repositories/milvus/artifacts?page={0}&page_size={1}" + \
+               "&with_tag=true&with_label=false&with_scan_overview=false&with_signature=false" + \
+               "&with_immutable_status=false"
 
         headers = {
             "accept": "application/json",
             "X-Accept-Vulnerabilities": "application/vnd.scanner.adapter.vuln.report.harbor+json; version=1.0"}
         try:
-            res = self.req.get(url=url, headers=headers)
-            for r in res:
-                t = r["tags"][0]["name"] if isinstance(r["tags"], list) else r["tags"]
-                if str(t).startswith(self.prefix) and not str(t).startswith(self.tag_name) \
-                        and len(str(t).split('-')) == 3:
-                    log.info("[AutoGetTag] The image name used is %s" % str(t))
-                    return t
+            # Maximum page turning: 100 pages
+            for page in range(1, 101):
+                url = _url.format(page, str(limit))
+                res = self.req.get(url=url, headers=headers)
+                for r in res:
+                    t = r["tags"][0]["name"] if isinstance(r["tags"], list) else r["tags"]
+                    tag_len = len(str(t).split('-'))
+                    if str(t).startswith(self.prefix) and \
+                            not str(t).startswith(self.tag_name) and \
+                            not str(t).endswith("-gpu") and \
+                            (tag_len == 3 or (tag_len == 4 and str(t).endswith("-amd64"))):
+                        log.info("[AutoGetTag] The image name used is %s" % str(t))
+                        return t
             return self.tag_name
         except Exception as e:
             log.error("[AutoGetTag] Can not get the tag list: {}".format(e))
