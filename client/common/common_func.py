@@ -151,11 +151,17 @@ def get_search_ids(result):
     return ids
 
 
-def get_ground_truth_ids(data_size, data_type: str):
-    size = str(int(parser_data_size(data_size) / 1000000)) + "M"
-    gnd_file_name = config_info.dataset_config.ground_truth_dir(data_type) + f"/idx_{size}.ivecs"
+def get_ground_truth_ids(data_size, data_type: str, ground_truth_file_name: str = None):
+    """
+    :param data_size: prepare data size
+    :param data_type: for get ground truth dir
+    :param ground_truth_file_name: the specified ground truth file name, e.g.: idx_10M.ivecs
+    """
+    _file_name = ground_truth_file_name or "idx_{0}.ivecs".format(str(int(parser_data_size(data_size) / 1000000)) + "M")
+    gnd_file_name = config_info.dataset_config.ground_truth_dir(data_type) + f"/{_file_name}"
 
-    if check_file_exist(gnd_file_name):
+    log.info(f"[get_ground_truth_ids] Ground truth file path: {gnd_file_name}")
+    if str(gnd_file_name).endswith(".ivecs") and check_file_exist(gnd_file_name):
         a = np.fromfile(gnd_file_name, dtype='int32')
         d = a[0]
         true_ids = a.reshape(-1, d + 1)[:, 1:].copy()

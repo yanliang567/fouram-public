@@ -26,6 +26,11 @@ dataset_params:
   # for `search` and `query`, number of serial execution requests
   req_run_counts: 10 / <int>
 
+  # support for `SearchRecall`
+  # the default file name is generated based on the dataset size: idx_<data size/1000000>M.ivecs
+  # only supports file name suffix ".ivecs"
+  ground_truth_file_name: idx_10M.ivecs / <str>
+
   # max_length for generating `varchar` schema,  which takes effect globally
   max_length: 256 / <int>
   # generating varchar data, whether to fill the length of `max_length`

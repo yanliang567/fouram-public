@@ -207,10 +207,11 @@ class CommonCases(Base):
             "TP95": round(np.percentile(search_rt, 95), Precision.SEARCH_PRECISION)}})
         return self.case_report.to_dict(), True
 
-    def prepare_search_recall(self, _nq, _top_k, **kwargs):
+    def prepare_search_recall(self, _nq, _top_k, ground_truth_file_name: str = None, **kwargs):
         res_search = self.search(**kwargs)
         true_ids = get_ground_truth_ids(data_size=self.params_obj.dataset_params[pn.dataset_size],
-                                        data_type=self.params_obj.dataset_params[pn.dataset_name])
+                                        data_type=self.params_obj.dataset_params[pn.dataset_name],
+                                        ground_truth_file_name=ground_truth_file_name)
         result_ids = get_search_ids(res_search.response)
         acc_value = get_recall_value(true_ids[:_nq, :_top_k].tolist(), result_ids)
 
@@ -736,9 +737,9 @@ class SearchRecall(CommonCases):
                                show_db_user=self.params_obj.dataset_params.get(pn.show_db_user, False))
 
         # search
-        def run(_nq, _top_k, run_s_p: dict):
+        def run(_nq, _top_k, _ground_truth_file_name, run_s_p: dict):
             try:
-                self.prepare_search_recall(_nq, _top_k, **run_s_p)
+                self.prepare_search_recall(_nq, _top_k, ground_truth_file_name=_ground_truth_file_name, **run_s_p)
                 return self.case_report.to_dict(), True
             except Exception as e:
                 log.error("[SearchRecall] Search raise error: {}".format(e))
@@ -757,8 +758,11 @@ class SearchRecall(CommonCases):
                 pn.top_k: top_k,
                 pn.expr: expr
             }, other_params)
-            p = CaseIterParams(callable_object=run, object_args=[nq, top_k, search_params],
-                               actual_params_used=actual_params_used, case_type=self.__class__.__name__)
+            p = CaseIterParams(
+                callable_object=run,
+                object_args=[nq, top_k, self.params_obj.dataset_params.get("ground_truth_file_name", None),
+                             search_params],
+                actual_params_used=actual_params_used, case_type=self.__class__.__name__)
             params_list.append(p)
         yield params_list
 

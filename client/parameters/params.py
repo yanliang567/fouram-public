@@ -141,6 +141,7 @@ class ParamsFormat:
     }, common_scene_build_index)
 
     common_scene_search_recall = update_dict_value({
+        dataset_params: {ground_truth_file_name: ([type(str())], OPTION)},
         search_params: {top_k: ([type(int()), type(list())], MUST),
                         nq: ([type(int()), type(list())], MUST),
                         search_param: ([type(dict())], MUST),

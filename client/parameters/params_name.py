@@ -59,6 +59,7 @@ metric_type = "metric_type"
 field_name = "field_name"
 ni_per = "ni_per"
 req_run_counts = "req_run_counts"
+ground_truth_file_name = "ground_truth_file_name"
 
 # collection
 shards_num = "shards_num"
