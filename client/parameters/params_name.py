@@ -67,6 +67,7 @@ enable_dynamic_field = "enable_dynamic_field"
 other_fields = "other_fields"
 varchar_id = "varchar_id"
 auto_id = "auto_id"
+num_partitions = "num_partitions"
 
 # load
 replica_number = "replica_number"

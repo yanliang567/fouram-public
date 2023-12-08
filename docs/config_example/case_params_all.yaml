@@ -102,6 +102,7 @@ dataset_params:
         dataset: laion2b_json
     varchar_1:
       params:
+        is_partition_key: true
         max_length: 65535
       other_params:
         dataset: laion2b_url
@@ -155,6 +156,7 @@ collection_params:
   # parameters of the `varchar` pk column can be set in `dataset_params.scalars_params.id`
   varchar_id: false / <bool>
   enable_dynamic_field: false / <bool>
+  num_partitions: 64 / <int>
 
 flush_params:
   # after inserting data, whether to call `flush`, `false` can create growing data
