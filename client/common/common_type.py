@@ -42,6 +42,7 @@ class DefaultValue:
     default_max_length = 256  # 65535
     default_desc = ""
     default_array_max_capacity = 10
+    default_metric_type = "L2"
 
     default_int64_field_name = "int64"
     default_float_field_name = "float"

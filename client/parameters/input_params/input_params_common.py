@@ -1,27 +1,66 @@
+from dataclasses import dataclass, field
+from typing import Optional, Union, List
+
 from client.parameters import params_name as pn
+from client.common.common_type import DefaultValue as dv
 from client.common.common_func import dict_recursive_key, parser_data_size
 from client.common.common_param import MetricsToIndexType
 import client.parameters.input_params.define_params as dp
 
 from utils.util_log import log
 
+""" define common params format """
+
+
+@dataclass
+class CommonParamsBase:
+    @property
+    def to_dict(self):
+        return vars(self)
+
+    @property
+    def obj_params(self):
+        return {k: v for k, v in self.to_dict.items() if v is not None}
+
+
+@dataclass
+class SearchV2ReqParams(CommonParamsBase):
+    search_param: Optional[dict]
+    anns_field: Optional[str] = dv.default_float_vec_field_name
+    expr: Optional[str] = None
+    top_k: Optional[int] = None
+
+
+@dataclass
+class SearchV2RerankParams(CommonParamsBase):
+    RRFRanker: Optional[list] = None
+    WeightedRanker: Optional[list] = None
+
+
+""" common params"""
+
 
 class CommonParams:
 
     @staticmethod
     def base(dataset_name, dim, dataset_size, ni_per, metric_type=None, req_run_counts=None,
+             vectors_index=None, scalars_index=None, scalars_params=None,
              other_fields=None, shards_num=2, enable_dynamic_field=None,
              replica_number=None, resource_groups=None,
              index_type=None, index_param=None,
              ids=None, query_expr=None, output_fields=None,
              search_param=None, search_expr=None, top_k=None, nq=None, guarantee_timestamp=None,
+             reqs=None, rerank=None, search_v2_top_k=None, search_v2_nq=None, search_v2_guarantee_timestamp=None,
              reset_rg=None, groups=None, reset_rbac=None, reset_db=None):
         dataset_params = {pn.dataset_name: dataset_name,
                           pn.dim: dim,
                           pn.dataset_size: dataset_size,
                           pn.ni_per: ni_per,
                           pn.metric_type: metric_type,
-                          pn.req_run_counts: req_run_counts}
+                          pn.req_run_counts: req_run_counts,
+                          pn.vectors_index: vectors_index,
+                          pn.scalars_index: scalars_index,
+                          pn.scalars_params: scalars_params}
         collection_params = {pn.other_fields: other_fields,
                              pn.shards_num: shards_num,
                              pn.enable_dynamic_field: enable_dynamic_field}
@@ -41,12 +80,18 @@ class CommonParams:
                          # "guarantee_timestamp": 1,
                          # "expr": ["float1 > -1 && float1 < 10", "float1 > 0 && float1 < 20"],
                          }
+        search_v2_params = {pn.reqs: reqs,
+                            pn.rerank: rerank,
+                            pn.top_k: search_v2_top_k,
+                            pn.nq: search_v2_nq,
+                            pn.guarantee_timestamp: search_v2_guarantee_timestamp,
+                            }
         resource_groups_params = {pn.reset: reset_rg,
                                   pn.groups: groups}
         database_user_params = {pn.reset_rbac: reset_rbac,
                                 pn.reset_db: reset_db}
 
-        return dict_recursive_key({
+        return {k: v for k, v in dict_recursive_key({
             pn.dataset_params: dataset_params,
             pn.collection_params: collection_params,
             pn.load_params: load_params,
@@ -54,9 +99,10 @@ class CommonParams:
             pn.index_params: index_params,
             pn.query_params: query_params,
             pn.search_params: search_params,
+            pn.searchV2_params: search_v2_params,
             pn.resource_groups_params: resource_groups_params,
             pn.database_user_params: database_user_params,
-        })
+        }).items() if v != {}}
 
 
 class InsertBatchParams(CommonParams):
@@ -187,4 +233,24 @@ class SearchParams(CommonParams):
                                    index_param=index_param, top_k=top_k, nq=nq, search_param=search_param,
                                    search_expr=_search_expr, req_run_counts=req_run_counts)
         log.debug("[SearchParams] Default params of params_scene_search_auto_index: {0}".format(default_params))
+        return default_params
+
+
+class SearchV2Params(CommonParams):
+    def params_scene_search_v2_ivf_flat(
+            self, search_v2_reqs: List[SearchV2ReqParams], search_v2_rerank: SearchV2RerankParams,
+            dataset_name=pn.DatasetsName.SIFT, dim=128, dataset_size="5m", req_run_counts=10, ni_per=5000,
+            vectors_index=None, scalars_index=None, scalars_params=None,
+            other_fields=dp.other_fields, metric_type=pn.MetricsTypeName.L2,
+            index_type=pn.IndexTypeName.IVF_FLAT, index_param={"nlist": 2048},
+            search_v2_top_k=[1, 10, 100, 1000], search_v2_nq=1):
+        dataset_size = parser_data_size(dataset_size)
+
+        default_params = self.base(
+            dataset_name=dataset_name, dim=dim, dataset_size=dataset_size, ni_per=ni_per, req_run_counts=req_run_counts,
+            vectors_index=vectors_index, scalars_index=scalars_index, scalars_params=scalars_params,
+            other_fields=other_fields, metric_type=metric_type, index_type=index_type, index_param=index_param,
+            search_v2_top_k=search_v2_top_k, search_v2_nq=search_v2_nq,
+            reqs=[i.obj_params for i in search_v2_reqs], rerank=search_v2_rerank.obj_params)
+        log.debug("[SearchV2Params] Default params of params_scene_search_v2_ivf_flat: {0}".format(default_params))
         return default_params

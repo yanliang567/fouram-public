@@ -29,13 +29,13 @@ class AccParams:
                          # "expr": ["float1 > -1 && float1 < 10", "float1 > 0 && float1 < 20"],
                          }
 
-        return dict_recursive_key({
+        return {k: v for k, v in dict_recursive_key({
             pn.dataset_params: dataset_params,
             pn.collection_params: collection_params,
             pn.load_params: load_params,
             pn.index_params: index_params,
             pn.search_params: search_params,
-        })
+        }).items() if v != {}}
 
     def sift_128_euclidean_hnsw(self, dataset_name=pn.AccDatasetsName.sift_128_euclidean,
                                 index_type=pn.IndexTypeName.HNSW, m=16, ef_construction=500, ef=None):

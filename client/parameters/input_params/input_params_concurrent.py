@@ -1,5 +1,6 @@
 from typing import List
 
+from client.parameters.input_params import SearchV2ReqParams, SearchV2RerankParams
 from client.parameters.input_params.input_params_common import CommonParams
 from client.parameters import params_name as pn
 from client.common.common_func import dict_recursive_key, parser_data_size, update_dict_value
@@ -111,6 +112,26 @@ class ConcurrentParams(CommonParams):
                 "params": {"nq": nq, "top_k": top_k, "search_param": search_param, "expr": expr,
                            "guarantee_timestamp": guarantee_timestamp, "output_fields": output_fields,
                            "ignore_growing": ignore_growing, "timeout": timeout, "random_data": random_data}}
+
+    @staticmethod
+    def params_searchV2(weight=1, nq=1, top_k=1, reqs: List[SearchV2ReqParams] = None,
+                        rerank: SearchV2RerankParams = None, output_fields: list = None, ignore_growing: bool = False,
+                        guarantee_timestamp: int = None, timeout: int = 60, random_data=True):
+        """
+        nq: int
+        top_k: int
+        reqs: list
+        rerank: dict
+        output_fields: Optional[list] = None
+        ignore_growing: Optional[bool] = False
+        guarantee_timestamp: Optional[int] = None
+        timeout: Optional[int] = 60
+        random_data: Optional[bool] = False
+        """
+        return {"type": "searchV2", "weight": weight,
+                "params": {"nq": nq, "top_k": top_k, "reqs": [i.obj_params for i in reqs], "rerank": rerank.obj_params,
+                           "output_fields": output_fields, "ignore_growing": ignore_growing,
+                           "guarantee_timestamp": guarantee_timestamp, "timeout": timeout, "random_data": random_data}}
 
     @staticmethod
     def params_query(weight=1, ids: list = None, expr: str = None, output_fields: list = None,
@@ -329,7 +350,9 @@ class ConcurrentParams(CommonParams):
                            "new_connect": new_connect, "new_user": new_user}}
 
     def params_scene_concurrent(self, concurrent_tasks: list, dataset_name=pn.DatasetsName.SIFT, dim=128,
-                                dataset_size="1m", ni_per=50000, other_fields=[], shards_num=2,
+                                dataset_size="1m", ni_per=50000,
+                                vectors_index=None, scalars_index=None, scalars_params=None,
+                                other_fields=[], shards_num=2,
                                 replica_number=None, resource_groups=None,
                                 reset_rg=False, groups=None, reset_rbac=False, reset_db=False,
                                 metric_type=pn.MetricsTypeName.L2, index_type=pn.IndexTypeName.HNSW,
@@ -337,11 +360,13 @@ class ConcurrentParams(CommonParams):
                                 during_time=120, interval=20, spawn_rate=None):
         dataset_size = parser_data_size(dataset_size)
 
-        base_default_params = self.base(dataset_name=dataset_name, dim=dim, dataset_size=dataset_size, ni_per=ni_per,
-                                        other_fields=other_fields, shards_num=shards_num, metric_type=metric_type,
-                                        index_type=index_type, index_param=index_param, reset_rg=reset_rg,
-                                        groups=groups, replica_number=replica_number, resource_groups=resource_groups,
-                                        reset_rbac=reset_rbac, reset_db=reset_db)
+        base_default_params = self.base(
+            dataset_name=dataset_name, dim=dim, dataset_size=dataset_size, ni_per=ni_per,
+            vectors_index=vectors_index, scalars_index=scalars_index, scalars_params=scalars_params,
+            other_fields=other_fields, shards_num=shards_num, metric_type=metric_type,
+            index_type=index_type, index_param=index_param, reset_rg=reset_rg,
+            groups=groups, replica_number=replica_number, resource_groups=resource_groups,
+            reset_rbac=reset_rbac, reset_db=reset_db)
         concurrent_default_params = self.concurrent_base(concurrent_number=concurrent_number, during_time=during_time,
                                                          interval=interval, concurrent_tasks=concurrent_tasks,
                                                          spawn_rate=spawn_rate)

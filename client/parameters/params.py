@@ -5,8 +5,11 @@ from typing import Optional, Union, List
 
 from pymilvus import DataType
 
+from client.client_base import RRFRanker, WeightedRanker, AnnSearchRequest
 from client.common.common_func import (
-    gen_combinations, update_dict_value, loop_ids, gen_vectors, get_default_field_name, gen_unique_str)
+    ParserFieldsParams,
+    gen_combinations, update_dict_value, loop_ids, gen_vectors, get_default_field_name
+)
 from client.common.common_type import concurrent_global_params, DefaultValue
 from client.parameters.params_name import *
 
@@ -22,6 +25,7 @@ class ParamsBase:
     flush_params: Optional[dict] = field(default_factory=lambda: {})
     index_params: Optional[dict] = field(default_factory=lambda: {})
     search_params: Optional[dict] = field(default_factory=lambda: {})
+    searchV2_params: Optional[dict] = field(default_factory=lambda: {})
     query_params: Optional[dict] = field(default_factory=lambda: {})
     go_search_params: Optional[dict] = field(default_factory=lambda: {})
     concurrent_params: Optional[dict] = field(default_factory=lambda: {})
@@ -76,6 +80,13 @@ class ParamsFormat:
             output_fields: ([type(list()), type(None)], OPTION),
             ignore_growing: ([type(bool())], OPTION),
             timeout: ([type(int())], OPTION),
+        },
+        searchV2_params: {
+            guarantee_timestamp: ([type(int())], OPTION),
+            output_fields: ([type(list()), type(None)], OPTION),
+            ignore_growing: ([type(bool())], OPTION),
+            timeout: ([type(int())], OPTION),
+            print_vectors: ([type(bool())], OPTION),
         },
         resource_groups_params: {groups: ([type(list()), type(dict()), type(None)], OPTION),
                                  reset: ([type(bool())], OPTION)},
@@ -159,6 +170,17 @@ class ParamsFormat:
         go_search_params: {concurrent_number: ([type((int())), type(list())], MUST),
                            during_time: ([type((int())), type((str()))], MUST),
                            interval: ([type((int()))], MUST)}
+    }, common_scene_build_index)
+
+    common_scene_searchV2 = update_dict_value({
+        dataset_params: {req_run_counts: ([type((int()))], MUST)},
+        searchV2_params: {top_k: ([type(int()), type(list())], MUST),
+                          nq: ([type(int()), type(list())], MUST),
+                          reqs: ([type(list())], MUST),
+                          rerank: ([type(dict())], MUST),
+                          },
+        index_params: {index_type: ([type(str())], OPTION),
+                       index_param: ([type(dict())], OPTION)},
     }, common_scene_build_index)
 
     common_concurrent = update_dict_value({
@@ -254,6 +276,71 @@ class ConcurrentGoBenchParamsSearch(DataClassBase):
     timeout: Optional[int] = DefaultValue.default_timeout
     expr: Optional[str] = ""
     output_fields: Optional[list] = field(default_factory=lambda: [])
+
+
+@dataclass
+class ConcurrentInputParamsSearchV2(DataClassBase):
+    nq: int
+    top_k: int
+    reqs: list
+    rerank: dict
+    output_fields: Optional[list] = None
+    ignore_growing: Optional[bool] = False
+    guarantee_timestamp: Optional[int] = None
+    timeout: Optional[int] = DefaultValue.default_timeout
+
+    random_data: Optional[bool] = False
+
+
+@dataclass
+class ConcurrentTaskSearchV2(DataClassBase):
+    all_fields_params: ParserFieldsParams
+
+    reqs: List[AnnSearchRequest]
+    rerank: Union[RRFRanker, WeightedRanker]
+    limit: int
+    output_fields: Optional[list] = None
+    ignore_growing: Optional[bool] = False
+    guarantee_timestamp: Optional[int] = None
+    timeout: Optional[int] = DefaultValue.default_timeout
+
+    # other params
+    random_data: Optional[bool] = False
+
+    def set_random_data(self):
+        for r in self.reqs:
+            _field_params = self.all_fields_params.get_fields_params(r.anns_field)
+            r._data = gen_vectors(nb=len(r.data), dim=_field_params.dim, field_name=r.anns_field)
+
+    @property
+    def obj_params(self):
+        _p = copy.deepcopy(self.to_dict)
+        del _p["all_fields_params"]
+        del _p["random_data"]
+
+        if _p["guarantee_timestamp"] is None:
+            del _p["guarantee_timestamp"]
+        if _p["ignore_growing"] not in [True]:
+            del _p["ignore_growing"]
+        return _p
+
+    @property
+    def get_all_params(self):
+        return {
+            "reqs": [{
+                "anns_field": r.anns_field,
+                "param": r.param,
+                "limit": r.limit,
+                "expr": r.expr,
+                "nq": len(r.data)
+            } for r in self.reqs],
+            "rerank": self.rerank.dict(),
+            "limit": self.limit,
+            "output_fields": self.output_fields,
+            "ignore_growing": self.ignore_growing,
+            "guarantee_timestamp": self.guarantee_timestamp,
+            "timeout": self.timeout
+        }
 
 
 @dataclass
@@ -798,6 +885,8 @@ class ConcurrentTasksParams(ConcurrentTasksParamsBase):
         default_factory=lambda: ConcurrentObjParams(**{"params": DataClassBase}))
     search: Optional[ConcurrentObjParams] = field(
         default_factory=lambda: ConcurrentObjParams(**{"params": ConcurrentTaskSearch}))
+    searchV2: Optional[ConcurrentObjParams] = field(
+        default_factory=lambda: ConcurrentObjParams(**{"params": ConcurrentTaskSearchV2}))
     query: Optional[ConcurrentObjParams] = field(
         default_factory=lambda: ConcurrentObjParams(**{"params": ConcurrentTaskQuery}))
     flush: Optional[ConcurrentObjParams] = field(

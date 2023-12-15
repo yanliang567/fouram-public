@@ -1,3 +1,4 @@
+import copy
 from dataclasses import dataclass, field
 from typing import Optional, List, Union
 
@@ -49,6 +50,34 @@ class TransferReplicasParams:
     target: str
     collection_name: str
     num_replica: int
+
+
+@dataclass
+class AnnSearchRequestParams:
+    anns_field: str
+    param: dict
+    limit: int
+    expr: Optional[str] = None
+    data: list = None  # need to update
+
+    @property
+    def get_params(self) -> dict:
+        return copy.deepcopy(vars(self))
+
+    @property
+    def get_require_params(self) -> dict:
+        _p = {
+            "anns_field": self.anns_field,
+            "param": self.param,
+            "limit": self.limit
+        }
+        if self.expr is not None:
+            _p.update({"expr": self.expr})
+        return _p
+
+    @staticmethod
+    def check_property():
+        return ["anns_field", "param", "limit"]
 
 
 @dataclass

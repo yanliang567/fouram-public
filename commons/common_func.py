@@ -183,6 +183,15 @@ def update_dict_value(server_resource, values_dict):
     return target
 
 
+def dict_merge(dicts: List[dict]) -> dict:
+    _result = {}
+    for _dict in dicts:
+        log.debug("[dict_merge] Merge {0} to {1}".format(_dict, _result))
+        _result = update_dict_value(_dict, _result)
+    log.debug("[dict_merge] Merge {0} done: {1}".format(dicts, _result))
+    return _result
+
+
 def execute_funcs(funcs: List[tuple]):
     for func in funcs:
         if len(func) == 1:

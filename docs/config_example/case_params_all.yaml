@@ -10,6 +10,8 @@ dataset_params:
   # `float32_vector` is the column_name on laion dataset
   column_name: float32_vector / <str>
   # vector dimensions for vector field, make sure it is consistent with the dim of the specified dataset
+  # `dataset_params.dim` is also a global parameter,
+  # `dim` of other vector field will be overwritten by `dataset_params.dim` if `dataset_params.scalars_params.<vector field name>.params.dim` is not set
   dim: 128 / <int>
   # dataset names currently support:
   # random: `local`
@@ -21,6 +23,7 @@ dataset_params:
   # The size of the data set to be inserted
   dataset_size: 1b / <str or int>
   # the amount of data for each insert during data preparation
+  # `InsertBatch` scenario, `ni_per` is List[int]
   ni_per: 50000 / <int>
 
   # for `search` and `query`, number of serial execution requests
@@ -31,9 +34,9 @@ dataset_params:
   # only supports file name suffix ".ivecs"
   ground_truth_file_name: idx_10M.ivecs / <str>
 
-  # max_length for generating `varchar` schema,  which takes effect globally
+  # max_length for generating `varchar` schema, which takes effect globally
   max_length: 256 / <int>
-  # generating varchar data, whether to fill the length of `max_length`
+  # varchar_filled for generating varchar data, whether to fill the length of `max_length`, which takes effect globally
   # false: convert id column to string; true: pad to length of `max_length`-1 with `ascii_letters` and `digits`
   varchar_filled: false / <bool>
 
@@ -62,10 +65,16 @@ dataset_params:
   scalars_params:
     # `params` for creating collection
     # `other_params` for inserting values
+    # Please set `dim` under both `params` and `other_params` !!!
 
-    # default column: float_vector, id
+    # default fields: float_vector, id
+    # "id" is the default primary key field
+    # "float_vector" can be reset by `dataset_params.vector_field_name`
     # Do not modify the vector field `float_vector` dataset from here, this is just an example of passing parameters !!!
+    # Unless your `dataset_params.vector_field_name` is not "float_vector"
     float_vector:
+      params:
+        dim: 768
       other_params:
         dataset: laion2b_multi
         column_name: float32_vector
@@ -75,19 +84,23 @@ dataset_params:
       params:
         dim: 768
       other_params:
+        # Parquet data set needs to specify the dataset name and column_name
         dataset: cohere10m_parquet
         column_name: emb
         dim: 768
     float_vector_2:
       params:
-        dim: 768
+        dim: 128
       other_params:
+        # Numpy data set only needs to pass the dataset name
         dataset: sift
+        dim: 128
     binary_vector_1:
       params:
         dim: 512
       other_params:
         dataset: binary
+        dim: 512
     id:
       other_params:
         dataset: laion2b_multi
@@ -185,18 +198,65 @@ release_params:
 
 # `scene_search`, `scene_search_recall`, `scene_go_search` these three scenes use this set of search parameters
 search_params:
+  # List data will be cross-combined
   # search vectors number
-  nq: 1 / <int>
+  nq: 1 / <int> / <List[int]>
   # search limit
-  top_k: 1 / <int>
+  top_k: 1 / <int> / <List[int]>
   # `search_param` can be dynamically adjusted according to `index_type`
   search_param:
-    nprobe: 64
-  expr: "int64_1 > 10" / <str>
+    nprobe: 64 / <int> / <List[int]>
+  expr: "int64_1 > 10" / <str> / <List[str]>
+
   output_fields: ["int64_1", "float_vector"] / <list>
   timeout: 60 / <int>
   ignore_growing: <bool>
   guarantee_timestamp: <int>
+
+# `scene_searchV2` scene use this set of searchV2 parameters
+searchV2_params:
+  # if search multi-vector, set vector fields of `dataset_params.vectors_index` and `dataset_params.scalars_params`
+
+  # if `dataset_params.scalars_params.<vector field name>.other_params.dataset` is omitted,
+  # vector data will be randomly generated,
+  # `dim` obtained from `dataset_params.scalars_params.<vector field name>.params.dim`
+
+  # search `metric_type` obtained from `dataset_params.vectors_index.<vector field name>.metric_type`
+
+  # List data will be cross-combined
+  # searchV2 reqs params: <list>
+  reqs:
+    # `anns_field` and `search_param` must be passed in
+    # default value of `expr` is None
+    # if `top_k` is not passed in, which will be overwritten by `searchV2_params.top_k`
+    - anns_field: float_vector / str
+      search_param:
+        nprobe: 64 / <int>
+      expr: "int64_1 > 10" / Optional[str]
+      top_k: Optional[int]
+    - anns_field: float_vector_2 / str
+      search_param:
+        ef: 64 / <int>
+      expr: "int64_1 > 10" / Optional[str]
+      top_k: Optional[int]
+  # searchV2 rerank params: <dict>: {<rank type>: List[tuple] or tuple}
+  # rank type: RRFRanker, WeightedRanker -> List[list] or list
+  rerank:
+    # at least one set of parameters needs to be passed in
+    RRFRanker: [[60], [70], [80]] / [99] / [] / [[], [], [50]]
+    WeightedRanker: [0.9, 0.1] / [[0.9, 0.1], [0.8, 0.2]]
+
+  # search vectors number
+  nq: 1 / <int> / <List[int]>
+  # search limit
+  top_k: 1 / <int> / <List[int]>
+
+  output_fields: [ "int64_1", "float_vector" ] / <list>
+  timeout: 60 / <int>
+  ignore_growing: <bool>
+  guarantee_timestamp: <int>
+  # print vector data when log output, default value is `false`
+  print_vectors: false / <bool>
 
 query_params:
   # `ids` will be converted to `expr`: "id in {ids}"
@@ -274,6 +334,49 @@ concurrent_tasks:
       guarantee_timestamp: Optional[int] = None
       output_fields: Optional[list] = None
       ignore_growing: Optional[bool] = False
+      timeout: Optional[int] = 60
+      # false: use the top nq vectors of the query.npy file of the dataset
+      # true: randomly generate search vectors every time
+      random_data: Optional[bool] = False
+
+  - type: searchV2
+    weight: 1
+    params:
+      nq: int
+      top_k: int
+
+      # if search multi-vector, set vector fields of `dataset_params.vectors_index` and `dataset_params.scalars_params`
+
+      # if `dataset_params.scalars_params.<vector field name>.other_params.dataset` is omitted,
+      # vector data will be randomly generated,
+      # `dim` obtained from `dataset_params.scalars_params.<vector field name>.params.dim`
+
+      # search `metric_type` obtained from `dataset_params.vectors_index.<vector field name>.metric_type`
+      reqs:  # List[dict]
+        # `anns_field` and `search_param` must be passed in
+        # default value of `expr` is None
+        # if `top_k` is not passed in, which will be overwritten by `top_k` above
+        - anns_field: float_vector  # str
+          search_param:  # dict
+            nprobe: 64
+          top_k: 2  # int
+          expr: "id > 0"  # str
+        - anns_field: float_vector_1
+          search_param:
+            ef: 64
+          expr: "int64_1 < 10"
+        - anns_field: binary_vector_1
+          search_param:
+            nprobe: 32
+          top_k: 3
+      # rank type: RRFRanker, WeightedRanker -> list
+      # Only one set of ranker param can be set !!!
+      rerank:
+#          RRFRanker: []
+        WeightedRanker: [0.8, 0.1, 0.1]
+      output_fields: Optional[list] = None
+      ignore_growing: Optional[bool] = False
+      guarantee_timestamp: Optional[int] = None
       timeout: Optional[int] = 60
       # false: use the top nq vectors of the query.npy file of the dataset
       # true: randomly generate search vectors every time

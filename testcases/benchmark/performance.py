@@ -1,10 +1,18 @@
 import pytest
 
-from client.cases import AccCases, InsertBatch, BuildIndex, Load, Query, Search, SearchRecall, GoBenchCases
+from client.cases import AccCases, InsertBatch, BuildIndex, Load, Query, Search, SearchV2, SearchRecall, GoBenchCases
 from client.common.common_func import parser_data_size  # do not remove
 from client.parameters.input_params import (
-    AccParams, InsertBatchParams, BuildIndexParams, LoadParams, QueryParams, SearchParams, GoBenchParams,
-    ConcurrentParams)
+    AccParams,
+    InsertBatchParams,
+    BuildIndexParams,
+    LoadParams,
+    QueryParams,
+    SearchParams,
+    GoBenchParams,
+    ConcurrentParams,
+    SearchV2Params, SearchV2ReqParams, SearchV2RerankParams
+)
 from client.parameters import params_name as pn
 import client.parameters.input_params.define_params as cdp
 from deploy.commons.common_params import (
@@ -14,6 +22,7 @@ from deploy.commons.common_func import get_class_key_name, get_default_deploy_mo
 
 from workflow.performance_template import PerfTemplate, ServerTemplate
 from parameters.input_params import param_info, InputParamsBase
+from commons.common_func import dict_merge
 from commons.common_type import DefaultParams as dp
 
 
@@ -797,6 +806,40 @@ class TestPerformanceCases(PerfTemplate):
             search_expr=None, req_run_counts=None)
         self.serial_template(input_params=input_params, cpu=dp.default_cpu, mem=dp.default_mem, deploy_mode=deploy_mode,
                              case_callable_obj=SearchRecall().scene_search_recall, default_case_params=case_params)
+
+    def test_search_v2_custom_parameters(self, input_params: InputParamsBase):
+        """
+        :test steps:
+            1. insert and calculation of searchV2 time
+        """
+        self.serial_template(input_params=input_params, cpu=dp.default_cpu, mem=dp.default_mem, deploy_mode=CLUSTER,
+                             case_callable_obj=SearchV2().scene_searchV2)
+
+    @pytest.mark.searchV2
+    @pytest.mark.parametrize("deploy_mode", [STANDALONE])
+    def test_ivf_flat_search_v2_standalone(self, input_params: InputParamsBase, deploy_mode):
+        """
+        :test steps:
+            1. insert and calculation of searchV2 time
+        """
+        self.serial_template(
+            input_params=input_params, cpu=8, mem=32, deploy_mode=deploy_mode,
+            case_callable_obj=SearchV2().scene_searchV2,
+            default_case_params=SearchV2Params().params_scene_search_v2_ivf_flat(
+                search_v2_reqs=[
+                    SearchV2ReqParams(search_param={"nprobe": 32}, expr="int64_1 < 100000"),
+                    SearchV2ReqParams(search_param={"ef": 64}, anns_field="float_vector_1", top_k=60, expr="id > 10"),
+                    SearchV2ReqParams(search_param={"nprobe": 64}, anns_field="binary_vector_1", top_k=2000)],
+                search_v2_rerank=SearchV2RerankParams(RRFRanker=[[60], [70]], WeightedRanker=[0.3, 0.4, 0.3]),
+                other_fields=["float_vector_1", "array_varchar_1", "int64_1", "binary_vector_1"], req_run_counts=50,
+                vectors_index=dict_merge([cdp.DefaultVectorIndexParams.HNSW("float_vector_1"),
+                                          cdp.DefaultVectorIndexParams.BIN_IVF_FLAT("binary_vector_1")]),
+                scalars_index=["int64_1"],
+                scalars_params=dict_merge([cdp.DefaultScalarParams.text2img("float_vector_1"),
+                                           cdp.DefaultScalarParams.binary("binary_vector_1"),
+                                           cdp.DefaultScalarParams.array_varchar("array_varchar_1")])
+            )
+        )
 
 
 class TestGoBenchCases(PerfTemplate):

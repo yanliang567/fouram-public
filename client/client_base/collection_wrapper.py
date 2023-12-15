@@ -140,6 +140,16 @@ class ApiCollectionWrapper:
                                        **kwargs).run()
         return InterfaceResponse(*res, res_result, check_result)
 
+    def searchV2(self, reqs, rerank, limit, partition_names=None, output_fields=None, timeout=None, round_decimal=-1,
+                 check_task=None, check_items=None, **kwargs):
+        func_name = sys._getframe().f_code.co_name
+        res, res_result = api_request([self.collection.searchV2, reqs, rerank, limit, partition_names,
+                                       output_fields, timeout, round_decimal], **kwargs)
+        check_result = ResponseChecker(res, func_name, check_task, check_items, res_result, reqs=reqs, rerank=rerank,
+                                       limit=limit, partition_names=partition_names, output_fields=output_fields,
+                                       timeout=timeout, **kwargs).run()
+        return InterfaceResponse(*res, res_result, check_result)
+
     def query(self, expr, output_fields=None, partition_names=None, timeout=None, check_task=None, check_items=None,
               **kwargs):
         func_name = sys._getframe().f_code.co_name

@@ -45,6 +45,9 @@ class MyTaskSet(TaskSet):
     def search(self):
         self.client.search(self.tasks_params.search.params)
 
+    def searchV2(self):
+        self.client.searchV2(self.tasks_params.searchV2.params)
+
     def query(self):
         self.client.query(self.tasks_params.query.params)
 

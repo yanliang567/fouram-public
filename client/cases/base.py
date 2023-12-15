@@ -6,12 +6,23 @@ from pprint import pformat
 from pymilvus import DefaultConfig, DataType
 
 from client.client_base import (
-    ApiConnectionsWrapper, ApiCollectionWrapper, ApiIndexWrapper, ApiPartitionWrapper, ApiCollectionSchemaWrapper,
-    ApiFieldSchemaWrapper, ApiUtilityWrapper, ApiRoleWrapper, ApiDBWrapper)
+    ApiConnectionsWrapper,
+    ApiCollectionWrapper,
+    ApiIndexWrapper,
+    ApiPartitionWrapper,
+    ApiCollectionSchemaWrapper,
+    ApiFieldSchemaWrapper,
+    ApiUtilityWrapper,
+    ApiRoleWrapper,
+    ApiDBWrapper
+)
 from client.common.common_func import (
-    gen_collection_schema, gen_unique_str, parser_data_size, gen_vectors, gen_entities, go_bench, go_bench_refine,
-    GoSearchParams, remove_list_values, parser_segment_info, update_dict_value, get_default_search_params,
-    parser_search_params_expr, hide_dict_value, gen_random_query_data, PrepareInsertParams)
+    PrepareInsertParams,
+    gen_collection_schema, gen_unique_str, parser_data_size, gen_vectors, gen_entities, gen_random_query_data,
+    go_bench, go_bench_refine, GoSearchParams,
+    remove_list_values, parser_segment_info, update_dict_value, hide_dict_value,
+    get_default_search_params, parser_search_params_expr, get_ann_search_request_params
+)
 from client.common.common_param import TransferNodesParams, TransferReplicasParams
 from client.common.common_type import Precision, CheckTasks
 from client.common.common_type import DefaultValue as dv
@@ -20,6 +31,7 @@ from client.parameters.params_name import (
 from client.parameters.params import (
     DataClassBase,
     ConcurrentTaskSearch,
+    ConcurrentTaskSearchV2,
     ConcurrentTaskQuery,
     ConcurrentTaskFlush,
     ConcurrentTaskLoad,
@@ -473,7 +485,7 @@ class Base:
 
     def query(self, ids=None, expr=None, **kwargs):
         """
-        :return: (result, rt), check_result
+        :return: InterfaceResponse
         """
         _expr = ""
         if ids is None and expr is None:
@@ -490,11 +502,20 @@ class Base:
 
     def search(self, data, anns_field, param, limit, expr=None, timeout=300, **kwargs):
         """
-        :return: (result, rt), check_result
+        :return: InterfaceResponse
         """
         msg = "[Base] Params of search: nq:{0}, anns_field:{1}, param:{2}, limit:{3}, expr:\"{4}\", kwargs:{5}"
         log.info(msg.format(len(data), anns_field, param, limit, expr, kwargs))
         return self.collection_wrap.search(data, anns_field, param, limit, expr=expr, timeout=timeout, **kwargs)
+
+    def searchV2(self, reqs, rerank, limit, timeout=300, **kwargs):
+        """
+        :return: InterfaceResponse
+        """
+        log.info("[Base] Params of searchV2: reqs:{0}, rerank:{1}, limit:{2}, timeout:{3}, kwargs:{4}".format(
+            get_ann_search_request_params(reqs, print_vectors=kwargs.pop("print_vectors", False)), rerank, limit,
+            timeout, kwargs))
+        return self.collection_wrap.searchV2(reqs, rerank, limit, timeout=timeout, **kwargs)
 
     def go_search(self, index_type: str, go_search_params: GoSearchParams, concurrent_number: int,
                   during_time: int, interval: int, uri="", go_benchmark="", timeout=300, output_format="json",
@@ -752,6 +773,12 @@ class Base:
         if params.random_data:
             params.data = gen_vectors(nb=len(params.data), dim=params.dim, field_name=params.anns_field)
         return self.collection_wrap.search(check_task=CheckTasks.assert_result, **params.obj_params)
+
+    def concurrent_searchV2(self, params: ConcurrentTaskSearchV2):
+        if params.random_data:
+            params.set_random_data()
+        log.debug("[Base] Params of concurrent_searchV2: {}".format(params.get_all_params))
+        return self.collection_wrap.searchV2(check_task=CheckTasks.assert_result, **params.obj_params)
 
     def concurrent_query(self, params: ConcurrentTaskQuery):
         _extra_expr = ""

@@ -3,7 +3,7 @@ import pytest
 from client.cases import ConcurrentClientBase, GoBenchCases
 from client.common.common_func import parser_data_size  # do not remove
 from client.common.common_type import DefaultValue as dv
-from client.parameters.input_params import ConcurrentParams
+from client.parameters.input_params import ConcurrentParams, SearchV2ReqParams, SearchV2RerankParams
 from client.parameters import params_name as pn
 import client.parameters.input_params.define_params as cdp
 from deploy.commons.common_params import CLUSTER, STANDALONE, queryNode, dataNode, indexNode, proxy, kafka, pulsar
@@ -12,6 +12,7 @@ from deploy.configs.default_configs import NodeResource, SetDependence
 from workflow.performance_template import PerfTemplate
 from parameters.input_params import InputParamsBase
 from commons.common_type import DefaultParams as dp
+from commons.common_func import dict_merge
 
 
 class TestConcurrentCases(PerfTemplate):
@@ -203,6 +204,69 @@ class TestConcurrentCases(PerfTemplate):
         node_resources = [
             NodeResource(nodes=[indexNode], cpu=4, mem=4),
             NodeResource(nodes=[queryNode], cpu=10, mem=4)
+        ]
+
+        self.concurrency_template(
+            input_params=input_params, cpu=dp.min_cpu, mem=dp.min_mem, deploy_mode=deploy_mode,
+            old_version_format=self.get_report_version_format(False),
+            case_callable_obj=self.get_callable_object(ConcurrentClientBase().scene_concurrent_locust),
+            default_case_params=default_case_params, node_resources=node_resources)
+
+    @pytest.mark.locust
+    @pytest.mark.parametrize("deploy_mode", [STANDALONE])
+    def test_concurrent_locust_ivf_sq8_search_v2_standalone(self, input_params: InputParamsBase, deploy_mode):
+        """
+        :test steps:
+            1. concurrent test and calculation of RT and QPS
+        """
+        default_case_params = ConcurrentParams().params_scene_concurrent(
+            [ConcurrentParams.params_searchV2(
+                nq=1, top_k=10, reqs=[
+                    SearchV2ReqParams(search_param={"nprobe": 32}, expr="int64_1 < 100000"),
+                    SearchV2ReqParams(search_param={"ef": 64}, anns_field="float_vector_1", top_k=60, expr="id > 10"),
+                    SearchV2ReqParams(search_param={"nprobe": 64}, anns_field="binary_vector_1", top_k=2000)],
+                rerank=SearchV2RerankParams(WeightedRanker=[0.3, 0.4, 0.3]))],
+            other_fields=["float_vector_1", "array_varchar_1", "int64_1", "binary_vector_1"],
+            vectors_index=dict_merge([cdp.DefaultVectorIndexParams.HNSW("float_vector_1"),
+                                      cdp.DefaultVectorIndexParams.BIN_IVF_FLAT("binary_vector_1")]),
+            scalars_index=["int64_1"],
+            scalars_params=dict_merge([cdp.DefaultScalarParams.text2img("float_vector_1"),
+                                       cdp.DefaultScalarParams.binary("binary_vector_1"),
+                                       cdp.DefaultScalarParams.array_varchar("array_varchar_1")]),
+            ni_per=5000, concurrent_number=[100], during_time=1800, interval=20, **cdp.DefaultIndexParams.IVF_SQ8)
+
+        self.concurrency_template(
+            input_params=input_params, cpu=8, mem=32, deploy_mode=deploy_mode,
+            old_version_format=self.get_report_version_format(False),
+            case_callable_obj=self.get_callable_object(ConcurrentClientBase().scene_concurrent_locust),
+            default_case_params=default_case_params)
+
+    @pytest.mark.locust
+    @pytest.mark.parametrize("deploy_mode", [CLUSTER])
+    def test_concurrent_locust_ivf_sq8_search_v2_cluster(self, input_params: InputParamsBase, deploy_mode):
+        """
+        :test steps:
+            1. concurrent test and calculation of RT and QPS
+        """
+        default_case_params = ConcurrentParams().params_scene_concurrent(
+            [ConcurrentParams.params_searchV2(
+                nq=1, top_k=10, reqs=[
+                    SearchV2ReqParams(search_param={"nprobe": 32}, expr="int64_1 < 100000"),
+                    SearchV2ReqParams(search_param={"ef": 64}, anns_field="float_vector_1", top_k=60, expr="id > 10"),
+                    SearchV2ReqParams(search_param={"nprobe": 64}, anns_field="binary_vector_1", top_k=2000)],
+                rerank=SearchV2RerankParams(WeightedRanker=[0.3, 0.4, 0.3]))],
+            other_fields=["float_vector_1", "array_varchar_1", "int64_1", "binary_vector_1"],
+            vectors_index=dict_merge([cdp.DefaultVectorIndexParams.HNSW("float_vector_1"),
+                                      cdp.DefaultVectorIndexParams.BIN_IVF_FLAT("binary_vector_1")]),
+            scalars_index=["int64_1"],
+            scalars_params=dict_merge([cdp.DefaultScalarParams.text2img("float_vector_1"),
+                                       cdp.DefaultScalarParams.binary("binary_vector_1"),
+                                       cdp.DefaultScalarParams.array_varchar("array_varchar_1")]),
+            ni_per=5000, concurrent_number=[100], during_time=1800, interval=20, **cdp.DefaultIndexParams.IVF_SQ8)
+
+        node_resources = [
+            NodeResource(nodes=[indexNode], cpu=4, mem=8),
+            NodeResource(nodes=[queryNode], cpu=8, mem=32)
         ]
 
         self.concurrency_template(

@@ -2,18 +2,25 @@ import numpy as np
 import copy
 import dacite
 
+import pymilvus
+
 from client.cases.base import Base
 from client.cases.case_report import CasesReport
 from client.parameters.params import ParamsFormat, ParamsBase
 from client.parameters import params_name as pn
 from client.util.params_check import check_params
+from client.client_base import AnnSearchRequest
+from client.common.common_param import AnnSearchRequestParams
 from client.common.common_type import Precision, CaseIterParams
 from client.common.common_type import DefaultValue as dv
 from client.common.common_func import (
-    gen_combinations, update_dict_value, get_vector_type, get_default_field_name, get_vectors_from_binary,
-    parser_search_params_expr, get_ground_truth_ids, get_search_ids, get_recall_value, ParserInputParams,
-    write_json_file, gen_go_bench_json_file, ExtraPartitionsParams, PrepareInsertParams, deal_insert_result,
-    check_vector_index_params)
+    ParserInputParams, PrepareInsertParams, ParserFieldsParams, ExtraPartitionsParams,
+    gen_combinations, update_dict_value,
+    get_vector_type, get_default_field_name, get_vectors_from_binary,
+    get_ground_truth_ids, get_search_ids, get_recall_value,
+    parser_search_params_expr, write_json_file, gen_go_bench_json_file, deal_insert_result,
+    check_vector_index_params, check_params_exist
+)
 
 from commons.common_params import EnvVariable
 from utils.util_log import log
@@ -289,6 +296,103 @@ class CommonCases(Base):
             _expr = parser_search_params_expr(expr)
         kwargs.update(expr=_expr)
         return kwargs
+
+    def prepare_searchV2(self, req_run_counts, **kwargs):
+        search_v2_rt = []
+        for i in range(req_run_counts):
+            res_search_v2 = self.searchV2(**kwargs)
+            search_v2_rt.append(round(res_search_v2.rt, Precision.SEARCH_PRECISION))
+
+        self.case_report.add_attr(**{"searchV2": {
+            "RT": round(float(np.mean(search_v2_rt)), Precision.SEARCH_PRECISION),
+            "MinRT": round(float(np.min(search_v2_rt)), Precision.SEARCH_PRECISION),
+            "MaxRT": round(float(np.max(search_v2_rt)), Precision.SEARCH_PRECISION),
+            "TP99": round(np.percentile(search_v2_rt, 99), Precision.SEARCH_PRECISION),
+            "TP95": round(np.percentile(search_v2_rt, 95), Precision.SEARCH_PRECISION)}})
+        return self.case_report.to_dict(), True
+
+    def parser_searchV2_params(self):
+        search_params = copy.deepcopy(self.params_obj.searchV2_params)
+        s_p = gen_combinations({pn.top_k: search_params.pop(pn.top_k, 0),
+                                pn.nq: search_params.pop(pn.nq, 0)})
+
+        # deal rerank
+        s_rerank_list = []
+        for k, v in search_params.pop(pn.rerank, {}).items():
+            _obj = getattr(pymilvus, k, None)
+            if _obj:
+                if isinstance(v, list):
+                    if len([True for i in v if not isinstance(i, list)]) > 0 or len(v) == 0:
+                        s_rerank_list.append({k: v})
+                    else:
+                        s_rerank_list.extend(gen_combinations({k: v}))
+                else:
+                    log.error(f"[CommonCases] Value for attr:{k} is not a list:{type(v)}, please check:{v}")
+            else:
+                log.error(f"[CommonCases] Can't get attr:{k} from pymilvus, please check version of pymilvus!!!")
+
+        # deal combination params
+        search_params_list = []
+        for re in s_rerank_list:
+            for s in s_p:
+                s = update_dict_value(search_params, s)
+                s = update_dict_value({pn.rerank: re}, s)
+                search_params_list.append(s)
+
+        return search_params_list
+
+    def searchV2_param_analysis(self, _search_params: dict, all_fields_params: ParserFieldsParams):
+        _params = copy.deepcopy(_search_params)
+        nq = _params.pop(pn.nq)
+        top_k = _params.pop(pn.top_k)
+        reqs = _params.pop(pn.reqs, [])
+        rerank = _params.pop(pn.rerank, {})
+
+        limit = top_k
+
+        _require_reqs = []
+        _reqs = []
+
+        # deal reqs
+        for r in reqs:
+            if isinstance(r, dict) and check_params_exist(r, [pn.anns_field, pn.search_param]):
+                # get the params of the specified vector field
+                _fields_params_obj = all_fields_params.get_fields_params(r[pn.anns_field])
+
+                r["limit"] = r.pop(pn.top_k, limit)
+                r["expr"] = parser_search_params_expr(r.pop(pn.expr, None))
+                r["param"] = update_dict_value({"params": r.pop(pn.search_param)},
+                                               {"metric_type": _fields_params_obj.metric_type})
+                s_obj = dacite.from_dict(data_class=AnnSearchRequestParams, data=r)
+
+                s_obj.data = get_vectors_from_binary(
+                    nq=nq, dimension=_fields_params_obj.dim, dataset_name=_fields_params_obj.dataset,
+                    field_name=s_obj.anns_field)
+
+                _reqs.append(AnnSearchRequest(**s_obj.get_params))
+                _require_reqs.append(s_obj.get_require_params)
+            else:
+                log.error(f"[CommonCases] Param for searchV2 `reqs` is not dict, type:{type(r)}, value:{r} ")
+
+        # deal rerank
+        if isinstance(rerank, dict) and len(rerank.keys()) == 1:
+            for k, v in rerank.items():
+                _obj = getattr(pymilvus, k, None)
+                if _obj and isinstance(v, list):
+                    rerank = _obj(*v)
+                else:
+                    raise ValueError(f"[CommonCases] Can't get attr:{k} from pymilvus or value is not a list:{v}")
+        else:
+            raise ValueError(f"[CommonCases] Can't parsing rerank params: {rerank}")
+
+        result = update_dict_value({
+            "reqs": _reqs,
+            "rerank": rerank,
+            "limit": limit
+        }, _params)
+
+        _params.update({"reqs": _require_reqs, "rerank": rerank.dict()})
+        return result, nq, top_k, _reqs, rerank, _params
 
 
 class InsertBatch(CommonCases):
@@ -763,6 +867,105 @@ class SearchRecall(CommonCases):
                 object_args=[nq, top_k, self.params_obj.dataset_params.get("ground_truth_file_name", None),
                              search_params],
                 actual_params_used=actual_params_used, case_type=self.__class__.__name__)
+            params_list.append(p)
+        yield params_list
+
+        # clear env
+        self.clear_collections(clean_collection=input_params.clean_collection)
+        yield True
+
+
+class SearchV2(CommonCases):
+
+    def __str__(self):
+        return """
+        1. create a collection or use an existing collection
+        2. build index on vector column
+        3. insert a certain number of vectors
+        4. flush collection
+        5. build index on vector column with the same parameters
+        6. build index on on scalars column or not
+        7. count the total number of rows
+        8. load collection
+        9. search collection with different parameters
+        10. clean all collections or not
+        """
+
+    @check_params(ParamsFormat.common_scene_searchV2)
+    def scene_searchV2(self, **kwargs):
+        """
+        :param kwargs:
+            params: dict
+            prepare: bool
+            prepare_clean: bool
+            rebuild_index: bool
+            clean_collection: bool
+        :return:
+        """
+
+        # params prepare
+        input_params = ParserInputParams(**kwargs)
+        log.info("[SearchV2] The detailed test steps are as follows: {}".format(self))
+
+        # params parsing
+        self.parsing_params(input_params.params)
+        vector_type = get_vector_type(self.params_obj.dataset_params[pn.dataset_name])
+        vector_default_field_name = get_default_field_name(
+            vector_type, self.params_obj.dataset_params.get(pn.vector_field_name, ""))
+
+        # prepare data
+        self.prepare_collection(vector_default_field_name, input_params.prepare, input_params.prepare_clean)
+        if input_params.prepare is True:
+            self.prepare_index(vector_field_name=vector_default_field_name,
+                               metric_type=self.params_obj.dataset_params[pn.metric_type],
+                               clean_index_before=True)
+            self.prepare_insert(data_type=self.params_obj.dataset_params[pn.dataset_name],
+                                dim=self.params_obj.dataset_params[pn.dim],
+                                size=self.params_obj.dataset_params[pn.dataset_size],
+                                ni=self.params_obj.dataset_params[pn.ni_per],
+                                vector_field_name=vector_default_field_name)
+            self.prepare_flush()
+            self.prepare_index(vector_field_name=vector_default_field_name,
+                               metric_type=self.params_obj.dataset_params[pn.metric_type])
+        else:
+            # if pass in rebuild_index, indexes of collection will be dropped before building index
+            if input_params.rebuild_index:
+                self.prepare_index(vector_field_name=vector_default_field_name,
+                                   metric_type=self.params_obj.dataset_params[pn.metric_type],
+                                   clean_index_before=input_params.rebuild_index)
+        self.count_entities()
+        # load collection
+        self.prepare_load(**self.params_obj.load_params)
+
+        self.show_all_resource(shards_num=self.params_obj.collection_params.get(pn.shards_num, 2),
+                               show_resource_groups=self.params_obj.dataset_params.get(pn.show_resource_groups, True),
+                               show_db_user=self.params_obj.dataset_params.get(pn.show_db_user, False))
+
+        # search
+        def run(run_s_p: dict):
+            try:
+                self.prepare_searchV2(self.params_obj.dataset_params[pn.req_run_counts], **run_s_p)
+                return self.case_report.to_dict(), True
+            except Exception as e:
+                log.error("[SearchV2] SearchV2 raise error: {}".format(e))
+                return {}, False
+
+        # parser all fields params for search
+        all_fields_params = ParserFieldsParams(self.params_obj.dataset_params, self.params_obj.collection_params,
+                                               main_field_name=vector_default_field_name)
+        s_params = self.parser_searchV2_params()
+        params_list = []
+        for s_p in s_params:
+            search_v2_params, nq, top_k, _reqs, _rerank, other_params = self.searchV2_param_analysis(
+                s_p, all_fields_params)
+
+            actual_params_used = copy.deepcopy(input_params.params)
+            actual_params_used[pn.searchV2_params] = update_dict_value({
+                pn.nq: nq,
+                pn.top_k: top_k
+            }, other_params)
+            p = CaseIterParams(callable_object=run, object_args=[search_v2_params],
+                               actual_params_used=actual_params_used, case_type=self.__class__.__name__)
             params_list.append(p)
         yield params_list
 

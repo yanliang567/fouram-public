@@ -15,3 +15,11 @@ class BaseWrapper:
 
     def __getattr__(self, name):
         raise ImportError(f"[BaseWrapper] Can't import:{self.object_name}.{name}, error:{self.message}")
+
+
+try:
+    from pymilvus import RRFRanker, WeightedRanker, AnnSearchRequest
+except ImportError as e:
+    RRFRanker = BaseWrapper
+    WeightedRanker = BaseWrapper
+    AnnSearchRequest = BaseWrapper

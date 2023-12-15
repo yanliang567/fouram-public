@@ -3,8 +3,8 @@ import dacite
 
 from client.common.common_type import Precision, CaseIterParams
 from client.common.common_func import (
-    gen_combinations, get_vector_type, get_default_field_name, GoSearchParams, GoBenchParams, parser_time,
-    update_dict_value, ParserInputParams)
+    ParserInputParams, GoSearchParams, GoBenchParams, ParserFieldsParams,
+    gen_combinations, get_vector_type, get_default_field_name, parser_time, update_dict_value)
 from client.util.params_check import check_params
 from client.util.api_request import info_logout
 from client.cases.common_cases import CommonCases
@@ -13,6 +13,7 @@ from client.parameters.params import (
     ParamsFormat, ConcurrentObjParams, ConcurrentTasksParams, DataClassBase, ConcurrentGoBenchTasksParams,
     ConcurrentTaskDebug, ConcurrentInputParamsDebug,
     ConcurrentTaskSearch, ConcurrentInputParamsSearch, ConcurrentGoBenchParamsSearch,
+    ConcurrentTaskSearchV2, ConcurrentInputParamsSearchV2,
     ConcurrentTaskQuery, ConcurrentInputParamsQuery, ConcurrentGoBenchParamsQuery,
     ConcurrentTaskFlush, ConcurrentInputParamsFlush,
     ConcurrentTaskLoad, ConcurrentInputParamsLoad,
@@ -305,11 +306,18 @@ class ConcurrentClientBase(CommonCases):
     def parser_tasks_params(self, req_type, req_params, vector_field_name: str, metric_type: str):
         if req_type == pn.search:
             params = ConcurrentInputParamsSearch(**req_params)
-            result, nq, top_k, expr, other_params = \
-                self.search_param_analysis(_search_params=params.to_dict, default_field_name=vector_field_name,
-                                           metric_type=metric_type)
+            result = self.search_param_analysis(_search_params=params.to_dict, default_field_name=vector_field_name,
+                                                metric_type=metric_type)[0]
             result.update({"dim": self.params_obj.dataset_params[pn.dim]})
             return ConcurrentTaskSearch(**result)
+
+        elif req_type == pn.searchV2:
+            params = ConcurrentInputParamsSearchV2(**req_params)
+            all_fields_params = ParserFieldsParams(self.params_obj.dataset_params, self.params_obj.collection_params,
+                                                   main_field_name=vector_field_name)
+            result = self.searchV2_param_analysis(_search_params=params.to_dict, all_fields_params=all_fields_params)[0]
+            result.update({"all_fields_params": all_fields_params})
+            return ConcurrentTaskSearchV2(**result)
 
         elif req_type == pn.query:
             params = ConcurrentInputParamsQuery(**req_params)
@@ -373,7 +381,8 @@ class ConcurrentClientBase(CommonCases):
         all_support_obj = ConcurrentTasksParams().all_obj
         for task in tasks:
             if task["type"] not in all_support_obj:
-                raise Exception(f"[parser_concurrent_tasks] Task type:{task['type']} is not supported, please check!!!")
+                raise Exception(
+                    "[parser_concurrent_tasks] Task type:{0} is not supported, please check!!!".format(task["type"]))
             task["params"] = self.parser_tasks_params(task["type"], task["params"], vector_field_name, metric_type)
             tasks_dict.update({task["type"]: ConcurrentObjParams(**task)})
         return ConcurrentTasksParams(**tasks_dict)

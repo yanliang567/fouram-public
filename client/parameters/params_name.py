@@ -9,6 +9,7 @@ release_params = "release_params"
 flush_params = "flush_params"
 index_params = "index_params"
 search_params = "search_params"
+searchV2_params = "searchV2_params"
 query_params = "query_params"
 go_search_params = "go_search_params"
 concurrent_params = "concurrent_params"
@@ -19,6 +20,7 @@ functional_params = "functional_params"
 
 # request type
 search = "search"
+searchV2 = "searchV2"
 query = "query"
 flush = "flush"
 load = "load"
@@ -100,6 +102,12 @@ expr = "expr"
 guarantee_timestamp = "guarantee_timestamp"
 output_fields = "output_fields"
 
+# searchV2
+anns_field = "anns_field"
+reqs = "reqs"
+rerank = "rerank"
+print_vectors = "print_vectors"
+
 # go search
 concurrent_number = "concurrent_number"
 during_time = "during_time"
@@ -169,11 +177,11 @@ class MetricsTypeName:
     L2 = "L2"
     IP = "IP"
     COSINE = "COSINE"
-    Jaccard = "Jaccard"
-    Tanimoto = "Tanimoto"
-    Hamming = "Hamming"
-    Superstructure = "Superstructure"
-    Substructure = "Substructure"
+    Jaccard = "JACCARD"
+    Tanimoto = "TANIMOTO"
+    Hamming = "HAMMING"
+    Superstructure = "SUPERSTRUCTURE"
+    Substructure = "SUBSTRUCTURE"
 
 
 class IndexTypeName:

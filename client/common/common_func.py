@@ -17,11 +17,12 @@ from dataclasses import dataclass
 
 from pymilvus import DataType
 
-from client.client_base.schema_wrapper import ApiCollectionSchemaWrapper, ApiFieldSchemaWrapper
+from client.client_base import ApiCollectionSchemaWrapper, ApiFieldSchemaWrapper, AnnSearchRequest
 from client.parameters import params_name as pn
 from client.common.common_type import DefaultValue as dv
 from client.common.common_type import NAS, SimilarityMetrics, AccMetrics, Precision
 from client.common.common_param import GoBenchIndex, SegmentsAnalysis
+
 from commons.common_params import EnvVariable
 from configs.config_info import config_info
 from utils.util_log import log
@@ -823,6 +824,167 @@ def check_params_type(source: dict, target: dict):
     return flag
 
 
+def check_vector_index_params(field_name: str, params):
+    if isinstance(params, dict):
+        _check = [i for i in ["index_type", "metric_type", "index_param"] if i not in params.keys()]
+        if not _check:
+            return True
+        log.error(f"[check_vector_index_params] Vector field:{field_name} index params does not contain:{_check}")
+    else:
+        log.error(f"[check_vector_index_params] Vector field:{field_name} index params is not dict:{params}")
+    return False
+
+
+def get_spawn_rate(total_num: int, default_max_step: int = 5, default_max_spawn_rate: int = 100):
+    _spawn_rate = math.ceil(total_num / default_max_step)
+    return _spawn_rate if _spawn_rate <= default_max_spawn_rate else default_max_spawn_rate
+
+
+def remove_list_values(_list: list, _value):
+    _list = copy.deepcopy(_list)
+    while True:
+        if _value in _list:
+            _list.remove(_value)
+        else:
+            break
+    return _list
+
+
+def list_processing(_type: np, _list: list, _precision=Precision.ALGORITHM_PRECISION, default_value=np.NaN):
+    if len(_list) == 0:
+        return default_value
+
+    if isinstance(_precision, int):
+        return round(_type(*_list), _precision)
+
+    return _type(*_list)
+
+
+def parser_segment_info(segment_info, shards_num: int = 2):
+    log.debug(f"[parser_segment_info] The type for segment_info:{type(segment_info)}")
+    if len(segment_info) == 0:
+        log.warning(f"[parser_segment_info] The number of segments is 0, please check segment_info: {segment_info}")
+        return segment_info
+
+    num_rows_list = []
+    for segment in segment_info:
+        num_rows_list.append(segment.num_rows)
+
+    # Remove the minimum values of the number of shard_num
+    num_rows_list.sort()
+    if len(num_rows_list) >= shards_num:
+        _num_rows_list = num_rows_list[shards_num:]
+    else:
+        _num_rows_list = []
+        log.warning("[parser_segment_info] The number of segments:%s are less than shards_num:%s" % (
+            len(num_rows_list), shards_num))
+
+    _dict = {"segment_counts": len(segment_info),
+             "segment_total_vectors": sum(num_rows_list),
+             "max_segment_raw_count": list_processing(np.max, [num_rows_list], None),
+             "min_segment_raw_count": list_processing(np.min, [num_rows_list], None),
+             "avg_segment_raw_count": list_processing(np.mean, [num_rows_list]),
+             "std_segment_raw_count": list_processing(np.std, [num_rows_list]),
+             "shards_num": shards_num,
+             "truncated_avg_segment_raw_count": list_processing(np.mean, [_num_rows_list]),
+             "truncated_std_segment_raw_count": list_processing(np.std, [_num_rows_list]),
+             "top_percentile": [{f"TP_{i}": list_processing(np.percentile, [num_rows_list, i])} for i
+                                in [j for j in range(10, 100, 10)]]}
+
+    return SegmentsAnalysis(**_dict).to_dict
+
+
+def check_object(_object, default_value: list = [None]):
+    if _object not in default_value:
+        return True
+    raise Exception(f"[check_object] Object:{_object} check failed in default_value:{default_value}")
+
+
+def get_default_search_params(index_type: str):
+    all_index_types = {
+        pn.IndexTypeName.IVF_SQ8: {"nprobe": 64},
+        pn.IndexTypeName.IVF_FLAT: {"nprobe": 64},
+        pn.IndexTypeName.IVF_PQ: {"nprobe": 64},
+        pn.IndexTypeName.FLAT: {},
+        pn.IndexTypeName.HNSW: {"ef": 64},
+        pn.IndexTypeName.DISKANN: {"search_list": 20},
+        pn.IndexTypeName.AUTOINDEX: {"level": 1}
+    }
+    return all_index_types.get(index_type, {})
+
+
+def get_ann_search_request_params(all_obj: List[AnnSearchRequest], print_vectors=False):
+    check_list = ["anns_field", "param", "limit", "expr"]
+    if print_vectors:
+        check_list.append("data")
+
+    result = []
+    for obj in all_obj:
+        _dict = {k: getattr(obj, k) for k in check_list if hasattr(obj, k)}
+        _dict.update({"nq": len(obj.data)})
+        result.append(_dict)
+    return result
+
+
+def hide_value(source, keys):
+    for key, value in source.items():
+        if isinstance(value, dict) and key not in keys:
+            hide_value(source[key], keys)
+        if key in keys and not isinstance(value, dict) and value:
+            source[key] = "***"
+    return source
+
+
+def hide_dict_value(source, keys):
+    if not isinstance(source, dict) or not isinstance(keys, list):
+        return source
+    _s = copy.deepcopy(source)
+    target = hide_value(_s, keys)
+    return target
+
+
+def deal_insert_result(data: List[dict], acc: bool = False) -> dict:
+    """
+    :param data: [{
+            "insert": {
+                "total_time": total_time,
+                "VPS": ips,
+                "batch_time": ni_time,
+                "batch": ni
+            }
+        }, ...]
+    :param acc: bool, acc type result only has total_time
+
+    After supporting the insertion of different ni, please rewrite this method
+    """
+    if len(data) == 0:
+        return {}
+    elif len(data) == 1:
+        return data[0]
+    try:
+        log.debug(
+            f"[deal_insert_result] Processing insert results that only have reference effects for the same batch:{data}")
+        if acc:
+            return {
+                "ann_insert": {
+                    "total_time": round(sum([d["ann_insert"]["total_time"] for d in data]), Precision.COMMON_PRECISION)
+                }
+            }
+
+        return {
+            "insert": {
+                "total_time": round(sum([d["insert"]["total_time"] for d in data]), Precision.COMMON_PRECISION),
+                "VPS": round(sum([d["insert"]["VPS"] for d in data]) / len(data), Precision.COMMON_PRECISION),
+                "batch_time": round(sum([d["insert"]["batch_time"] for d in data]) / len(data),
+                                    Precision.COMMON_PRECISION),
+                "batch": round(sum([d["insert"]["batch"] for d in data]) / len(data), Precision.COMMON_PRECISION)
+            }
+        }
+    except Exception as e:
+        log.error(f"[deal_insert_result] Can't parser insert result: {data}, error:{e}")
+        return {"insert_result": data}
+
+
 def run_go_bench_process(params: list):
     process = subprocess.Popen(params, stderr=subprocess.PIPE)
     return process.communicate()[1].decode('utf-8')
@@ -834,17 +996,6 @@ def check_params_exist(target: dict, keys: list):
         if i not in k:
             raise Exception("[check_params_exist] Key:{0} not in target:{1}".format(i, target))
     return True
-
-
-def check_vector_index_params(field_name: str, params):
-    if isinstance(params, dict):
-        _check = [i for i in ["index_type", "metric_type", "index_param"] if i not in params.keys()]
-        if not _check:
-            return True
-        log.error(f"[check_vector_index_params] Vector field:{field_name} index params does not contain:{_check}")
-    else:
-        log.error(f"[check_vector_index_params] Vector field:{field_name} index params is not dict:{params}")
-    return False
 
 
 def gen_go_bench_json_file(prefix_file_path: str, retry_counts: int = 99999):
@@ -1072,82 +1223,7 @@ class GoBenchParams:
         }
 
 
-def get_spawn_rate(total_num: int, default_max_step: int = 5, default_max_spawn_rate: int = 100):
-    _spawn_rate = math.ceil(total_num / default_max_step)
-    return _spawn_rate if _spawn_rate <= default_max_spawn_rate else default_max_spawn_rate
-
-
-def remove_list_values(_list: list, _value):
-    _list = copy.deepcopy(_list)
-    while True:
-        if _value in _list:
-            _list.remove(_value)
-        else:
-            break
-    return _list
-
-
-def list_processing(_type: np, _list: list, _precision=Precision.ALGORITHM_PRECISION, default_value=np.NaN):
-    if len(_list) == 0:
-        return default_value
-
-    if isinstance(_precision, int):
-        return round(_type(*_list), _precision)
-
-    return _type(*_list)
-
-
-def parser_segment_info(segment_info, shards_num: int = 2):
-    log.debug(f"[parser_segment_info] The type for segment_info:{type(segment_info)}")
-    if len(segment_info) == 0:
-        log.warning(f"[parser_segment_info] The number of segments is 0, please check segment_info: {segment_info}")
-        return segment_info
-
-    num_rows_list = []
-    for segment in segment_info:
-        num_rows_list.append(segment.num_rows)
-
-    # Remove the minimum values of the number of shard_num
-    num_rows_list.sort()
-    if len(num_rows_list) >= shards_num:
-        _num_rows_list = num_rows_list[shards_num:]
-    else:
-        _num_rows_list = []
-        log.warning("[parser_segment_info] The number of segments:%s are less than shards_num:%s" % (
-            len(num_rows_list), shards_num))
-
-    _dict = {"segment_counts": len(segment_info),
-             "segment_total_vectors": sum(num_rows_list),
-             "max_segment_raw_count": list_processing(np.max, [num_rows_list], None),
-             "min_segment_raw_count": list_processing(np.min, [num_rows_list], None),
-             "avg_segment_raw_count": list_processing(np.mean, [num_rows_list]),
-             "std_segment_raw_count": list_processing(np.std, [num_rows_list]),
-             "shards_num": shards_num,
-             "truncated_avg_segment_raw_count": list_processing(np.mean, [_num_rows_list]),
-             "truncated_std_segment_raw_count": list_processing(np.std, [_num_rows_list]),
-             "top_percentile": [{f"TP_{i}": list_processing(np.percentile, [num_rows_list, i])} for i
-                                in [j for j in range(10, 100, 10)]]}
-
-    return SegmentsAnalysis(**_dict).to_dict
-
-
-def check_object(_object, default_value: list = [None]):
-    if _object not in default_value:
-        return True
-    raise Exception(f"[check_object] Object:{_object} check failed in default_value:{default_value}")
-
-
-def get_default_search_params(index_type: str):
-    all_index_types = {
-        pn.IndexTypeName.IVF_SQ8: {"nprobe": 64},
-        pn.IndexTypeName.IVF_FLAT: {"nprobe": 64},
-        pn.IndexTypeName.IVF_PQ: {"nprobe": 64},
-        pn.IndexTypeName.FLAT: {},
-        pn.IndexTypeName.HNSW: {"ef": 64},
-        pn.IndexTypeName.DISKANN: {"search_list": 20},
-        pn.IndexTypeName.AUTOINDEX: {"level": 1}
-    }
-    return all_index_types.get(index_type, {})
+""" Parser input params """
 
 
 @dataclass
@@ -1158,68 +1234,6 @@ class ParserInputParams:
     rebuild_index: Optional[bool] = False
     clean_collection: Optional[bool] = True
     sub_callable_obj: Optional[callable] = None
-
-
-def hide_value(source, keys):
-    for key, value in source.items():
-        if isinstance(value, dict) and key not in keys:
-            hide_value(source[key], keys)
-        if key in keys and not isinstance(value, dict) and value:
-            source[key] = "***"
-    return source
-
-
-def hide_dict_value(source, keys):
-    if not isinstance(source, dict) or not isinstance(keys, list):
-        return source
-    _s = copy.deepcopy(source)
-    target = hide_value(_s, keys)
-    return target
-
-
-def deal_insert_result(data: List[dict], acc: bool = False) -> dict:
-    """
-    :param data: [{
-            "insert": {
-                "total_time": total_time,
-                "VPS": ips,
-                "batch_time": ni_time,
-                "batch": ni
-            }
-        }, ...]
-    :param acc: bool, acc type result only has total_time
-
-    After supporting the insertion of different ni, please rewrite this method
-    """
-    if len(data) == 0:
-        return {}
-    elif len(data) == 1:
-        return data[0]
-    try:
-        log.debug(
-            f"[deal_insert_result] Processing insert results that only have reference effects for the same batch:{data}")
-        if acc:
-            return {
-                "ann_insert": {
-                    "total_time": round(sum([d["ann_insert"]["total_time"] for d in data]), Precision.COMMON_PRECISION)
-                }
-            }
-
-        return {
-            "insert": {
-                "total_time": round(sum([d["insert"]["total_time"] for d in data]), Precision.COMMON_PRECISION),
-                "VPS": round(sum([d["insert"]["VPS"] for d in data]) / len(data), Precision.COMMON_PRECISION),
-                "batch_time": round(sum([d["insert"]["batch_time"] for d in data]) / len(data),
-                                    Precision.COMMON_PRECISION),
-                "batch": round(sum([d["insert"]["batch"] for d in data]) / len(data), Precision.COMMON_PRECISION)
-            }
-        }
-    except Exception as e:
-        log.error(f"[deal_insert_result] Can't parser insert result: {data}, error:{e}")
-        return {"insert_result": data}
-
-
-""" Parser input params """
 
 
 @dataclass
@@ -1416,3 +1430,79 @@ class PrepareInsertParams:
     def insert_scalars_params(self, ni: int):
         self.GenScalarValuesObj.set_insert_length(ni)
         return next(self.iter_insert_scalars_params)
+
+
+@dataclass
+class FieldsParamsBase:
+    dim: int = dv.default_dim
+    dataset: str = dv.default_dataset
+    column_name: str = None
+    metric_type: str = dv.default_metric_type
+
+    @property
+    def to_dict(self):
+        return vars(self)
+
+
+class ParserFieldsParams:
+    """
+    Mainly to obtain the parameters set by multi-vector
+    """
+
+    def __init__(self, dataset_params: dict, collection_params: dict, main_field_name: str):
+        self._dataset_params = copy.deepcopy(dataset_params)
+        self._collection_params = copy.deepcopy(collection_params)
+        self._main_field_name = main_field_name
+
+        self._parser_params()
+
+    def _set_attr(self, k: str, v: dict):
+        obj = getattr(self, k, None)
+        if obj is None:
+            setattr(self, k, FieldsParamsBase())
+            obj = getattr(self, k)
+        elif not isinstance(obj, FieldsParamsBase):
+            raise ValueError(f"[ParserFieldsParams] Property:{k} already exists, value:{obj}")
+
+        for i, j in v.items():
+            if hasattr(obj, i):
+                setattr(obj, i, j)
+
+    def _parser_params(self):
+        try:
+            # get main `dim`
+            main_dim = self._dataset_params.get(pn.dim)
+
+            # set main vector filed
+            m = FieldsParamsBase(dim=main_dim, dataset=self._dataset_params.get(pn.dataset_name),
+                                 column_name=self._dataset_params.get(pn.column_name),
+                                 metric_type=self._dataset_params.get(pn.metric_type))
+            setattr(self, self._main_field_name, m)
+
+            # set other fields from `collection_params.other_fields`
+            for f in self._collection_params.get(pn.other_fields, []):
+                if isinstance(f, str):
+                    self._set_attr(f, {"dim": main_dim})
+
+            # parser metric type
+            for k1, v1 in self._dataset_params.get(pn.vectors_index, {}).items():
+                if isinstance(v1, dict):
+                    self._set_attr(k1, {pn.metric_type: v1.get(pn.metric_type, dv.default_metric_type)})
+
+            # set other fields from `dataset_params.scalars_params`
+            for k, v in self._dataset_params.get(pn.scalars_params, {}).items():
+                if isinstance(v, dict) and isinstance(v.get("other_params", {}), dict):
+                    _other_params = v.get("other_params", {})
+                    _p = {i: _other_params.get(i) for i in ["dataset", "column_name"] if _other_params.get(i, None)}
+
+                    _params = v.get("params", {})
+                    _p["dim"] = _params.get("dim", main_dim)
+                    self._set_attr(k, _p)
+
+        except Exception as e:
+            raise Exception(f"[ParserFieldsParams] Parser fields params failed: {e}")
+
+        log.debug(f"[ParserFieldsParams] Parser fields params done: {vars(self)}")
+
+    def get_fields_params(self, _field_name: str) -> FieldsParamsBase:
+        return getattr(self, _field_name, eval(f"self.{self._main_field_name}"))
