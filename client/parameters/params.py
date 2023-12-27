@@ -53,7 +53,7 @@ class ParamsFormat:
             dim: ([type(int())], OPTION),
             max_length: ([type(int())], OPTION),
             varchar_filled: ([type(bool())], OPTION),
-            scalars_index: ([type(list())], OPTION),
+            scalars_index: ([type(list()), type(dict())], OPTION),
             vectors_index: ([type(dict())], OPTION),
             scalars_params: ([type(dict())], OPTION),
             show_resource_groups: ([type(bool())], OPTION),

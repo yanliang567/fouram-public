@@ -59,8 +59,16 @@ dataset_params:
       index_type: BIN_IVF_FLAT
       index_param:
         nlist: 2048
-  # create index on the already created scalar column: <List[<scalar field name>...]>
-  scalars_index: ["int64_1", "float_1", "json_1", "varchar_1", "varchar_2", "array_varchar_1", "array_int64_1"]
+  # `scalars_index` supports list or dict, create index on the already created scalar column
+  #   - list: <List[<scalar field name>...]>
+  #   - dict: <Dict[{<scalar field name>: {<index_type>: "INVERTED"}}, <scalar field name>: {}}, ...]>
+#  scalars_index: ["int64_1", "float_1", "json_1", "varchar_1", "varchar_2", "array_varchar_1", "array_int64_1"]
+  scalars_index:
+    # create scalars index params
+    varchar_1:
+      index_type: INVERTED
+    varchar_2: {}  # for default index, don't pass in params
+
   # parameters required to create scalars: {<field_name>: {<params>: {}, <other_params>: {} }}
   scalars_params:
     # `params` for creating collection

@@ -445,9 +445,9 @@ class Base:
         collection_obj = collection_obj or self.collection_wrap
         return self.index_wrap.init_index(collection_obj.collection, field_name, index_params, **kwargs)
 
-    def build_scalar_index(self, field_name):
-        log.info("[Base] Start build scalar index of {0}".format(field_name))
-        return self.index_wrap.init_index(self.collection_wrap.collection, field_name, index_params={})
+    def build_scalar_index(self, field_name, index_params: dict = {}):
+        log.info("[Base] Start build scalar index of {0}, index_params:{1}".format(field_name, index_params))
+        return self.index_wrap.init_index(self.collection_wrap.collection, field_name, index_params=index_params)
 
     def show_index(self, collection_name=""):
         collection_name = collection_name or self.collection_name

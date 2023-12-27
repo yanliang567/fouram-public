@@ -160,19 +160,22 @@ class CommonCases(Base):
         self.prepare_scalars_index()
 
     def prepare_scalars_index(self, update_report_data=True):
-        scalars = self.params_obj.dataset_params.get(pn.scalars_index, [])
+        scalars = self.params_obj.dataset_params.get(pn.scalars_index, {})
+        scalars = {s: {} for s in scalars} if isinstance(scalars, list) else scalars
+        scalars_field = list(scalars.keys())
+
         vectors_index = self.params_obj.dataset_params.get(pn.vectors_index, {})
         vectors_field = list(vectors_index.keys())
 
-        if len(scalars) + len(vectors_field) == 0:
+        if len(scalars_field) + len(vectors_field) == 0:
             log.info("[AccCases] No scalar and vector fields need to be indexed.")
             return True
         log.info(f"[AccCases] Start building other fields index.")
 
         other_fields = self.params_obj.collection_params.get(pn.other_fields, [])
-        for scalar in scalars:
-            if scalar not in other_fields:
-                log.error("[AccCases] The field `{0}` is not in the collection {1}.".format(scalar, other_fields))
+        for _field in scalars_field + vectors_field:
+            if _field not in other_fields:
+                log.error("[AccCases] The field `{0}` is not in the collection {1}.".format(_field, other_fields))
                 return False
 
         self.show_index()
@@ -187,14 +190,14 @@ class CommonCases(Base):
                 log.info("[AccCases] RT of build vector field index `{1}`: {0}s".format(rt, k))
 
         # build scalar index
-        for scalar in scalars:
-            result = self.build_scalar_index(scalar)
+        for scalar, scalar_index_params in scalars.items():
+            result = self.build_scalar_index(field_name=scalar, index_params=scalar_index_params)
             rt = round(result.rt, Precision.INDEX_PRECISION)
             # set report data
             self.case_report.add_attr(update_report_data, **{"index": {scalar: {"RT": rt}}})
             log.info("[AccCases] RT of build scalar index `{1}`: {0}s".format(rt, scalar))
 
-        log.info("[AccCases] Prepare scalars:{0} vectors:{1} index done.".format(scalars, vectors_field))
+        log.info("[AccCases] Prepare scalars:{0} vectors:{1} index done.".format(scalars_field, vectors_field))
         self.show_index()
 
     def parser_search_params(self):

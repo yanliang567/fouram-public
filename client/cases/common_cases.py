@@ -150,7 +150,10 @@ class CommonCases(Base):
             self.prepare_scalars_index()
 
     def prepare_scalars_index(self, update_report_data=True):
-        scalars = self.params_obj.dataset_params.get(pn.scalars_index, [])
+        scalars = self.params_obj.dataset_params.get(pn.scalars_index, {})
+        scalars = {s: {} for s in scalars} if isinstance(scalars, list) else scalars
+        scalars_field = list(scalars.keys())
+
         vectors_index = self.params_obj.dataset_params.get(pn.vectors_index, {})
         vectors_field = list(vectors_index.keys())
 
@@ -160,9 +163,9 @@ class CommonCases(Base):
         log.info(f"[CommonCases] Start building other fields index.")
 
         other_fields = self.params_obj.collection_params.get(pn.other_fields, [])
-        for scalar in scalars + vectors_field:
-            if scalar not in other_fields:
-                log.error("[CommonCases] The field `{0}` is not in the collection {1}.".format(scalar, other_fields))
+        for _field in scalars_field + vectors_field:
+            if _field not in other_fields:
+                log.error("[CommonCases] The field `{0}` is not in the collection {1}.".format(_field, other_fields))
                 return False
 
         self.show_index()
@@ -175,15 +178,16 @@ class CommonCases(Base):
                 # set report data
                 self.case_report.add_attr(update_report_data, **{"index": {k: {"RT": rt}}})
                 log.info("[CommonCases] RT of build vector field index `{1}`: {0}s".format(rt, k))
+
         # build scalar index
-        for scalar in scalars:
-            result = self.build_scalar_index(scalar)
+        for scalar, scalar_index_params in scalars.items():
+            result = self.build_scalar_index(field_name=scalar, index_params=scalar_index_params)
             rt = round(result.rt, Precision.INDEX_PRECISION)
             # set report data
             self.case_report.add_attr(update_report_data, **{"index": {scalar: {"RT": rt}}})
             log.info("[CommonCases] RT of build scalar field index `{1}`: {0}s".format(rt, scalar))
 
-        log.info("[CommonCases] Prepare scalars:{0} vectors:{1} index done.".format(scalars, vectors_field))
+        log.info("[CommonCases] Prepare scalars:{0} vectors:{1} index done.".format(scalars_field, vectors_field))
         self.show_index()
 
     def prepare_query(self, req_run_counts, **kwargs):
