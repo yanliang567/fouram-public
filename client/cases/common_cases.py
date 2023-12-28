@@ -301,28 +301,28 @@ class CommonCases(Base):
         kwargs.update(expr=_expr)
         return kwargs
 
-    def prepare_searchV2(self, req_run_counts, **kwargs):
-        search_v2_rt = []
+    def prepare_hybrid_search(self, req_run_counts, **kwargs):
+        hybrid_search_rt = []
         for i in range(req_run_counts):
-            res_search_v2 = self.searchV2(**kwargs)
-            search_v2_rt.append(round(res_search_v2.rt, Precision.SEARCH_PRECISION))
+            res_hybrid_search = self.hybrid_search(**kwargs)
+            hybrid_search_rt.append(round(res_hybrid_search.rt, Precision.SEARCH_PRECISION))
 
-        self.case_report.add_attr(**{"searchV2": {
-            "RT": round(float(np.mean(search_v2_rt)), Precision.SEARCH_PRECISION),
-            "MinRT": round(float(np.min(search_v2_rt)), Precision.SEARCH_PRECISION),
-            "MaxRT": round(float(np.max(search_v2_rt)), Precision.SEARCH_PRECISION),
-            "TP99": round(np.percentile(search_v2_rt, 99), Precision.SEARCH_PRECISION),
-            "TP95": round(np.percentile(search_v2_rt, 95), Precision.SEARCH_PRECISION)}})
+        self.case_report.add_attr(**{"hybrid_search": {
+            "RT": round(float(np.mean(hybrid_search_rt)), Precision.SEARCH_PRECISION),
+            "MinRT": round(float(np.min(hybrid_search_rt)), Precision.SEARCH_PRECISION),
+            "MaxRT": round(float(np.max(hybrid_search_rt)), Precision.SEARCH_PRECISION),
+            "TP99": round(np.percentile(hybrid_search_rt, 99), Precision.SEARCH_PRECISION),
+            "TP95": round(np.percentile(hybrid_search_rt, 95), Precision.SEARCH_PRECISION)}})
         return self.case_report.to_dict(), True
 
-    def parser_searchV2_params(self):
-        search_params = copy.deepcopy(self.params_obj.searchV2_params)
-        s_p = gen_combinations({pn.top_k: search_params.pop(pn.top_k, 0),
-                                pn.nq: search_params.pop(pn.nq, 0)})
+    def parser_hybrid_search_params(self):
+        hybrid_search_params = copy.deepcopy(self.params_obj.hybrid_search_params)
+        s_p = gen_combinations({pn.top_k: hybrid_search_params.pop(pn.top_k, 0),
+                                pn.nq: hybrid_search_params.pop(pn.nq, 0)})
 
         # deal rerank
         s_rerank_list = []
-        for k, v in search_params.pop(pn.rerank, {}).items():
+        for k, v in hybrid_search_params.pop(pn.rerank, {}).items():
             _obj = getattr(pymilvus, k, None)
             if _obj:
                 if isinstance(v, list):
@@ -339,13 +339,13 @@ class CommonCases(Base):
         search_params_list = []
         for re in s_rerank_list:
             for s in s_p:
-                s = update_dict_value(search_params, s)
+                s = update_dict_value(hybrid_search_params, s)
                 s = update_dict_value({pn.rerank: re}, s)
                 search_params_list.append(s)
 
         return search_params_list
 
-    def searchV2_param_analysis(self, _search_params: dict, all_fields_params: ParserFieldsParams):
+    def hybrid_search_param_analysis(self, _search_params: dict, all_fields_params: ParserFieldsParams):
         _params = copy.deepcopy(_search_params)
         nq = _params.pop(pn.nq)
         top_k = _params.pop(pn.top_k)
@@ -376,7 +376,7 @@ class CommonCases(Base):
                 _reqs.append(AnnSearchRequest(**s_obj.get_params))
                 _require_reqs.append(s_obj.get_require_params)
             else:
-                log.error(f"[CommonCases] Param for searchV2 `reqs` is not dict, type:{type(r)}, value:{r} ")
+                log.error(f"[CommonCases] Param for hybrid_search `reqs` is not dict, type:{type(r)}, value:{r} ")
 
         # deal rerank
         if isinstance(rerank, dict) and len(rerank.keys()) == 1:
@@ -879,7 +879,7 @@ class SearchRecall(CommonCases):
         yield True
 
 
-class SearchV2(CommonCases):
+class HybridSearch(CommonCases):
 
     def __str__(self):
         return """
@@ -895,8 +895,8 @@ class SearchV2(CommonCases):
         10. clean all collections or not
         """
 
-    @check_params(ParamsFormat.common_scene_searchV2)
-    def scene_searchV2(self, **kwargs):
+    @check_params(ParamsFormat.common_scene_hybrid_search)
+    def scene_hybrid_search(self, **kwargs):
         """
         :param kwargs:
             params: dict
@@ -909,7 +909,7 @@ class SearchV2(CommonCases):
 
         # params prepare
         input_params = ParserInputParams(**kwargs)
-        log.info("[SearchV2] The detailed test steps are as follows: {}".format(self))
+        log.info("[HybridSearch] The detailed test steps are as follows: {}".format(self))
 
         # params parsing
         self.parsing_params(input_params.params)
@@ -948,27 +948,27 @@ class SearchV2(CommonCases):
         # search
         def run(run_s_p: dict):
             try:
-                self.prepare_searchV2(self.params_obj.dataset_params[pn.req_run_counts], **run_s_p)
+                self.prepare_hybrid_search(self.params_obj.dataset_params[pn.req_run_counts], **run_s_p)
                 return self.case_report.to_dict(), True
             except Exception as e:
-                log.error("[SearchV2] SearchV2 raise error: {}".format(e))
+                log.error("[HybridSearch] HybridSearch raise error: {}".format(e))
                 return {}, False
 
         # parser all fields params for search
         all_fields_params = ParserFieldsParams(self.params_obj.dataset_params, self.params_obj.collection_params,
                                                main_field_name=vector_default_field_name)
-        s_params = self.parser_searchV2_params()
+        s_params = self.parser_hybrid_search_params()
         params_list = []
         for s_p in s_params:
-            search_v2_params, nq, top_k, _reqs, _rerank, other_params = self.searchV2_param_analysis(
+            hybrid_search_params, nq, top_k, _reqs, _rerank, other_params = self.hybrid_search_param_analysis(
                 s_p, all_fields_params)
 
             actual_params_used = copy.deepcopy(input_params.params)
-            actual_params_used[pn.searchV2_params] = update_dict_value({
+            actual_params_used[pn.hybrid_search_params] = update_dict_value({
                 pn.nq: nq,
                 pn.top_k: top_k
             }, other_params)
-            p = CaseIterParams(callable_object=run, object_args=[search_v2_params],
+            p = CaseIterParams(callable_object=run, object_args=[hybrid_search_params],
                                actual_params_used=actual_params_used, case_type=self.__class__.__name__)
             params_list.append(p)
         yield params_list

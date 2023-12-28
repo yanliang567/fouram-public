@@ -31,7 +31,7 @@ from client.parameters.params_name import (
 from client.parameters.params import (
     DataClassBase,
     ConcurrentTaskSearch,
-    ConcurrentTaskSearchV2,
+    ConcurrentTaskHybridSearch,
     ConcurrentTaskQuery,
     ConcurrentTaskFlush,
     ConcurrentTaskLoad,
@@ -508,14 +508,14 @@ class Base:
         log.info(msg.format(len(data), anns_field, param, limit, expr, kwargs))
         return self.collection_wrap.search(data, anns_field, param, limit, expr=expr, timeout=timeout, **kwargs)
 
-    def searchV2(self, reqs, rerank, limit, timeout=300, **kwargs):
+    def hybrid_search(self, reqs, rerank, limit, timeout=300, **kwargs):
         """
         :return: InterfaceResponse
         """
-        log.info("[Base] Params of searchV2: reqs:{0}, rerank:{1}, limit:{2}, timeout:{3}, kwargs:{4}".format(
+        log.info("[Base] Params of hybrid_search: reqs:{0}, rerank:{1}, limit:{2}, timeout:{3}, kwargs:{4}".format(
             get_ann_search_request_params(reqs, print_vectors=kwargs.pop("print_vectors", False)), rerank, limit,
             timeout, kwargs))
-        return self.collection_wrap.searchV2(reqs, rerank, limit, timeout=timeout, **kwargs)
+        return self.collection_wrap.hybrid_search(reqs, rerank, limit, timeout=timeout, **kwargs)
 
     def go_search(self, index_type: str, go_search_params: GoSearchParams, concurrent_number: int,
                   during_time: int, interval: int, uri="", go_benchmark="", timeout=300, output_format="json",
@@ -774,11 +774,11 @@ class Base:
             params.data = gen_vectors(nb=len(params.data), dim=params.dim, field_name=params.anns_field)
         return self.collection_wrap.search(check_task=CheckTasks.assert_result, **params.obj_params)
 
-    def concurrent_searchV2(self, params: ConcurrentTaskSearchV2):
+    def concurrent_hybrid_search(self, params: ConcurrentTaskHybridSearch):
         if params.random_data:
             params.set_random_data()
-        log.debug("[Base] Params of concurrent_searchV2: {}".format(params.get_all_params))
-        return self.collection_wrap.searchV2(check_task=CheckTasks.assert_result, **params.obj_params)
+        log.debug("[Base] Params of concurrent_hybrid_search: {}".format(params.get_all_params))
+        return self.collection_wrap.hybrid_search(check_task=CheckTasks.assert_result, **params.obj_params)
 
     def concurrent_query(self, params: ConcurrentTaskQuery):
         _extra_expr = ""

@@ -3,7 +3,7 @@ import pytest
 from client.cases import ConcurrentClientBase, GoBenchCases
 from client.common.common_func import parser_data_size  # do not remove
 from client.common.common_type import DefaultValue as dv
-from client.parameters.input_params import ConcurrentParams, SearchV2ReqParams, SearchV2RerankParams
+from client.parameters.input_params import ConcurrentParams, HybridSearchReqParams, HybridSearchRerankParams
 from client.parameters import params_name as pn
 import client.parameters.input_params.define_params as cdp
 from deploy.commons.common_params import CLUSTER, STANDALONE, queryNode, dataNode, indexNode, proxy, kafka, pulsar
@@ -214,18 +214,19 @@ class TestConcurrentCases(PerfTemplate):
 
     @pytest.mark.locust
     @pytest.mark.parametrize("deploy_mode", [STANDALONE])
-    def test_concurrent_locust_ivf_sq8_search_v2_standalone(self, input_params: InputParamsBase, deploy_mode):
+    def test_concurrent_locust_ivf_sq8_hybrid_search_standalone(self, input_params: InputParamsBase, deploy_mode):
         """
         :test steps:
             1. concurrent test and calculation of RT and QPS
         """
         default_case_params = ConcurrentParams().params_scene_concurrent(
-            [ConcurrentParams.params_searchV2(
+            [ConcurrentParams.params_hybrid_search(
                 nq=1, top_k=10, reqs=[
-                    SearchV2ReqParams(search_param={"nprobe": 32}, expr="int64_1 < 100000"),
-                    SearchV2ReqParams(search_param={"ef": 64}, anns_field="float_vector_1", top_k=60, expr="id > 10"),
-                    SearchV2ReqParams(search_param={"nprobe": 64}, anns_field="binary_vector_1", top_k=2000)],
-                rerank=SearchV2RerankParams(WeightedRanker=[0.3, 0.4, 0.3]))],
+                    HybridSearchReqParams(search_param={"nprobe": 32}, expr="int64_1 < 100000"),
+                    HybridSearchReqParams(search_param={"ef": 64}, anns_field="float_vector_1", top_k=60,
+                                          expr="id > 10"),
+                    HybridSearchReqParams(search_param={"nprobe": 64}, anns_field="binary_vector_1", top_k=2000)],
+                rerank=HybridSearchRerankParams(WeightedRanker=[0.3, 0.4, 0.3]))],
             other_fields=["float_vector_1", "array_varchar_1", "int64_1", "binary_vector_1"],
             vectors_index=dict_merge([cdp.DefaultVectorIndexParams.HNSW("float_vector_1"),
                                       cdp.DefaultVectorIndexParams.BIN_IVF_FLAT("binary_vector_1")]),
@@ -243,18 +244,19 @@ class TestConcurrentCases(PerfTemplate):
 
     @pytest.mark.locust
     @pytest.mark.parametrize("deploy_mode", [CLUSTER])
-    def test_concurrent_locust_ivf_sq8_search_v2_cluster(self, input_params: InputParamsBase, deploy_mode):
+    def test_concurrent_locust_ivf_sq8_hybrid_search_cluster(self, input_params: InputParamsBase, deploy_mode):
         """
         :test steps:
             1. concurrent test and calculation of RT and QPS
         """
         default_case_params = ConcurrentParams().params_scene_concurrent(
-            [ConcurrentParams.params_searchV2(
+            [ConcurrentParams.params_hybrid_search(
                 nq=1, top_k=10, reqs=[
-                    SearchV2ReqParams(search_param={"nprobe": 32}, expr="int64_1 < 100000"),
-                    SearchV2ReqParams(search_param={"ef": 64}, anns_field="float_vector_1", top_k=60, expr="id > 10"),
-                    SearchV2ReqParams(search_param={"nprobe": 64}, anns_field="binary_vector_1", top_k=2000)],
-                rerank=SearchV2RerankParams(WeightedRanker=[0.3, 0.4, 0.3]))],
+                    HybridSearchReqParams(search_param={"nprobe": 32}, expr="int64_1 < 100000"),
+                    HybridSearchReqParams(search_param={"ef": 64}, anns_field="float_vector_1", top_k=60,
+                                          expr="id > 10"),
+                    HybridSearchReqParams(search_param={"nprobe": 64}, anns_field="binary_vector_1", top_k=2000)],
+                rerank=HybridSearchRerankParams(WeightedRanker=[0.3, 0.4, 0.3]))],
             other_fields=["float_vector_1", "array_varchar_1", "int64_1", "binary_vector_1"],
             vectors_index=dict_merge([cdp.DefaultVectorIndexParams.HNSW("float_vector_1"),
                                       cdp.DefaultVectorIndexParams.BIN_IVF_FLAT("binary_vector_1")]),

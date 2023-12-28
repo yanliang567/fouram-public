@@ -13,7 +13,7 @@ from client.parameters.params import (
     ParamsFormat, ConcurrentObjParams, ConcurrentTasksParams, DataClassBase, ConcurrentGoBenchTasksParams,
     ConcurrentTaskDebug, ConcurrentInputParamsDebug,
     ConcurrentTaskSearch, ConcurrentInputParamsSearch, ConcurrentGoBenchParamsSearch,
-    ConcurrentTaskSearchV2, ConcurrentInputParamsSearchV2,
+    ConcurrentTaskHybridSearch, ConcurrentInputParamsHybridSearch,
     ConcurrentTaskQuery, ConcurrentInputParamsQuery, ConcurrentGoBenchParamsQuery,
     ConcurrentTaskFlush, ConcurrentInputParamsFlush,
     ConcurrentTaskLoad, ConcurrentInputParamsLoad,
@@ -311,13 +311,14 @@ class ConcurrentClientBase(CommonCases):
             result.update({"dim": self.params_obj.dataset_params[pn.dim]})
             return ConcurrentTaskSearch(**result)
 
-        elif req_type == pn.searchV2:
-            params = ConcurrentInputParamsSearchV2(**req_params)
+        elif req_type == pn.hybrid_search:
+            params = ConcurrentInputParamsHybridSearch(**req_params)
             all_fields_params = ParserFieldsParams(self.params_obj.dataset_params, self.params_obj.collection_params,
                                                    main_field_name=vector_field_name)
-            result = self.searchV2_param_analysis(_search_params=params.to_dict, all_fields_params=all_fields_params)[0]
+            result = self.hybrid_search_param_analysis(_search_params=params.to_dict,
+                                                       all_fields_params=all_fields_params)[0]
             result.update({"all_fields_params": all_fields_params})
-            return ConcurrentTaskSearchV2(**result)
+            return ConcurrentTaskHybridSearch(**result)
 
         elif req_type == pn.query:
             params = ConcurrentInputParamsQuery(**req_params)

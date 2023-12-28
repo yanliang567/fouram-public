@@ -25,7 +25,7 @@ class ParamsBase:
     flush_params: Optional[dict] = field(default_factory=lambda: {})
     index_params: Optional[dict] = field(default_factory=lambda: {})
     search_params: Optional[dict] = field(default_factory=lambda: {})
-    searchV2_params: Optional[dict] = field(default_factory=lambda: {})
+    hybrid_search_params: Optional[dict] = field(default_factory=lambda: {})
     query_params: Optional[dict] = field(default_factory=lambda: {})
     go_search_params: Optional[dict] = field(default_factory=lambda: {})
     concurrent_params: Optional[dict] = field(default_factory=lambda: {})
@@ -81,7 +81,7 @@ class ParamsFormat:
             ignore_growing: ([type(bool())], OPTION),
             timeout: ([type(int())], OPTION),
         },
-        searchV2_params: {
+        hybrid_search_params: {
             guarantee_timestamp: ([type(int())], OPTION),
             output_fields: ([type(list()), type(None)], OPTION),
             ignore_growing: ([type(bool())], OPTION),
@@ -172,13 +172,13 @@ class ParamsFormat:
                            interval: ([type((int()))], MUST)}
     }, common_scene_build_index)
 
-    common_scene_searchV2 = update_dict_value({
+    common_scene_hybrid_search = update_dict_value({
         dataset_params: {req_run_counts: ([type((int()))], MUST)},
-        searchV2_params: {top_k: ([type(int()), type(list())], MUST),
-                          nq: ([type(int()), type(list())], MUST),
-                          reqs: ([type(list())], MUST),
-                          rerank: ([type(dict())], MUST),
-                          },
+        hybrid_search_params: {top_k: ([type(int()), type(list())], MUST),
+                               nq: ([type(int()), type(list())], MUST),
+                               reqs: ([type(list())], MUST),
+                               rerank: ([type(dict())], MUST),
+                               },
         index_params: {index_type: ([type(str())], OPTION),
                        index_param: ([type(dict())], OPTION)},
     }, common_scene_build_index)
@@ -279,7 +279,7 @@ class ConcurrentGoBenchParamsSearch(DataClassBase):
 
 
 @dataclass
-class ConcurrentInputParamsSearchV2(DataClassBase):
+class ConcurrentInputParamsHybridSearch(DataClassBase):
     nq: int
     top_k: int
     reqs: list
@@ -293,7 +293,7 @@ class ConcurrentInputParamsSearchV2(DataClassBase):
 
 
 @dataclass
-class ConcurrentTaskSearchV2(DataClassBase):
+class ConcurrentTaskHybridSearch(DataClassBase):
     all_fields_params: ParserFieldsParams
 
     reqs: List[AnnSearchRequest]
@@ -885,8 +885,8 @@ class ConcurrentTasksParams(ConcurrentTasksParamsBase):
         default_factory=lambda: ConcurrentObjParams(**{"params": DataClassBase}))
     search: Optional[ConcurrentObjParams] = field(
         default_factory=lambda: ConcurrentObjParams(**{"params": ConcurrentTaskSearch}))
-    searchV2: Optional[ConcurrentObjParams] = field(
-        default_factory=lambda: ConcurrentObjParams(**{"params": ConcurrentTaskSearchV2}))
+    hybrid_search: Optional[ConcurrentObjParams] = field(
+        default_factory=lambda: ConcurrentObjParams(**{"params": ConcurrentTaskHybridSearch}))
     query: Optional[ConcurrentObjParams] = field(
         default_factory=lambda: ConcurrentObjParams(**{"params": ConcurrentTaskQuery}))
     flush: Optional[ConcurrentObjParams] = field(

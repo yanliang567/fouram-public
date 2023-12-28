@@ -221,8 +221,8 @@ search_params:
   ignore_growing: <bool>
   guarantee_timestamp: <int>
 
-# `scene_searchV2` scene use this set of searchV2 parameters
-searchV2_params:
+# `scene_hybrid_search` scene use this set of hybrid_search parameters
+hybrid_search_params:
   # if search multi-vector, set vector fields of `dataset_params.vectors_index` and `dataset_params.scalars_params`
 
   # if `dataset_params.scalars_params.<vector field name>.other_params.dataset` is omitted,
@@ -232,11 +232,11 @@ searchV2_params:
   # search `metric_type` obtained from `dataset_params.vectors_index.<vector field name>.metric_type`
 
   # List data will be cross-combined
-  # searchV2 reqs params: <list>
+  # hybrid_search reqs params: <list>
   reqs:
     # `anns_field` and `search_param` must be passed in
     # default value of `expr` is None
-    # if `top_k` is not passed in, which will be overwritten by `searchV2_params.top_k`
+    # if `top_k` is not passed in, which will be overwritten by `hybrid_search_params.top_k`
     - anns_field: float_vector / str
       search_param:
         nprobe: 64 / <int>
@@ -247,7 +247,7 @@ searchV2_params:
         ef: 64 / <int>
       expr: "int64_1 > 10" / Optional[str]
       top_k: Optional[int]
-  # searchV2 rerank params: <dict>: {<rank type>: List[tuple] or tuple}
+  # hybrid_search rerank params: <dict>: {<rank type>: List[tuple] or tuple}
   # rank type: RRFRanker, WeightedRanker -> List[list] or list
   rerank:
     # at least one set of parameters needs to be passed in
@@ -347,7 +347,7 @@ concurrent_tasks:
       # true: randomly generate search vectors every time
       random_data: Optional[bool] = False
 
-  - type: searchV2
+  - type: hybrid_search
     weight: 1
     params:
       nq: int

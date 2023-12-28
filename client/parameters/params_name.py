@@ -9,7 +9,7 @@ release_params = "release_params"
 flush_params = "flush_params"
 index_params = "index_params"
 search_params = "search_params"
-searchV2_params = "searchV2_params"
+hybrid_search_params = "hybrid_search_params"
 query_params = "query_params"
 go_search_params = "go_search_params"
 concurrent_params = "concurrent_params"
@@ -20,7 +20,7 @@ functional_params = "functional_params"
 
 # request type
 search = "search"
-searchV2 = "searchV2"
+hybrid_search = "hybrid_search"
 query = "query"
 flush = "flush"
 load = "load"
@@ -102,7 +102,7 @@ expr = "expr"
 guarantee_timestamp = "guarantee_timestamp"
 output_fields = "output_fields"
 
-# searchV2
+# hybrid_search
 anns_field = "anns_field"
 reqs = "reqs"
 rerank = "rerank"

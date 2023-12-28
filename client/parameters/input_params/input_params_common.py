@@ -24,7 +24,7 @@ class CommonParamsBase:
 
 
 @dataclass
-class SearchV2ReqParams(CommonParamsBase):
+class HybridSearchReqParams(CommonParamsBase):
     search_param: Optional[dict]
     anns_field: Optional[str] = dv.default_float_vec_field_name
     expr: Optional[str] = None
@@ -32,7 +32,7 @@ class SearchV2ReqParams(CommonParamsBase):
 
 
 @dataclass
-class SearchV2RerankParams(CommonParamsBase):
+class HybridSearchRerankParams(CommonParamsBase):
     RRFRanker: Optional[list] = None
     WeightedRanker: Optional[list] = None
 
@@ -50,7 +50,8 @@ class CommonParams:
              index_type=None, index_param=None,
              ids=None, query_expr=None, output_fields=None,
              search_param=None, search_expr=None, top_k=None, nq=None, guarantee_timestamp=None,
-             reqs=None, rerank=None, search_v2_top_k=None, search_v2_nq=None, search_v2_guarantee_timestamp=None,
+             reqs=None, rerank=None, hybrid_search_top_k=None, hybrid_search_nq=None,
+             hybrid_search_guarantee_timestamp=None,
              reset_rg=None, groups=None, reset_rbac=None, reset_db=None):
         dataset_params = {pn.dataset_name: dataset_name,
                           pn.dim: dim,
@@ -80,12 +81,12 @@ class CommonParams:
                          # "guarantee_timestamp": 1,
                          # "expr": ["float1 > -1 && float1 < 10", "float1 > 0 && float1 < 20"],
                          }
-        search_v2_params = {pn.reqs: reqs,
-                            pn.rerank: rerank,
-                            pn.top_k: search_v2_top_k,
-                            pn.nq: search_v2_nq,
-                            pn.guarantee_timestamp: search_v2_guarantee_timestamp,
-                            }
+        hybrid_search_params = {pn.reqs: reqs,
+                                pn.rerank: rerank,
+                                pn.top_k: hybrid_search_top_k,
+                                pn.nq: hybrid_search_nq,
+                                pn.guarantee_timestamp: hybrid_search_guarantee_timestamp,
+                                }
         resource_groups_params = {pn.reset: reset_rg,
                                   pn.groups: groups}
         database_user_params = {pn.reset_rbac: reset_rbac,
@@ -99,7 +100,7 @@ class CommonParams:
             pn.index_params: index_params,
             pn.query_params: query_params,
             pn.search_params: search_params,
-            pn.searchV2_params: search_v2_params,
+            pn.hybrid_search_params: hybrid_search_params,
             pn.resource_groups_params: resource_groups_params,
             pn.database_user_params: database_user_params,
         }).items() if v != {}}
@@ -236,21 +237,22 @@ class SearchParams(CommonParams):
         return default_params
 
 
-class SearchV2Params(CommonParams):
-    def params_scene_search_v2_ivf_flat(
-            self, search_v2_reqs: List[SearchV2ReqParams], search_v2_rerank: SearchV2RerankParams,
+class HybridSearchParams(CommonParams):
+    def params_scene_hybrid_search_ivf_flat(
+            self, hybrid_search_reqs: List[HybridSearchReqParams], hybrid_search_rerank: HybridSearchRerankParams,
             dataset_name=pn.DatasetsName.SIFT, dim=128, dataset_size="5m", req_run_counts=10, ni_per=5000,
             vectors_index=None, scalars_index=None, scalars_params=None,
             other_fields=dp.other_fields, metric_type=pn.MetricsTypeName.L2,
             index_type=pn.IndexTypeName.IVF_FLAT, index_param={"nlist": 2048},
-            search_v2_top_k=[1, 10, 100, 1000], search_v2_nq=1):
+            hybrid_search_top_k=[1, 10, 100, 1000], hybrid_search_nq=1):
         dataset_size = parser_data_size(dataset_size)
 
         default_params = self.base(
             dataset_name=dataset_name, dim=dim, dataset_size=dataset_size, ni_per=ni_per, req_run_counts=req_run_counts,
             vectors_index=vectors_index, scalars_index=scalars_index, scalars_params=scalars_params,
             other_fields=other_fields, metric_type=metric_type, index_type=index_type, index_param=index_param,
-            search_v2_top_k=search_v2_top_k, search_v2_nq=search_v2_nq,
-            reqs=[i.obj_params for i in search_v2_reqs], rerank=search_v2_rerank.obj_params)
-        log.debug("[SearchV2Params] Default params of params_scene_search_v2_ivf_flat: {0}".format(default_params))
+            hybrid_search_top_k=hybrid_search_top_k, hybrid_search_nq=hybrid_search_nq,
+            reqs=[i.obj_params for i in hybrid_search_reqs], rerank=hybrid_search_rerank.obj_params)
+        log.debug(
+            "[HybridSearchParams] Default params of params_scene_hybrid_search_ivf_flat: {0}".format(default_params))
         return default_params

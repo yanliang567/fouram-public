@@ -1,6 +1,6 @@
 from typing import List
 
-from client.parameters.input_params import SearchV2ReqParams, SearchV2RerankParams
+from client.parameters.input_params import HybridSearchReqParams, HybridSearchRerankParams
 from client.parameters.input_params.input_params_common import CommonParams
 from client.parameters import params_name as pn
 from client.common.common_func import dict_recursive_key, parser_data_size, update_dict_value
@@ -114,9 +114,11 @@ class ConcurrentParams(CommonParams):
                            "ignore_growing": ignore_growing, "timeout": timeout, "random_data": random_data}}
 
     @staticmethod
-    def params_searchV2(weight=1, nq=1, top_k=1, reqs: List[SearchV2ReqParams] = None,
-                        rerank: SearchV2RerankParams = None, output_fields: list = None, ignore_growing: bool = False,
-                        guarantee_timestamp: int = None, timeout: int = 60, random_data=True):
+    def params_hybrid_search(weight=1, nq=1, top_k=1,
+                             reqs: List[HybridSearchReqParams] = None,
+                             rerank: HybridSearchRerankParams = None,
+                             output_fields: list = None, ignore_growing: bool = False,
+                             guarantee_timestamp: int = None, timeout: int = 60, random_data=True):
         """
         nq: int
         top_k: int
@@ -128,7 +130,7 @@ class ConcurrentParams(CommonParams):
         timeout: Optional[int] = 60
         random_data: Optional[bool] = False
         """
-        return {"type": "searchV2", "weight": weight,
+        return {"type": "hybrid_search", "weight": weight,
                 "params": {"nq": nq, "top_k": top_k, "reqs": [i.obj_params for i in reqs], "rerank": rerank.obj_params,
                            "output_fields": output_fields, "ignore_growing": ignore_growing,
                            "guarantee_timestamp": guarantee_timestamp, "timeout": timeout, "random_data": random_data}}
