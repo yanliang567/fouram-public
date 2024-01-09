@@ -375,10 +375,13 @@ class VDCClientBase:
 
         if instance_type == InstanceType.Milvus:
             # stop instance and check stopped
-            self.stop_server()
+            self.rm_stop_server()
+            # self.stop_server()
 
             # resume stopped instance and wait running
-            self.resume_server()
+            self.rm_resume_server()
+            # self.resume_server()
+
             log.info(f"[VDCClientBase] Modify instance's: {self.instance_name} parameters completed.")
         elif instance_type == InstanceType.Serverless:
             # stop instance serverless and check stopped

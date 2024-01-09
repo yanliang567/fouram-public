@@ -106,10 +106,12 @@ class CloudRMApi:
         return self.req.post(url=url, body=body, headers=self.headers, log_level=log_level)
 
     @request_catch()
-    def resume(self, instance_id: str, user_id: str = "", log_level=Log_Level) -> RequestResponseParser:
+    def resume(self, instance_id: str, user_id: str = "", skip_upgrade: bool = True,
+               log_level=Log_Level) -> RequestResponseParser:
         url = self.host + "/resource/v1/instance/milvus/resume"
         body = {
             "instanceId": instance_id,
+            "skipUpgrade": skip_upgrade
         }
         return self.req.post(url=url, body=body, headers=self.update_headers(user_id=user_id), log_level=log_level)
 
