@@ -90,5 +90,8 @@ class MyTaskSet(TaskSet):
     def load_search_release(self):
         self.client.load_search_release(self.tasks_params.load_search_release.params)
 
+    def load_hybrid_search_release(self):
+        self.client.load_hybrid_search_release(self.tasks_params.load_hybrid_search_release.params)
+
     def scene_search_test(self):
         self.client.scene_search_test(self.tasks_params.scene_search_test.params)

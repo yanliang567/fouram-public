@@ -26,6 +26,7 @@ from client.parameters.params import (
     ConcurrentTaskSceneInsertDeleteFlush, ConcurrentInputParamsSceneInsertDeleteFlush,
     ConcurrentTaskIterateSearch, ConcurrentInputParamsIterateSearch,
     ConcurrentTaskLoadSearchRelease, ConcurrentInputParamsLoadSearchRelease,
+    ConcurrentInputParamsLoadHybridSearchRelease, ConcurrentTaskLoadHybridSearchRelease,
     ConcurrentTaskSceneSearchTest, ConcurrentInputParamsSceneSearchTest,
     ConcurrentTaskSceneInsertPartition, ConcurrentInputParamsSceneInsertPartition,
     ConcurrentInputParamsSceneTestPartition, ConcurrentTaskSceneTestPartition
@@ -371,6 +372,15 @@ class ConcurrentClientBase(CommonCases):
                                            metric_type=metric_type)
             result.update({"dim": self.params_obj.dataset_params[pn.dim]})
             return ConcurrentTaskLoadSearchRelease(**result)
+
+        elif req_type == pn.load_hybrid_search_release:
+            params = ConcurrentInputParamsLoadHybridSearchRelease(**req_params)
+            all_fields_params = ParserFieldsParams(self.params_obj.dataset_params, self.params_obj.collection_params,
+                                                   main_field_name=vector_field_name)
+            result = self.hybrid_search_param_analysis(_search_params=params.to_dict,
+                                                       all_fields_params=all_fields_params)[0]
+            result.update({"all_fields_params": all_fields_params})
+            return ConcurrentTaskLoadHybridSearchRelease(**result)
 
         elif req_type == pn.scene_search_test:
             return ConcurrentTaskSceneSearchTest(**ConcurrentInputParamsSceneSearchTest(**req_params).to_dict)

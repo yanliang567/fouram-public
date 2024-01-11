@@ -312,6 +312,33 @@ class ConcurrentParams(CommonParams):
                            "replica_number": replica_number}}
 
     @staticmethod
+    def params_load_hybrid_search_release(weight=1, nq=1, top_k=1,
+                                          reqs: List[HybridSearchReqParams] = None,
+                                          rerank: HybridSearchRerankParams = None,
+                                          output_fields: list = None, ignore_growing: bool = False,
+                                          guarantee_timestamp: int = None, replica_number: int = 1, timeout: int = 60,
+                                          random_data=True):
+        """
+        nq: int
+        top_k: int
+        reqs: list
+        rerank: dict
+        output_fields: Optional[list] = None
+        ignore_growing: Optional[bool] = False
+        guarantee_timestamp: Optional[int] = None
+
+        replica_number: Optional[int] = 1
+        timeout: Optional[int] = DefaultValue.default_timeout
+
+        random_data: Optional[bool] = False
+        """
+        return {"type": "load_hybrid_search_release", "weight": weight,
+                "params": {"nq": nq, "top_k": top_k, "reqs": [i.obj_params for i in reqs], "rerank": rerank.obj_params,
+                           "output_fields": output_fields, "ignore_growing": ignore_growing,
+                           "guarantee_timestamp": guarantee_timestamp, "replica_number": replica_number,
+                           "timeout": timeout, "random_data": random_data}}
+
+    @staticmethod
     def params_scene_search_test(weight=1, dataset=DefaultValue.default_dataset, dim=DefaultValue.default_dim,
                                  shards_num=2, data_size=3000, nb=3000,
                                  index_type=pn.IndexTypeName.IVF_SQ8, index_param={'nlist': 2048},

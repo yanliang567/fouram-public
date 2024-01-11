@@ -35,6 +35,7 @@ scene_insert_partition = "scene_insert_partition"
 scene_test_partition = "scene_test_partition"
 iterate_search = "iterate_search"
 load_search_release = "load_search_release"
+load_hybrid_search_release = "load_hybrid_search_release"
 scene_search_test = "scene_search_test"
 
 # all used

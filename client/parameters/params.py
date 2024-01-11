@@ -764,6 +764,75 @@ class ConcurrentTaskLoadSearchRelease(DataClassBase):
 
 
 @dataclass
+class ConcurrentInputParamsLoadHybridSearchRelease(DataClassBase):
+    nq: int
+    top_k: int
+    reqs: list
+    rerank: dict
+    output_fields: Optional[list] = None
+    ignore_growing: Optional[bool] = False
+    guarantee_timestamp: Optional[int] = None
+
+    replica_number: Optional[int] = 1
+    timeout: Optional[int] = DefaultValue.default_timeout
+
+    random_data: Optional[bool] = False
+
+
+@dataclass
+class ConcurrentTaskLoadHybridSearchRelease(DataClassBase):
+    all_fields_params: ParserFieldsParams
+
+    reqs: List[AnnSearchRequest]
+    rerank: Union[RRFRanker, WeightedRanker]
+    limit: int
+    output_fields: Optional[list] = None
+    ignore_growing: Optional[bool] = False
+    guarantee_timestamp: Optional[int] = None
+
+    timeout: Optional[int] = DefaultValue.default_timeout
+
+    # for load
+    replica_number: Optional[int] = 1
+
+    # other params
+    random_data: Optional[bool] = False
+
+    def set_random_data(self):
+        for r in self.reqs:
+            _field_params = self.all_fields_params.get_fields_params(r.anns_field)
+            r._data = gen_vectors(nb=len(r.data), dim=_field_params.dim, field_name=r.anns_field)
+
+    @property
+    def hybrid_search_obj_params(self):
+        _p = {n: getattr(self, n) for n in ["reqs", "rerank", "limit", "output_fields", "timeout"]}
+
+        if self.guarantee_timestamp is not None:
+            _p["guarantee_timestamp"] = self.guarantee_timestamp
+        if self.ignore_growing in [True]:
+            _p["ignore_growing"] = self.ignore_growing
+        return _p
+
+    @property
+    def get_all_hybrid_search_params(self):
+        return {
+            "reqs": [{
+                "anns_field": r.anns_field,
+                "param": r.param,
+                "limit": r.limit,
+                "expr": r.expr,
+                "nq": len(r.data)
+            } for r in self.reqs],
+            "rerank": self.rerank.dict(),
+            "limit": self.limit,
+            "output_fields": self.output_fields,
+            "ignore_growing": self.ignore_growing,
+            "guarantee_timestamp": self.guarantee_timestamp,
+            "timeout": self.timeout
+        }
+
+
+@dataclass
 class ConcurrentInputParamsSceneSearchTest(DataClassBase):
     dataset: Optional[str] = DefaultValue.default_dataset
     dim: Optional[int] = DefaultValue.default_dim
@@ -915,6 +984,8 @@ class ConcurrentTasksParams(ConcurrentTasksParamsBase):
         default_factory=lambda: ConcurrentObjParams(**{"params": ConcurrentTaskIterateSearch}))
     load_search_release: Optional[ConcurrentObjParams] = field(
         default_factory=lambda: ConcurrentObjParams(**{"params": ConcurrentTaskLoadSearchRelease}))
+    load_hybrid_search_release: Optional[ConcurrentObjParams] = field(
+        default_factory=lambda: ConcurrentObjParams(**{"params": ConcurrentTaskLoadHybridSearchRelease}))
     scene_search_test: Optional[ConcurrentObjParams] = field(
         default_factory=lambda: ConcurrentObjParams(**{"params": ConcurrentTaskSceneSearchTest}))
 

@@ -44,6 +44,7 @@ from client.parameters.params import (
     ConcurrentTaskSceneInsertDeleteFlush,
     ConcurrentTaskIterateSearch,
     ConcurrentTaskLoadSearchRelease,
+    ConcurrentTaskLoadHybridSearchRelease,
     ConcurrentTaskSceneSearchTest,
     ConcurrentTaskSceneInsertPartition,
     ConcurrentTaskSceneTestPartition
@@ -997,6 +998,18 @@ class Base:
 
         self.collection_wrap.release(check_task=CheckTasks.assert_result, timeout=params.timeout)
         return "[Base] concurrent_load_search_release finished."
+
+    @func_time_catch()
+    def concurrent_load_hybrid_search_release(self, params: ConcurrentTaskLoadHybridSearchRelease):
+        self.collection_wrap.load(check_task=CheckTasks.assert_result, replica_number=params.replica_number,
+                                  timeout=params.timeout)
+        if params.random_data:
+            params.set_random_data()
+        log.debug(f"[Base] Params of concurrent_load_hybrid_search_release: {params.get_all_hybrid_search_params}")
+        self.collection_wrap.hybrid_search(check_task=CheckTasks.assert_result, **params.hybrid_search_obj_params)
+
+        self.collection_wrap.release(check_task=CheckTasks.assert_result, timeout=params.timeout)
+        return "[Base] concurrent_load_hybrid_search_release finished."
 
     @func_time_catch()
     def concurrent_scene_search_test(self, params: ConcurrentTaskSceneSearchTest):
