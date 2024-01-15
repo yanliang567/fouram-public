@@ -49,7 +49,7 @@ class CommonParams:
              replica_number=None, resource_groups=None,
              index_type=None, index_param=None,
              ids=None, query_expr=None, output_fields=None,
-             search_param=None, search_expr=None, top_k=None, nq=None, guarantee_timestamp=None,
+             search_param=None, search_expr=None, top_k=None, nq=None, guarantee_timestamp=None, group_by_field=None,
              reqs=None, rerank=None, hybrid_search_top_k=None, hybrid_search_nq=None,
              hybrid_search_guarantee_timestamp=None,
              reset_rg=None, groups=None, reset_rbac=None, reset_db=None):
@@ -78,6 +78,7 @@ class CommonParams:
                          pn.search_param: search_param,
                          pn.expr: search_expr,
                          pn.guarantee_timestamp: guarantee_timestamp,
+                         pn.group_by_field: group_by_field,
                          # "guarantee_timestamp": 1,
                          # "expr": ["float1 > -1 && float1 < 10", "float1 > 0 && float1 < 20"],
                          }

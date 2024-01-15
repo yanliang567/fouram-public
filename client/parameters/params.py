@@ -79,6 +79,7 @@ class ParamsFormat:
             guarantee_timestamp: ([type(int())], OPTION),
             output_fields: ([type(list()), type(None)], OPTION),
             ignore_growing: ([type(bool())], OPTION),
+            group_by_field: ([type(str())], OPTION),
             timeout: ([type(int())], OPTION),
         },
         hybrid_search_params: {
@@ -236,6 +237,7 @@ class ConcurrentInputParamsSearch(DataClassBase):
     guarantee_timestamp: Optional[int] = None
     output_fields: Optional[list] = None
     ignore_growing: Optional[bool] = False
+    group_by_field: Optional[str] = None
     timeout: Optional[int] = DefaultValue.default_timeout
     random_data: Optional[bool] = False
 
@@ -251,6 +253,7 @@ class ConcurrentTaskSearch(DataClassBase):
     guarantee_timestamp: Optional[int] = None
     output_fields: Optional[list] = None
     ignore_growing: Optional[bool] = False
+    group_by_field: Optional[str] = None
     timeout: Optional[int] = DefaultValue.default_timeout
 
     # other params
@@ -259,11 +262,17 @@ class ConcurrentTaskSearch(DataClassBase):
     @property
     def obj_params(self):
         _p = copy.deepcopy(self.to_dict)
+        del _p["dim"]
         del _p["random_data"]
+
         if _p["guarantee_timestamp"] is None:
             del _p["guarantee_timestamp"]
+
         if _p["ignore_growing"] not in [True]:
             del _p["ignore_growing"]
+
+        if _p["group_by_field"] is None:
+            del _p["group_by_field"]
         return _p
 
 
@@ -730,6 +739,8 @@ class ConcurrentInputParamsLoadSearchRelease(DataClassBase):
     search_param: dict
     expr: Optional[str] = None
     guarantee_timestamp: Optional[int] = None
+    output_fields: Optional[list] = None
+    group_by_field: Optional[str] = None
     random_data: Optional[bool] = False
 
     replica_number: Optional[int] = 1
@@ -745,6 +756,8 @@ class ConcurrentTaskLoadSearchRelease(DataClassBase):
     limit: int
     expr: Optional[str] = None
     guarantee_timestamp: Optional[int] = None
+    output_fields: Optional[list] = None
+    group_by_field: Optional[str] = None
     timeout: Optional[int] = DefaultValue.default_timeout
 
     # for load
@@ -756,10 +769,15 @@ class ConcurrentTaskLoadSearchRelease(DataClassBase):
     @property
     def obj_params(self):
         _p = copy.deepcopy(self.to_dict)
+        del _p["dim"]
         del _p["random_data"]
         del _p["replica_number"]
+
         if _p["guarantee_timestamp"] is None:
             del _p["guarantee_timestamp"]
+
+        if _p["group_by_field"] is None:
+            del _p["group_by_field"]
         return _p
 
 

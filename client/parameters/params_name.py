@@ -102,6 +102,7 @@ search_param = "search_param"
 expr = "expr"
 guarantee_timestamp = "guarantee_timestamp"
 output_fields = "output_fields"
+group_by_field = "group_by_field"
 
 # hybrid_search
 anns_field = "anns_field"

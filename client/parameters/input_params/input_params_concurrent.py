@@ -96,7 +96,7 @@ class ConcurrentParams(CommonParams):
     @staticmethod
     def params_search(weight=1, nq=1, top_k=1, search_param={"ef": 64}, expr: str = None,
                       guarantee_timestamp: int = None, output_fields: list = None, ignore_growing: bool = False,
-                      timeout: int = 60, random_data=True):
+                      group_by_field: str = None, timeout: int = 60, random_data=True):
         """
         nq: int
         top_k: int
@@ -105,13 +105,16 @@ class ConcurrentParams(CommonParams):
         guarantee_timestamp: Optional[int] = None
         output_fields: Optional[list] = None
         ignore_growing: Optional[bool] = False
+        group_by_field: Optional[str] = None
+
         timeout: Optional[int] = 60
         random_data: Optional[bool] = False
         """
         return {"type": "search", "weight": weight,
                 "params": {"nq": nq, "top_k": top_k, "search_param": search_param, "expr": expr,
                            "guarantee_timestamp": guarantee_timestamp, "output_fields": output_fields,
-                           "ignore_growing": ignore_growing, "timeout": timeout, "random_data": random_data}}
+                           "ignore_growing": ignore_growing, "group_by_field": group_by_field, "timeout": timeout,
+                           "random_data": random_data}}
 
     @staticmethod
     def params_hybrid_search(weight=1, nq=1, top_k=1,
@@ -293,7 +296,7 @@ class ConcurrentParams(CommonParams):
     @staticmethod
     def params_load_search_release(weight=1, nq=1, top_k=1, search_param={"ef": 64}, expr: str = None,
                                    guarantee_timestamp: int = None, timeout: int = 60, random_data=True,
-                                   replica_number=1):
+                                   output_fields: list = None, group_by_field: str = None, replica_number=1):
         """
         nq: int
         top_k: int
@@ -301,6 +304,8 @@ class ConcurrentParams(CommonParams):
         expr: Optional[str] = None
         guarantee_timestamp: Optional[int] = None
         timeout: Optional[int] = 60
+        output_fields: Optional[list] = None
+        group_by_field: Optional[str] = None
         random_data: Optional[bool] = False
 
         # for load
@@ -309,6 +314,7 @@ class ConcurrentParams(CommonParams):
         return {"type": "load_search_release", "weight": weight,
                 "params": {"nq": nq, "top_k": top_k, "search_param": search_param, "expr": expr,
                            "guarantee_timestamp": guarantee_timestamp, "timeout": timeout, "random_data": random_data,
+                           "output_fields": output_fields, "group_by_field": group_by_field,
                            "replica_number": replica_number}}
 
     @staticmethod

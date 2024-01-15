@@ -938,7 +938,7 @@ class Base:
         data = gen_vectors(nb=params.nq, dim=_dim, field_name=_vector_field_name)
         self.search_partition(data=data, anns_field=_vector_field_name, param=params.search_param, limit=params.limit,
                               partition_obj=partition_obj, check_task=CheckTasks.assert_result, log_level=log_level,
-                              **params.obj_params)
+                              **params.search_obj_params)
 
         # release partition and search failed
         self.release_partition(partition_obj, log_level=log_level, timeout=params.timeout,
@@ -946,7 +946,7 @@ class Base:
         self.search_partition(data=data, anns_field=_vector_field_name, param=params.search_param, limit=params.limit,
                               partition_obj=partition_obj, check_task=CheckTasks.err_res,
                               check_items={dv.err_code: 65535, dv.err_msg: f"partition not loaded"},
-                              log_level=log_level, **params.obj_params)
+                              log_level=log_level, **params.search_obj_params)
 
         # drop partition
         self.drop_partition(partition_obj, log_level)

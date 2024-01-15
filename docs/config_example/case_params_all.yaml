@@ -217,9 +217,10 @@ search_params:
   expr: "int64_1 > 10" / <str> / <List[str]>
 
   output_fields: ["int64_1", "float_vector"] / <list>
-  timeout: 60 / <int>
+  timeout: 300 / <int>
   ignore_growing: <bool>
   guarantee_timestamp: <int>
+  group_by_field: <str>
 
 # `scene_hybrid_search` scene use this set of hybrid_search parameters
 hybrid_search_params:
@@ -342,6 +343,7 @@ concurrent_tasks:
       guarantee_timestamp: Optional[int] = None
       output_fields: Optional[list] = None
       ignore_growing: Optional[bool] = False
+      group_by_field: Optional[str] = None
       timeout: Optional[int] = 60
       # false: use the top nq vectors of the query.npy file of the dataset
       # true: randomly generate search vectors every time
@@ -550,6 +552,8 @@ concurrent_tasks:
       search_param: dict
       expr: Optional[str] = None
       guarantee_timestamp: Optional[int] = None
+      output_fields: Optional[list] = None
+      group_by_field: Optional[str] = None
       random_data: Optional[bool] = False
 
       replica_number: Optional[int] = 1
