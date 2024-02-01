@@ -560,21 +560,21 @@ concurrent_tasks:
       timeout: Optional[int] = 60
 
   - type: load_hybrid_search_release
-      weight: 1
-      params:
-        # load collection -> hybrid_search collection -> release collection, can only set concurrent_number=1
-        nq: int
-        top_k: int
-        reqs: list
-        rerank: dict
-        output_fields: Optional[list] = None
-        ignore_growing: Optional[bool] = False
-        guarantee_timestamp: Optional[int] = None
+    weight: 1
+    params:
+      # load collection -> hybrid_search collection -> release collection, can only set concurrent_number=1
+      nq: int
+      top_k: int
+      reqs: list
+      rerank: dict
+      output_fields: Optional[list] = None
+      ignore_growing: Optional[bool] = False
+      guarantee_timestamp: Optional[int] = None
 
-        replica_number: Optional[int] = 1
-        timeout: Optional[int] = DefaultValue.default_timeout
+      replica_number: Optional[int] = 1
+      timeout: Optional[int] = DefaultValue.default_timeout
 
-        random_data: Optional[bool] = False
+      random_data: Optional[bool] = False
 
   - type: scene_search_test
     weight: 1

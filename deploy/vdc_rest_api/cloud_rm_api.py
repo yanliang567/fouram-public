@@ -1,4 +1,5 @@
 import uuid
+import time
 
 from deploy.commons.request_catch import request_catch, RequestResponseParser
 from deploy.commons.common_params import ClassID
@@ -147,6 +148,22 @@ class CloudRMApi:
             "instanceId": instance_id,
             "parameterName": parameter_name,
             "parameterValue": parameter_value
+        }
+        return self.req.post(url=url, body=body, headers=self.update_headers(user_id=user_id), log_level=log_level)
+
+    """ Rolling upgrade """
+
+    @request_catch()
+    def rolling_upgrade(self, instance_id: str, db_version: str, user_id: str = "",
+                        log_level=Log_Level) -> RequestResponseParser:
+        url = self.host + "/resource/v1/instance/rolling/upgrade/add/task"
+        body = {
+            "actionTimestamp": int(round(time.time() * 1000)),
+            "instanceId": instance_id,
+            "targetDbVersion": db_version,
+            "force": True,
+            "needBackup": False,
+            "notChangeStatus": False
         }
         return self.req.post(url=url, body=body, headers=self.update_headers(user_id=user_id), log_level=log_level)
 

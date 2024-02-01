@@ -314,7 +314,7 @@ class VDCClientBase:
         """ Update server's image """
         _db_version = self.get_server_image(instance_id=self.real_instance_id, user_id=self.real_user_id)
 
-        self.cloud_rm_api.upgrade_version(instance_id=self.real_instance_id, db_version=image_tag,
+        self.cloud_rm_api.rolling_upgrade(instance_id=self.real_instance_id, db_version=image_tag,
                                           user_id=self.real_user_id)
 
         assert self.rm_check_server_status() and \
