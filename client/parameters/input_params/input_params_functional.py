@@ -27,18 +27,22 @@ class FunctionalParams(CommonParams):
         return {"delete": delete.to_dict, "query": query.to_dict, "result": result}
 
     def params_scene_functional(self, functional_params: dict, dataset_name=pn.DatasetsName.SIFT, dim=128,
-                                dataset_size="1m", ni_per=50000, other_fields=[], shards_num=2,
+                                dataset_size="1m", ni_per=50000,
+                                vectors_index=None, scalars_index=None, scalars_params=None,
+                                other_fields=[], shards_num=2, varchar_id=None,
                                 replica_number=None, resource_groups=None,
                                 reset_rg=False, groups=None, reset_rbac=False, reset_db=False,
                                 metric_type=pn.MetricsTypeName.L2, index_type=pn.IndexTypeName.HNSW,
                                 index_param={"M": 8, "efConstruction": 200}):
         dataset_size = parser_data_size(dataset_size)
 
-        base_default_params = self.base(dataset_name=dataset_name, dim=dim, dataset_size=dataset_size, ni_per=ni_per,
-                                        other_fields=other_fields, shards_num=shards_num, metric_type=metric_type,
-                                        index_type=index_type, index_param=index_param, reset_rg=reset_rg,
-                                        groups=groups, replica_number=replica_number, resource_groups=resource_groups,
-                                        reset_rbac=reset_rbac, reset_db=reset_db)
+        base_default_params = self.base(
+            dataset_name=dataset_name, dim=dim, dataset_size=dataset_size, ni_per=ni_per,
+            vectors_index=vectors_index, scalars_index=scalars_index, scalars_params=scalars_params,
+            other_fields=other_fields, shards_num=shards_num, varchar_id=varchar_id, metric_type=metric_type,
+            index_type=index_type, index_param=index_param, reset_rg=reset_rg,
+            groups=groups, replica_number=replica_number, resource_groups=resource_groups,
+            reset_rbac=reset_rbac, reset_db=reset_db)
 
         concurrent_default_params = self.functional_base(functional_params=functional_params)
         default_params = update_dict_value(concurrent_default_params, base_default_params)

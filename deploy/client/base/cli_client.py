@@ -126,7 +126,7 @@ class CliClient(BaseClient):
 
     def get_pods(self, release_name: str):
         release_name = release_name or self.release_name
-        check_list = "STATUS|{0}-milvus|{0}-minio|{0}-etcd|{0}-pulsar|{0}-kafka".format(release_name)
+        check_list = "STATUS|{0}-milvus|{0}-minio|{0}-etcd|{0}-pulsar|{0}-kafka|{0}-log|{0}-tikv".format(release_name)
         _cmd = " kubectl get pods %s -o wide | grep -E '%s' " % (self.ns, check_list)
         res_cmd = CmdExe(_cmd).run_cmd()
         log.info("[CliClient] pod details of release({0}): \n {1}".format(release_name, res_cmd))
@@ -134,7 +134,7 @@ class CliClient(BaseClient):
 
     def get_pvc(self, release_name: str):
         release_name = release_name or self.release_name
-        check_list = "STATUS|{0}-milvus|{0}-minio|{0}-etcd|{0}-pulsar|{0}-kafka".format(release_name)
+        check_list = "STATUS|{0}-milvus|{0}-minio|{0}-etcd|{0}-pulsar|{0}-kafka|{0}-log|{0}-tikv".format(release_name)
         _cmd = " kubectl get pvc %s | grep -E '%s' " % (self.ns, check_list)
         res_cmd = CmdExe(_cmd).run_cmd()
         log.info("[CliClient] pvc storage class of release({0}): \n {1}".format(release_name, res_cmd))
@@ -142,7 +142,7 @@ class CliClient(BaseClient):
 
     def get_pvc_storage_class(self, release_name: str):
         release_name = release_name or self.release_name
-        check_list = "NAME|{0}-milvus|{0}-minio|{0}-etcd|{0}-pulsar|{0}-kafka".format(release_name)
+        check_list = "NAME|{0}-milvus|{0}-minio|{0}-etcd|{0}-pulsar|{0}-kafka|{0}-log|{0}-tikv".format(release_name)
         _cmd = " kubectl get pvc %s | grep -E '%s' | awk '{print $1,$6}'" % (self.ns, check_list)
         return CmdExe(_cmd).run_cmd()
 

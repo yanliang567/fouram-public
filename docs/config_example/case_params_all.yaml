@@ -284,7 +284,7 @@ database_user_params:
 resource_groups_params:
   # remove all resource group, revert to default status
   reset: false / <bool>
-  # int: [1, 2, 4] just for nodes, create RG_1: 1 queryNode, RG_2: 2 queryNodes, RG_3: 4 queryNodes
+  # List[int]: [1, 2, 4] just for nodes, create RG_1: 1 queryNode, RG_2: 2 queryNodes, RG_3: 4 queryNodes
   groups:
     transfer_nodes:
       - source: "__default_resource_group" / <name>
@@ -489,6 +489,11 @@ concurrent_tasks:
       index_type: Optional[str] = "IVF_SQ8"
       index_param: {"nlist": 2048}  # Optional[dict]
       metric_type: Optional[str] = "L2"
+      other_fields: Optional[list] = []  # same as `collection_params.other_fields`
+
+      scalars_params: Optional[dict] = {}  # same as `dataset_params.scalars_params`
+      scalars_index: Optional[dict, list] = {}  # same as `dataset_params.scalars_index`
+      vectors_index: Optional[dict] = {}  # same as `dataset_params.vectors_index`
 
   - type: scene_insert_delete_flush
     weight: 1
@@ -529,6 +534,27 @@ concurrent_tasks:
       output_fields: Optional[list] = None
       guarantee_timestamp: Optional[int] = None
       timeout: Optional[int] = 60
+
+  - type: scene_test_partition_hybrid_search
+    weight: 1
+    params:
+      # hybrid_search
+      # same as the params of `- type: hybrid_search`
+      reqs: list
+      rerank:
+        RRFRanker: []
+      nq: Optional[int] = 1
+      top_k: Optional[int] = 10
+      output_fields: Optional[list] = None
+      ignore_growing: Optional[bool] = False
+      guarantee_timestamp: Optional[int] = None
+      timeout: Optional[int] = DefaultValue.default_timeout
+
+      random_data: Optional[bool] = False
+
+      # collection and insert
+      data_size: Optional[int] = 3000
+      ni: Optional[int] = 3000
 
   - type: iterate_search
     weight: 1
@@ -591,6 +617,11 @@ concurrent_tasks:
       index_type: Optional[str] = "IVF_SQ8"
       index_param: {'nlist': 2048} # Optional[dict]
       metric_type: Optional[str] = "L2"
+      other_fields: Optional[list] = []  # same as `collection_params.other_fields`
+
+      scalars_params: Optional[dict] = {}  # same as `dataset_params.scalars_params`
+      scalars_index: Optional[dict, list] = {}  # same as `dataset_params.scalars_index`
+      vectors_index: Optional[dict] = {}  # same as `dataset_params.vectors_index`
 
       # load
       replica_number: Optional[int] = 1
@@ -603,6 +634,54 @@ concurrent_tasks:
       # other
       prepare_before_insert: Optional[bool] = False
       search_counts: Optional[int] = 1
+      new_connect: Optional[bool] = False
+
+      # use db and user
+      new_user: Optional[bool] = False
+
+  - type: scene_hybrid_search_test
+    weight: 1
+    params:
+      # create user and role when new_user=true -> connect with new alias when new_connect=true ->
+      # create collection -> index and load when prepare_before_insert=true -> insert -> flush -> count vectors ->
+      # build index -> load collection -> serial hybrid_search `hybrid_search_counts` times -> drop collection ->
+      # delete role and user when new_user=true -> remove new alias connect when new_connect=true
+
+      # hybrid_search
+      # same as the params of `- type: hybrid_search`
+      reqs: list
+      rerank:
+        RRFRanker: []
+      nq: int
+      top_k: int
+      output_fields: Optional[list] = None
+      ignore_growing: Optional[bool] = False
+      guarantee_timestamp: Optional[int] = None
+      timeout: Optional[int] = DefaultValue.default_timeout
+
+      random_data: Optional[bool] = False
+
+      # collection and insert and index params
+      dataset: Optional[str] = local
+      dim: Optional[int] = 128
+      shards_num: Optional[int] = 2
+      data_size: Optional[int] = 3000
+      nb: Optional[int] = 3000
+      index_type: Optional[str] = "IVF_SQ8"
+      index_param: { 'nlist': 2048 } # Optional[dict]
+      metric_type: Optional[str] = "L2"
+      other_fields: Optional[list] = []  # same as `collection_params.other_fields`
+
+      scalars_params: Optional[dict] = {}  # same as `dataset_params.scalars_params`
+      scalars_index: Optional[dict, list] = {}  # same as `dataset_params.scalars_index`
+      vectors_index: Optional[dict] = {}  # same as `dataset_params.vectors_index`
+
+      # load
+      replica_number: Optional[int] = 1
+
+      # other
+      prepare_before_insert: Optional[bool] = False
+      hybrid_search_counts: Optional[int] = 1
       new_connect: Optional[bool] = False
 
       # use db and user

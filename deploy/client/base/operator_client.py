@@ -243,8 +243,7 @@ class OperatorClient(BaseClient):
         release_name = release_name or self.release_name
         namespace = namespace or self.namespace
 
-        check_list = [release_name + "-etcd", release_name + "-milvus", release_name + "-minio",
-                      release_name + "-pulsar", release_name + "-kafka"]
+        check_list = [release_name + i for i in ["-etcd", "-milvus", "-minio", "-pulsar", "-kafka"]]
         result_dict = {}
 
         _configs = self.dc_pvc.result_to_dict(self.dc_pvc.get(namespace=namespace))

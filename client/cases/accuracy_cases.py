@@ -12,7 +12,7 @@ from client.common.common_type import Precision, CaseIterParams
 from client.common.common_func import (
     get_source_file, read_ann_hdf5_file, normalize_data, get_acc_metric_type, gen_combinations, update_dict_value,
     get_vector_type, get_default_field_name, get_search_ids, get_recall_value, ParserInputParams, ExtraPartitionsParams,
-    PrepareInsertParams, deal_insert_result, check_vector_index_params)
+    PrepareInsertParams, deal_insert_result, check_vector_index_params, parser_scalar_index)
 
 from utils.util_log import log
 
@@ -160,8 +160,7 @@ class CommonCases(Base):
         self.prepare_scalars_index()
 
     def prepare_scalars_index(self, update_report_data=True):
-        scalars = self.params_obj.dataset_params.get(pn.scalars_index, {})
-        scalars = {s: {} for s in scalars} if isinstance(scalars, list) else scalars
+        scalars = parser_scalar_index(self.params_obj.dataset_params.get(pn.scalars_index, {}))
         scalars_field = list(scalars.keys())
 
         vectors_index = self.params_obj.dataset_params.get(pn.vectors_index, {})
@@ -174,7 +173,7 @@ class CommonCases(Base):
 
         other_fields = self.params_obj.collection_params.get(pn.other_fields, [])
         for _field in scalars_field + vectors_field:
-            if _field not in other_fields:
+            if _field not in other_fields + ["id"]:
                 log.error("[AccCases] The field `{0}` is not in the collection {1}.".format(_field, other_fields))
                 return False
 

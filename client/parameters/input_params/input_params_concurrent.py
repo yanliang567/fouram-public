@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 
 from client.parameters.input_params import HybridSearchReqParams, HybridSearchRerankParams
 from client.parameters.input_params.input_params_common import CommonParams
@@ -95,14 +95,15 @@ class ConcurrentParams(CommonParams):
 
     @staticmethod
     def params_search(weight=1, nq=1, top_k=1, search_param={"ef": 64}, expr: str = None,
-                      guarantee_timestamp: int = None, output_fields: list = None, ignore_growing: bool = False,
-                      group_by_field: str = None, timeout: int = 60, random_data=True):
+                      guarantee_timestamp: int = None, partition_names: list = None, output_fields: list = None,
+                      ignore_growing: bool = False, group_by_field: str = None, timeout: int = 60, random_data=True):
         """
         nq: int
         top_k: int
         search_param: dict
         expr: Optional[str] = None
         guarantee_timestamp: Optional[int] = None
+        partition_names: Optional[list] = None
         output_fields: Optional[list] = None
         ignore_growing: Optional[bool] = False
         group_by_field: Optional[str] = None
@@ -112,16 +113,17 @@ class ConcurrentParams(CommonParams):
         """
         return {"type": "search", "weight": weight,
                 "params": {"nq": nq, "top_k": top_k, "search_param": search_param, "expr": expr,
-                           "guarantee_timestamp": guarantee_timestamp, "output_fields": output_fields,
-                           "ignore_growing": ignore_growing, "group_by_field": group_by_field, "timeout": timeout,
-                           "random_data": random_data}}
+                           "guarantee_timestamp": guarantee_timestamp, "partition_names": partition_names,
+                           "output_fields": output_fields, "ignore_growing": ignore_growing,
+                           "group_by_field": group_by_field, "timeout": timeout, "random_data": random_data}}
 
     @staticmethod
     def params_hybrid_search(weight=1, nq=1, top_k=1,
                              reqs: List[HybridSearchReqParams] = None,
                              rerank: HybridSearchRerankParams = None,
                              output_fields: list = None, ignore_growing: bool = False,
-                             guarantee_timestamp: int = None, timeout: int = 60, random_data=True):
+                             guarantee_timestamp: int = None, partition_names: list = None,
+                             timeout: Optional[int] = 60, random_data=True):
         """
         nq: int
         top_k: int
@@ -130,68 +132,111 @@ class ConcurrentParams(CommonParams):
         output_fields: Optional[list] = None
         ignore_growing: Optional[bool] = False
         guarantee_timestamp: Optional[int] = None
+        partition_names: Optional[list] = None
         timeout: Optional[int] = 60
         random_data: Optional[bool] = False
         """
         return {"type": "hybrid_search", "weight": weight,
                 "params": {"nq": nq, "top_k": top_k, "reqs": [i.obj_params for i in reqs], "rerank": rerank.obj_params,
                            "output_fields": output_fields, "ignore_growing": ignore_growing,
-                           "guarantee_timestamp": guarantee_timestamp, "timeout": timeout, "random_data": random_data}}
+                           "guarantee_timestamp": guarantee_timestamp, "partition_names": partition_names,
+                           "timeout": timeout, "random_data": random_data}}
 
     @staticmethod
     def params_query(weight=1, ids: list = None, expr: str = None, output_fields: list = None,
-                     ignore_growing: bool = False, timeout: int = 60):
+                     ignore_growing: bool = False, offset: int = None, limit: int = None, partition_names: list = None,
+                     timeout: Optional[int] = 60, random_data: bool = False, random_count: int = 0,
+                     random_range: list = [0, 1], field_name: str = "id", field_type: str = "int64"):
         """
         ids: Optional[list] = None
         expr: Optional[str] = None
         output_fields: Optional[list] = None
         ignore_growing: Optional[bool] = False
-        timeout: Optional[int] = 60
+        offset: Optional[int] = None
+        limit: Optional[int] = None
+        partition_names: Optional[list] = None
+        timeout: Optional[int] = DefaultValue.default_timeout
+
+        # other params
+        random_data: Optional[bool] = False
+        random_count: Optional[int] = 0
+        random_range: Optional[list] = field(default_factory=lambda: [0, 1])
+        field_name: Optional[str] = DefaultValue.default_query_field
+        field_type: Optional[str] = DefaultValue.default_int64_field_name
         """
         return {"type": "query", "weight": weight,
-                "params": {"ids": ids, "expr": expr, "output_fields": output_fields, "ignore_growing": ignore_growing,
-                           "timeout": timeout}}
+                "params": {"ids": ids, "expr": expr, "output_fields": output_fields, "offset": offset, "limit": limit,
+                           "ignore_growing": ignore_growing, "partition_names": partition_names, "timeout": timeout,
+                           "random_data": random_data, "random_count": random_count, "random_range": random_range,
+                           "field_name": field_name, "field_type": field_type}}
 
     @staticmethod
-    def params_flush(weight=1, timeout: int = 30):
+    def params_flush(weight=1, timeout: Optional[int] = 30):
         """
-        timeout: Optional[int] = 30
+        timeout: Optional[int] = DefaultValue.default_timeout
         """
         return {"type": "flush", "weight": weight, "params": {"timeout": timeout}}
 
     @staticmethod
-    def params_load(weight=1, replica_number=1, timeout: int = 30):
+    def params_load(weight=1, replica_number=1, timeout: Optional[int] = 30):
         """
         replica_number: Optional[int] = 1
-        timeout: Optional[int] = 30
+        timeout: Optional[int] = DefaultValue.default_timeout
         """
         return {"type": "load", "weight": weight, "params": {"replica_number": replica_number, "timeout": timeout}}
 
     @staticmethod
-    def params_release(weight=1, timeout: int = 30):
+    def params_release(weight=1, timeout: Optional[int] = 30):
         """
-        timeout: Optional[int] = 30
+        timeout: Optional[int] = DefaultValue.default_timeout
         """
         return {"type": "release", "weight": weight, "params": {"timeout": timeout}}
 
     @staticmethod
-    def params_insert(weight=1, nb=1, timeout: int = 30, random_id=False, random_vector=False, varchar_filled=False,
-                      start_id=0):
+    def params_load_release(weight=1, replica_number=1, timeout: Optional[int] = 30):
+        """
+        replica_number: Optional[int] = 1
+        timeout: Optional[int] = DefaultValue.default_timeout
+        """
+        return {"type": "load_release", "weight": weight,
+                "params": {"replica_number": replica_number, "timeout": timeout}}
+
+    @staticmethod
+    def params_insert(weight=1, nb=1, timeout: Optional[int] = 30,
+                      random_id=False, random_vector=False, varchar_filled=False, start_id=0):
         """
         nb: Optional[int] = 1  # number of batch insert
-        timeout: Optional[int] = 30
+        timeout: Optional[int] = DefaultValue.default_timeout
 
         # random id or vectors
         random_id: Optional[bool] = False
         random_vector: Optional[bool] = False
         varchar_filled: Optional[bool] = False
+        start_id: Optional[int] = 0
         """
         return {"type": "insert", "weight": weight,
                 "params": {"nb": nb, "timeout": timeout, "random_id": random_id, "random_vector": random_vector,
                            "varchar_filled": varchar_filled, "start_id": start_id}}
 
     @staticmethod
-    def params_delete(weight=1, expr: str = "", delete_length: int = 1, timeout: int = 30):
+    def params_upsert(weight=1, nb=1, timeout: Optional[int] = 30,
+                      random_id=False, random_vector=False, varchar_filled=False, start_id=0):
+        """
+        nb: Optional[int] = 1  # number of batch insert
+        timeout: Optional[int] = DefaultValue.default_timeout
+
+        # random id or vectors
+        random_id: Optional[bool] = False
+        random_vector: Optional[bool] = False
+        varchar_filled: Optional[bool] = False
+        start_id: Optional[int] = 0
+        """
+        return {"type": "upsert", "weight": weight,
+                "params": {"nb": nb, "timeout": timeout, "random_id": random_id, "random_vector": random_vector,
+                           "varchar_filled": varchar_filled, "start_id": start_id}}
+
+    @staticmethod
+    def params_delete(weight=1, expr: str = "", delete_length: int = 1, timeout: Optional[int] = 30):
         """
         expr: Optional[str] = None
         delete_length: Optional[int] = 1
@@ -203,7 +248,8 @@ class ConcurrentParams(CommonParams):
     @staticmethod
     def params_scene_test(weight=1, dim=DefaultValue.default_dim, data_size=3000, nb=3000,
                           index_type=pn.IndexTypeName.IVF_SQ8, index_param={'nlist': 2048},
-                          metric_type=pn.MetricsTypeName.L2):
+                          metric_type=pn.MetricsTypeName.L2, other_fields=[],
+                          scalars_params={}, scalars_index={}, vectors_index={}):
         """
         dim: Optional[int] = DefaultValue.default_dim
         data_size: Optional[int] = 3000
@@ -211,10 +257,17 @@ class ConcurrentParams(CommonParams):
         index_type: Optional[str] = "IVF_SQ8"
         index_param: Optional[dict] = field(default_factory=lambda: {'nlist': 2048})
         metric_type: Optional[str] = "L2"
+        other_fields: Optional[list] = field(default_factory=lambda: [])
+
+        scalars_params: Optional[dict] = field(default_factory=lambda: {})
+        scalars_index: Optional[dict, list] = field(default_factory=lambda: {})
+        vectors_index: Optional[dict] = field(default_factory=lambda: {})
         """
         return {"type": "scene_test", "weight": weight,
                 "params": {"dim": dim, "data_size": data_size, "nb": nb, "index_type": index_type,
-                           "index_param": index_param, "metric_type": metric_type}}
+                           "index_param": index_param, "metric_type": metric_type, "other_fields": other_fields,
+                           "scalars_params": scalars_params, "scalars_index": scalars_index,
+                           "vectors_index": vectors_index}}
 
     @staticmethod
     def transfer_nodes(source: str, target: str, num_node: int):
@@ -235,16 +288,19 @@ class ConcurrentParams(CommonParams):
         return {"transfer_nodes": nodes, "transfer_replicas": replicas}
 
     @staticmethod
-    def params_scene_insert_delete_flush(weight=1, insert_length=1, delete_length=1, random_id=False,
-                                         random_vector=False, varchar_filled=False, start_id=0, timeout=None):
+    def params_scene_insert_delete_flush(weight=1, insert_length=1, delete_length=1, start_id=0,
+                                         random_id=False, random_vector=False, varchar_filled=False,
+                                         timeout: Optional[int] = None):
         """
         insert_length: Optional[int] = 1
         delete_length: Optional[int] = 1
+        start_id: Optional[int] = 0
 
         # random id or vectors
         random_id: Optional[bool] = False
         random_vector: Optional[bool] = False
         varchar_filled: Optional[bool] = False
+        timeout: Optional[int] = None
         """
         return {"type": "scene_insert_delete_flush", "weight": weight,
                 "params": {"insert_length": insert_length, "delete_length": delete_length, "start_id": start_id,
@@ -252,7 +308,7 @@ class ConcurrentParams(CommonParams):
                            "timeout": timeout}}
 
     @staticmethod
-    def params_scene_insert_partition(weight=1, data_size="1m", ni=5, with_flush=False, timeout: int = 30):
+    def params_scene_insert_partition(weight=1, data_size="1m", ni=5, with_flush=False, timeout: Optional[int] = 30):
         """
         data_size: total insert data_size data into partition
         ni: insert ni into the created partition per time
@@ -263,7 +319,8 @@ class ConcurrentParams(CommonParams):
 
     @staticmethod
     def params_scene_test_partition(weight=1, data_size="3k", ni=3000, nq=1, search_param={"ef": 64}, limit=10,
-                                    expr=None, output_fields=None, guarantee_timestamp=None, timeout: int = 120):
+                                    expr=None, output_fields=None, guarantee_timestamp=None,
+                                    timeout: Optional[int] = 120):
         """
         data_size: total insert data_size data into partition
         ni: insert ni into the created partition per time
@@ -280,8 +337,38 @@ class ConcurrentParams(CommonParams):
                            "timeout": timeout}}
 
     @staticmethod
+    def params_scene_test_partition_hybrid_search(weight=1, nq=1, top_k=1,
+                                                  reqs: List[HybridSearchReqParams] = None,
+                                                  rerank: HybridSearchRerankParams = None,
+                                                  output_fields: list = None, ignore_growing: bool = False,
+                                                  guarantee_timestamp: int = None, timeout: Optional[int] = 60,
+                                                  random_data=True, data_size="3k", ni=3000):
+        """
+        # hybrid_search
+        reqs: list
+        rerank: Optional[dict] = field(default_factory=lambda: {RRFRanker: []})
+        nq: Optional[int] = 1
+        top_k: Optional[int] = 10
+        output_fields: Optional[list] = None
+        ignore_growing: Optional[bool] = False
+        guarantee_timestamp: Optional[int] = None
+        timeout: Optional[int] = DefaultValue.default_timeout
+
+        random_data: Optional[bool] = False
+
+        # collection and insert
+        data_size: Optional[int] = 3000
+        ni: Optional[int] = 3000
+        """
+        return {"type": "scene_test_partition_hybrid_search", "weight": weight,
+                "params": {"nq": nq, "top_k": top_k, "reqs": [i.obj_params for i in reqs], "rerank": rerank.obj_params,
+                           "output_fields": output_fields, "ignore_growing": ignore_growing,
+                           "guarantee_timestamp": guarantee_timestamp, "timeout": timeout, "random_data": random_data,
+                           "data_size": data_size, "ni": ni}}
+
+    @staticmethod
     def params_iterate_search(weight=1, nq=1, top_k=1, search_param={"ef": 64}, guarantee_timestamp: int = None,
-                              timeout: int = 60):
+                              timeout: Optional[int] = 60):
         """
         nq: Optional[int] = 1
         top_k: Optional[int] = 10
@@ -348,8 +435,10 @@ class ConcurrentParams(CommonParams):
     def params_scene_search_test(weight=1, dataset=DefaultValue.default_dataset, dim=DefaultValue.default_dim,
                                  shards_num=2, data_size=3000, nb=3000,
                                  index_type=pn.IndexTypeName.IVF_SQ8, index_param={'nlist': 2048},
-                                 metric_type=pn.MetricsTypeName.L2, replica_number=1, nq=1, top_k=10,
-                                 search_param={'nprobe': 16}, search_counts=1,
+                                 metric_type=pn.MetricsTypeName.L2, other_fields=[],
+                                 replica_number=1,
+                                 nq=1, top_k=10, search_param={'nprobe': 16}, search_counts=1,
+                                 scalars_params={}, scalars_index={}, vectors_index={},
                                  prepare_before_insert=False, new_connect=False, new_user=False):
         """
         dataset: Optional[str] = DefaultValue.default_dataset
@@ -360,6 +449,11 @@ class ConcurrentParams(CommonParams):
         index_type: Optional[str] = "IVF_SQ8"
         index_param: Optional[dict] = field(default_factory=lambda: {'nlist': 2048})
         metric_type: Optional[str] = "L2"
+        other_fields: Optional[list] = field(default_factory=lambda: [])
+
+        scalars_params: Optional[dict] = field(default_factory=lambda: {})
+        scalars_index: Optional[dict, list] = field(default_factory=lambda: {})
+        vectors_index: Optional[dict] = field(default_factory=lambda: {})
 
         # load
         replica_number: Optional[int] = 1
@@ -380,14 +474,84 @@ class ConcurrentParams(CommonParams):
         return {"type": "scene_search_test", "weight": weight,
                 "params": {"dataset": dataset, "dim": dim, "shards_num": shards_num, "data_size": data_size, "nb": nb,
                            "index_type": index_type, "index_param": index_param, "metric_type": metric_type,
-                           "replica_number": replica_number, "nq": nq, "top_k": top_k, "search_param": search_param,
-                           "search_counts": search_counts, "prepare_before_insert": prepare_before_insert,
+                           "other_fields": other_fields, "replica_number": replica_number,
+                           "nq": nq, "top_k": top_k, "search_param": search_param, "search_counts": search_counts,
+                           "scalars_params": scalars_params, "scalars_index": scalars_index,
+                           "vectors_index": vectors_index, "prepare_before_insert": prepare_before_insert,
                            "new_connect": new_connect, "new_user": new_user}}
 
+    @staticmethod
+    def params_scene_hybrid_search_test(weight=1, nq=1, top_k=1,
+                                        reqs: List[HybridSearchReqParams] = None,
+                                        rerank: HybridSearchRerankParams = None,
+                                        output_fields: list = None, ignore_growing: bool = False,
+                                        guarantee_timestamp: int = None, partition_names: list = None,
+                                        timeout: Optional[int] = 60, random_data=True,
+                                        dataset=DefaultValue.default_dataset, dim=DefaultValue.default_dim,
+                                        shards_num=2, data_size=3000, nb=3000,
+                                        index_type=pn.IndexTypeName.IVF_SQ8, index_param={'nlist': 2048},
+                                        metric_type=pn.MetricsTypeName.L2, other_fields=[],
+                                        replica_number=1, hybrid_search_counts=1,
+                                        scalars_params={}, scalars_index={}, vectors_index={},
+                                        prepare_before_insert=False, new_connect=False, new_user=False):
+        """
+        # hybrid_search
+        nq: int
+        top_k: int
+        reqs: list
+        rerank: dict
+        output_fields: Optional[list] = None
+        ignore_growing: Optional[bool] = False
+        guarantee_timestamp: Optional[int] = None
+        partition_names: Optional[list] = None
+        timeout: Optional[int] = DefaultValue.default_timeout
+
+        random_data: Optional[bool] = False
+
+        # collection and insert and index params
+        dataset: Optional[str] = DefaultValue.default_dataset
+        dim: Optional[int] = DefaultValue.default_dim
+        shards_num: Optional[int] = DefaultValue.default_shards_num
+        data_size: Optional[int] = 3000
+        nb: Optional[int] = 3000
+        index_type: Optional[str] = IndexTypeName.IVF_SQ8
+        index_param: Optional[dict] = field(default_factory=lambda: {'nlist': 2048})
+        metric_type: Optional[str] = MetricsTypeName.L2
+        other_fields: Optional[list] = field(default_factory=lambda: [])
+
+        scalars_params: Optional[dict] = field(default_factory=lambda: {})
+        scalars_index: Union[dict, list] = field(default_factory=lambda: {})
+        vectors_index: Optional[dict] = field(default_factory=lambda: {})
+
+        # load
+        replica_number: Optional[int] = 1
+
+        # other
+        prepare_before_insert: Optional[bool] = False
+        hybrid_search_counts: Optional[int] = 1
+        new_connect: Optional[bool] = False
+
+        # use db and user
+        new_user: Optional[bool] = False
+        """
+        return {"type": "scene_hybrid_search_test", "weight": weight,
+                "params": {"nq": nq, "top_k": top_k, "reqs": [i.obj_params for i in reqs], "rerank": rerank.obj_params,
+                           "output_fields": output_fields, "ignore_growing": ignore_growing,
+                           "guarantee_timestamp": guarantee_timestamp, "partition_names": partition_names,
+                           "timeout": timeout, "random_data": random_data,
+                           "dataset": dataset, "dim": dim, "shards_num": shards_num, "data_size": data_size, "nb": nb,
+                           "index_type": index_type, "index_param": index_param, "metric_type": metric_type,
+                           "other_fields": other_fields, "replica_number": replica_number,
+                           "scalars_params": scalars_params, "scalars_index": scalars_index,
+                           "vectors_index": vectors_index, "prepare_before_insert": prepare_before_insert,
+                           "hybrid_search_counts": hybrid_search_counts, "new_connect": new_connect,
+                           "new_user": new_user}}
+
     def params_scene_concurrent(self, concurrent_tasks: list, dataset_name=pn.DatasetsName.SIFT, dim=128,
-                                dataset_size="1m", ni_per=50000,
-                                vectors_index=None, scalars_index=None, scalars_params=None,
-                                other_fields=[], shards_num=2,
+                                dataset_size="1m", ni_per=50000, vector_field_name=None,
+                                max_length=None, varchar_filled=None,
+                                vectors_index=None, scalars_index=None, scalars_params=None, extra_partitions=None,
+                                other_fields=[], shards_num=2, varchar_id=None, num_partitions=None,
                                 replica_number=None, resource_groups=None,
                                 reset_rg=False, groups=None, reset_rbac=False, reset_db=False,
                                 metric_type=pn.MetricsTypeName.L2, index_type=pn.IndexTypeName.HNSW,
@@ -397,9 +561,11 @@ class ConcurrentParams(CommonParams):
 
         base_default_params = self.base(
             dataset_name=dataset_name, dim=dim, dataset_size=dataset_size, ni_per=ni_per,
+            vector_field_name=vector_field_name, max_length=max_length, varchar_filled=varchar_filled,
             vectors_index=vectors_index, scalars_index=scalars_index, scalars_params=scalars_params,
-            other_fields=other_fields, shards_num=shards_num, metric_type=metric_type,
-            index_type=index_type, index_param=index_param, reset_rg=reset_rg,
+            extra_partitions=extra_partitions,
+            other_fields=other_fields, shards_num=shards_num, varchar_id=varchar_id, num_partitions=num_partitions,
+            metric_type=metric_type, index_type=index_type, index_param=index_param, reset_rg=reset_rg,
             groups=groups, replica_number=replica_number, resource_groups=resource_groups,
             reset_rbac=reset_rbac, reset_db=reset_db)
         concurrent_default_params = self.concurrent_base(concurrent_number=concurrent_number, during_time=during_time,

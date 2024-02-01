@@ -1,6 +1,7 @@
 import traceback
 import time
 from typing import Tuple
+import uuid
 
 from client.common.common_param import InterfaceResponse
 
@@ -32,15 +33,17 @@ def time_catch():
     def wrapper(func):
         # @functools.wraps(func)
         def inner_wrapper(*args, **kwargs) -> Tuple[tuple, bool]:
+            request_id = str(uuid.uuid1())
+            func_name = args[0][0].__qualname__
             start = time.perf_counter()
             try:
                 # start = time.perf_counter()
-                res = func(*args, **kwargs)
+                res = func(*args, request_id=request_id, **kwargs)
                 rt = time.perf_counter() - start
 
-                log.debug("(api_response) : %s " % truncated_output(res, info_logout.log_row_length))
+                log.debug("(api_response) : [%s] %s, [requestId: %s]" % (
+                    func_name, truncated_output(res, info_logout.log_row_length), request_id))
 
-                func_name = args[0][0].__qualname__
                 msg = "[Time] {0} run in {1}s".format(func_name, round(rt, PRECISION.COMMON_PRECISION))
                 if callable(args[0][0]) and func_name in info_logout.log_output:
                     log.info(msg)
@@ -51,7 +54,8 @@ def time_catch():
             except Exception as e:
                 rt = time.perf_counter() - start
                 log.debug(traceback.format_exc())
-                log.error("(api_response) : %s" % truncated_output(e, info_logout.log_row_length))
+                log.error("(api_response) : [%s] %s, [requestId: %s]" % (
+                    func_name, truncated_output(e, info_logout.log_row_length), request_id))
                 return (e, rt), False
 
         return inner_wrapper
@@ -60,7 +64,7 @@ def time_catch():
 
 
 @time_catch()
-def api_request(_list, **kwargs):
+def api_request(_list, request_id: str = None, **kwargs):
     if isinstance(_list, list):
         func = _list[0]
         if callable(func):
@@ -69,8 +73,8 @@ def api_request(_list, **kwargs):
                 for a in _list[1:]:
                     arg.append(a)
 
-            log.debug("(api_request)  : [%s] args: %s, kwargs: %s" % (
-                func.__qualname__, truncated_output(arg, info_logout.log_row_length), str(kwargs)))
+            log.debug("(api_request)  : [%s] args: %s, kwargs: %s, [requestId: %s]" % (
+                func.__qualname__, truncated_output(arg, info_logout.log_row_length), str(kwargs), request_id))
 
             return func(*arg, **kwargs)
     return (False, 0), False
@@ -131,4 +135,5 @@ def docstring_decorator(func):
     def wrapper(*args, **kwargs):
         log.info("[docstring_decorator] Detailed test content is as follows: {}".format(func.__doc__))
         return func(*args, **kwargs)
+
     return wrapper

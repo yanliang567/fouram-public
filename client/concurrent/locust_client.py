@@ -84,6 +84,9 @@ class MyTaskSet(TaskSet):
     def scene_test_partition(self):
         self.client.scene_test_partition(self.tasks_params.scene_test_partition.params)
 
+    def scene_test_partition_hybrid_search(self):
+        self.client.scene_test_partition_hybrid_search(self.tasks_params.scene_test_partition_hybrid_search.params)
+
     def iterate_search(self):
         self.client.iterate_search(self.tasks_params.iterate_search.params)
 
@@ -95,3 +98,6 @@ class MyTaskSet(TaskSet):
 
     def scene_search_test(self):
         self.client.scene_search_test(self.tasks_params.scene_search_test.params)
+
+    def scene_hybrid_search_test(self):
+        self.client.scene_hybrid_search_test(self.tasks_params.scene_hybrid_search_test.params)

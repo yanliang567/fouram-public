@@ -894,6 +894,10 @@ def parser_segment_info(segment_info, shards_num: int = 2):
     return SegmentsAnalysis(**_dict).to_dict
 
 
+def parser_scalar_index(scalar_index: Union[dict, list]):
+    return {s: {} for s in scalar_index} if isinstance(scalar_index, list) else scalar_index
+
+
 def check_object(_object, default_value: list = [None]):
     if _object not in default_value:
         return True

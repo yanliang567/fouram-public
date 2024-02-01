@@ -43,9 +43,10 @@ class HybridSearchRerankParams(CommonParamsBase):
 class CommonParams:
 
     @staticmethod
-    def base(dataset_name, dim, dataset_size, ni_per, metric_type=None, req_run_counts=None,
-             vectors_index=None, scalars_index=None, scalars_params=None,
-             other_fields=None, shards_num=2, enable_dynamic_field=None,
+    def base(dataset_name, dim, dataset_size, ni_per, metric_type=None, req_run_counts=None, vector_field_name=None,
+             max_length=None, varchar_filled=None,
+             vectors_index=None, scalars_index=None, scalars_params=None, extra_partitions=None,
+             other_fields=None, shards_num=2, varchar_id=None, enable_dynamic_field=None, num_partitions=None,
              replica_number=None, resource_groups=None,
              index_type=None, index_param=None,
              ids=None, query_expr=None, output_fields=None,
@@ -58,13 +59,19 @@ class CommonParams:
                           pn.dataset_size: dataset_size,
                           pn.ni_per: ni_per,
                           pn.metric_type: metric_type,
+                          pn.vector_field_name: vector_field_name,
                           pn.req_run_counts: req_run_counts,
+                          pn.max_length: max_length,
+                          pn.varchar_filled: varchar_filled,
                           pn.vectors_index: vectors_index,
                           pn.scalars_index: scalars_index,
-                          pn.scalars_params: scalars_params}
+                          pn.scalars_params: scalars_params,
+                          pn.extra_partitions: extra_partitions}
         collection_params = {pn.other_fields: other_fields,
                              pn.shards_num: shards_num,
-                             pn.enable_dynamic_field: enable_dynamic_field}
+                             pn.varchar_id: varchar_id,
+                             pn.enable_dynamic_field: enable_dynamic_field,
+                             pn.num_partitions: num_partitions}
         load_params = {pn.replica_number: replica_number,
                        pn.resource_groups: resource_groups}
         release_params = {}

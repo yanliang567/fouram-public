@@ -235,6 +235,7 @@ class ConcurrentInputParamsSearch(DataClassBase):
     search_param: dict
     expr: Optional[str] = None
     guarantee_timestamp: Optional[int] = None
+    partition_names: Optional[list] = None
     output_fields: Optional[list] = None
     ignore_growing: Optional[bool] = False
     group_by_field: Optional[str] = None
@@ -251,6 +252,7 @@ class ConcurrentTaskSearch(DataClassBase):
     limit: int
     expr: Optional[str] = None
     guarantee_timestamp: Optional[int] = None
+    partition_names: Optional[list] = None
     output_fields: Optional[list] = None
     ignore_growing: Optional[bool] = False
     group_by_field: Optional[str] = None
@@ -259,21 +261,26 @@ class ConcurrentTaskSearch(DataClassBase):
     # other params
     random_data: Optional[bool] = False
 
+    # save obj_params
+    _obj_params: Optional[dict] = None
+
     @property
     def obj_params(self):
-        _p = copy.deepcopy(self.to_dict)
-        del _p["dim"]
-        del _p["random_data"]
+        if self._obj_params is None:
+            _p = copy.deepcopy(self.to_dict)
+            for i in ["dim", "data", "random_data", "_obj_params"]:
+                del _p[i]
 
-        if _p["guarantee_timestamp"] is None:
-            del _p["guarantee_timestamp"]
+            for n in ["guarantee_timestamp", "group_by_field", "partition_names"]:
+                if _p[n] is None:
+                    del _p[n]
 
-        if _p["ignore_growing"] not in [True]:
-            del _p["ignore_growing"]
+            if _p["ignore_growing"] is False:
+                del _p["ignore_growing"]
 
-        if _p["group_by_field"] is None:
-            del _p["group_by_field"]
-        return _p
+            self._obj_params = _p
+
+        return self._obj_params
 
 
 @dataclass
@@ -296,6 +303,7 @@ class ConcurrentInputParamsHybridSearch(DataClassBase):
     output_fields: Optional[list] = None
     ignore_growing: Optional[bool] = False
     guarantee_timestamp: Optional[int] = None
+    partition_names: Optional[list] = None
     timeout: Optional[int] = DefaultValue.default_timeout
 
     random_data: Optional[bool] = False
@@ -311,45 +319,60 @@ class ConcurrentTaskHybridSearch(DataClassBase):
     output_fields: Optional[list] = None
     ignore_growing: Optional[bool] = False
     guarantee_timestamp: Optional[int] = None
+    partition_names: Optional[list] = None
     timeout: Optional[int] = DefaultValue.default_timeout
 
     # other params
     random_data: Optional[bool] = False
 
-    def set_random_data(self):
-        for r in self.reqs:
-            _field_params = self.all_fields_params.get_fields_params(r.anns_field)
-            r._data = gen_vectors(nb=len(r.data), dim=_field_params.dim, field_name=r.anns_field)
+    # save obj_params
+    _obj_params: Optional[dict] = None
+    # save hybrid_search params
+    _get_all_params: Optional[dict] = None
+
+    def get_random_data(self):
+        _reqs = self.reqs
+        if self.random_data:
+            _reqs = copy.deepcopy(self.reqs)
+            for r in _reqs:
+                _field_params = self.all_fields_params.get_fields_params(r.anns_field)
+                r._data = gen_vectors(nb=len(r.data), dim=_field_params.dim, field_name=r.anns_field)
+        return _reqs, [{"anns_field": r.anns_field,
+                        "param": r.param,
+                        "limit": r.limit,
+                        "expr": r.expr,
+                        "nq": len(r.data)} for r in _reqs]
 
     @property
     def obj_params(self):
-        _p = copy.deepcopy(self.to_dict)
-        del _p["all_fields_params"]
-        del _p["random_data"]
+        if self._obj_params is None:
+            _p = {n: getattr(self, n) for n in ["rerank", "limit", "output_fields", "ignore_growing",
+                                                "guarantee_timestamp", "partition_names", "timeout"]}
 
-        if _p["guarantee_timestamp"] is None:
-            del _p["guarantee_timestamp"]
-        if _p["ignore_growing"] not in [True]:
-            del _p["ignore_growing"]
-        return _p
+            for n in ["guarantee_timestamp", "partition_names"]:
+                if _p[n] is None:
+                    del _p[n]
+
+            if _p["ignore_growing"] is False:
+                del _p["ignore_growing"]
+
+            self._obj_params = copy.deepcopy(_p)
+
+        return self._obj_params
 
     @property
     def get_all_params(self):
-        return {
-            "reqs": [{
-                "anns_field": r.anns_field,
-                "param": r.param,
-                "limit": r.limit,
-                "expr": r.expr,
-                "nq": len(r.data)
-            } for r in self.reqs],
-            "rerank": self.rerank.dict(),
-            "limit": self.limit,
-            "output_fields": self.output_fields,
-            "ignore_growing": self.ignore_growing,
-            "guarantee_timestamp": self.guarantee_timestamp,
-            "timeout": self.timeout
-        }
+        if self._get_all_params is None:
+            self._get_all_params = {
+                "rerank": self.rerank.dict(),
+                "limit": self.limit,
+                "output_fields": self.output_fields,
+                "ignore_growing": self.ignore_growing,
+                "guarantee_timestamp": self.guarantee_timestamp,
+                "partition_names": self.partition_names,
+                "timeout": self.timeout
+            }
+        return self._get_all_params
 
 
 @dataclass
@@ -360,6 +383,7 @@ class ConcurrentInputParamsQuery(DataClassBase):
     ignore_growing: Optional[bool] = False
     offset: Optional[int] = None
     limit: Optional[int] = None
+    partition_names: Optional[list] = None
     timeout: Optional[int] = DefaultValue.default_timeout
 
     # other params
@@ -377,6 +401,7 @@ class ConcurrentTaskQuery(DataClassBase):
     ignore_growing: Optional[bool] = False
     offset: Optional[int] = None
     limit: Optional[int] = None
+    partition_names: Optional[list] = None
     timeout: Optional[int] = DefaultValue.default_timeout
 
     # other params
@@ -392,7 +417,7 @@ class ConcurrentTaskQuery(DataClassBase):
         if _p["ignore_growing"] not in [True]:
             del _p["ignore_growing"]
 
-        for i in ["offset", "limit"]:
+        for i in ["offset", "limit", "partition_names"]:
             if _p[i] is None:
                 del _p[i]
 
@@ -554,6 +579,11 @@ class ConcurrentInputParamsSceneTest(DataClassBase):
     index_type: Optional[str] = IndexTypeName.IVF_SQ8
     index_param: Optional[dict] = field(default_factory=lambda: {'nlist': 2048})
     metric_type: Optional[str] = MetricsTypeName.L2
+    other_fields: Optional[list] = field(default_factory=lambda: [])
+
+    scalars_params: Optional[dict] = field(default_factory=lambda: {})
+    scalars_index: Union[dict, list] = field(default_factory=lambda: {})
+    vectors_index: Optional[dict] = field(default_factory=lambda: {})
 
 
 @dataclass
@@ -565,6 +595,11 @@ class ConcurrentTaskSceneTest(DataClassBase):
     index_param: Optional[dict] = field(default_factory=lambda: {'nlist': 2048})
     metric_type: Optional[str] = MetricsTypeName.L2
     vector_field_name: Optional[str] = get_default_field_name()
+    other_fields: Optional[list] = field(default_factory=lambda: [])
+
+    scalars_params: Optional[dict] = field(default_factory=lambda: {})
+    scalars_index: Optional[dict] = field(default_factory=lambda: {})
+    vectors_index: Optional[dict] = field(default_factory=lambda: {})
 
 
 @dataclass
@@ -640,6 +675,9 @@ class ConcurrentInputParamsSceneInsertPartition(DataClassBase):
 
 @dataclass
 class ConcurrentTaskSceneInsertPartition(DataClassBase):
+    dim: int
+    anns_field: Optional[str] = None
+
     data_size: Optional[str] = "1m"
     ni: Optional[int] = 5
     with_flush: Optional[bool] = False
@@ -668,6 +706,9 @@ class ConcurrentInputParamsSceneTestPartition(DataClassBase):
 
 @dataclass
 class ConcurrentTaskSceneTestPartition(DataClassBase):
+    dim: int
+    anns_field: Optional[str] = None
+
     # collection and insert
     data_size: Optional[int] = 3000
     ni: Optional[int] = 3000
@@ -689,6 +730,81 @@ class ConcurrentTaskSceneTestPartition(DataClassBase):
             "guarantee_timestamp": self.guarantee_timestamp,
             "timeout": self.timeout
         }
+
+    @property
+    def obj_params(self):
+        return {"timeout": self.timeout}
+
+
+@dataclass
+class ConcurrentInputParamsSceneTestPartitionHybridSearch(DataClassBase):
+    # hybrid_search
+    reqs: list
+    rerank: Optional[dict] = field(default_factory=lambda: {RRFRanker: []})
+    nq: Optional[int] = 1
+    top_k: Optional[int] = 10
+    output_fields: Optional[list] = None
+    ignore_growing: Optional[bool] = False
+    guarantee_timestamp: Optional[int] = None
+    timeout: Optional[int] = DefaultValue.default_timeout
+
+    random_data: Optional[bool] = False
+
+    # collection and insert
+    data_size: Optional[int] = 3000
+    ni: Optional[int] = 3000
+
+
+@dataclass
+class ConcurrentTaskSceneTestPartitionHybridSearch(DataClassBase):
+    all_fields_params: ParserFieldsParams
+
+    dim: int
+    anns_field: Optional[str]
+
+    reqs: List[AnnSearchRequest]
+    rerank: Union[RRFRanker, WeightedRanker]
+    limit: int
+    output_fields: Optional[list] = None
+    ignore_growing: Optional[bool] = False
+    guarantee_timestamp: Optional[int] = None
+    timeout: Optional[int] = DefaultValue.default_timeout
+
+    # other params
+    random_data: Optional[bool] = False
+
+    # collection and insert
+    data_size: Optional[int] = 3000
+    ni: Optional[int] = 3000
+
+    # save search_obj_params
+    _search_obj_params: Optional[dict] = None
+
+    def get_random_data(self):
+        _reqs = self.reqs
+        if self.random_data:
+            _reqs = copy.deepcopy(self.reqs)
+            for r in _reqs:
+                _field_params = self.all_fields_params.get_fields_params(r.anns_field)
+                r._data = gen_vectors(nb=len(r.data), dim=_field_params.dim, field_name=r.anns_field)
+        return _reqs, [{"anns_field": r.anns_field,
+                        "param": r.param,
+                        "limit": r.limit,
+                        "expr": r.expr,
+                        "nq": len(r.data)} for r in _reqs]
+
+    @property
+    def search_obj_params(self):
+        if self._search_obj_params is None:
+            self._search_obj_params = {s: getattr(self, s) for s in ["rerank", "limit", "output_fields", "timeout"]}
+
+            if self.guarantee_timestamp is not None:
+                self._search_obj_params["guarantee_timestamp"] = self.guarantee_timestamp
+
+            if self.ignore_growing is not False:
+                self._search_obj_params["ignore_growing"] = self.ignore_growing
+
+        return self._search_obj_params
 
     @property
     def obj_params(self):
@@ -860,6 +976,11 @@ class ConcurrentInputParamsSceneSearchTest(DataClassBase):
     index_type: Optional[str] = IndexTypeName.IVF_SQ8
     index_param: Optional[dict] = field(default_factory=lambda: {'nlist': 2048})
     metric_type: Optional[str] = MetricsTypeName.L2
+    other_fields: Optional[list] = field(default_factory=lambda: [])
+
+    scalars_params: Optional[dict] = field(default_factory=lambda: {})
+    scalars_index: Union[dict, list] = field(default_factory=lambda: {})
+    vectors_index: Optional[dict] = field(default_factory=lambda: {})
 
     # load
     replica_number: Optional[int] = 1
@@ -888,6 +1009,11 @@ class ConcurrentTaskSceneSearchTest(DataClassBase):
     index_type: Optional[str] = IndexTypeName.IVF_SQ8
     index_param: Optional[dict] = field(default_factory=lambda: {'nlist': 2048})
     metric_type: Optional[str] = MetricsTypeName.L2
+    other_fields: Optional[list] = field(default_factory=lambda: [])
+
+    scalars_params: Optional[dict] = field(default_factory=lambda: {})
+    scalars_index: Optional[dict] = field(default_factory=lambda: {})
+    vectors_index: Optional[dict] = field(default_factory=lambda: {})
 
     # load
     replica_number: Optional[int] = 1
@@ -909,6 +1035,154 @@ class ConcurrentTaskSceneSearchTest(DataClassBase):
     def anns_field(self):
         data_type = getattr(DataType, config_info.dataset_config.vector_type(self.dataset), DataType.FLOAT_VECTOR)
         return get_default_field_name(data_type=data_type)
+
+
+@dataclass
+class ConcurrentInputParamsSceneHybridSearchTest(DataClassBase):
+    # hybrid_search
+    nq: int
+    top_k: int
+    reqs: list
+    rerank: dict
+    output_fields: Optional[list] = None
+    ignore_growing: Optional[bool] = False
+    guarantee_timestamp: Optional[int] = None
+    partition_names: Optional[list] = None
+    timeout: Optional[int] = DefaultValue.default_timeout
+
+    random_data: Optional[bool] = False
+
+    # collection and insert and index params
+    dataset: Optional[str] = DefaultValue.default_dataset
+    dim: Optional[int] = DefaultValue.default_dim
+    shards_num: Optional[int] = DefaultValue.default_shards_num
+    data_size: Optional[int] = 3000
+    nb: Optional[int] = 3000
+    index_type: Optional[str] = IndexTypeName.IVF_SQ8
+    index_param: Optional[dict] = field(default_factory=lambda: {'nlist': 2048})
+    metric_type: Optional[str] = MetricsTypeName.L2
+    other_fields: Optional[list] = field(default_factory=lambda: [])
+
+    scalars_params: Optional[dict] = field(default_factory=lambda: {})
+    scalars_index: Union[dict, list] = field(default_factory=lambda: {})
+    vectors_index: Optional[dict] = field(default_factory=lambda: {})
+
+    # load
+    replica_number: Optional[int] = 1
+
+    # other
+    prepare_before_insert: Optional[bool] = False
+    hybrid_search_counts: Optional[int] = 1
+    new_connect: Optional[bool] = False
+
+    # use db and user
+    new_user: Optional[bool] = False
+
+    @property
+    def anns_field(self):
+        data_type = getattr(DataType, config_info.dataset_config.vector_type(self.dataset), DataType.FLOAT_VECTOR)
+        return get_default_field_name(data_type=data_type)
+
+    @property
+    def set_all_fields_params_obj(self):
+        return ParserFieldsParams(
+            dataset_params={
+                dim: self.dim,
+                dataset_name: self.dataset,
+                column_name: None,
+                metric_type: self.metric_type,
+                vectors_index: self.vectors_index,
+                scalars_params: self.scalars_params
+            }, collection_params={other_fields: self.other_fields}, main_field_name=self.anns_field)
+
+
+@dataclass
+class ConcurrentTaskSceneHybridSearchTest(DataClassBase):
+    # hybrid_search
+    reqs: List[AnnSearchRequest]
+    rerank: Union[RRFRanker, WeightedRanker]
+    limit: int
+    output_fields: Optional[list] = None
+    ignore_growing: Optional[bool] = False
+    guarantee_timestamp: Optional[int] = None
+    partition_names: Optional[list] = None
+    timeout: Optional[int] = DefaultValue.default_timeout
+
+    # other params
+    random_data: Optional[bool] = False
+
+    dataset: Optional[str] = DefaultValue.default_dataset
+    dim: Optional[int] = DefaultValue.default_dim
+    shards_num: Optional[int] = DefaultValue.default_shards_num
+    data_size: Optional[int] = 3000
+    nb: Optional[int] = 3000
+    index_type: Optional[str] = IndexTypeName.IVF_SQ8
+    index_param: Optional[dict] = field(default_factory=lambda: {'nlist': 2048})
+    metric_type: Optional[str] = MetricsTypeName.L2
+    other_fields: Optional[list] = field(default_factory=lambda: [])
+
+    scalars_params: Optional[dict] = field(default_factory=lambda: {})
+    scalars_index: Optional[dict] = field(default_factory=lambda: {})
+    vectors_index: Optional[dict] = field(default_factory=lambda: {})
+
+    # load
+    replica_number: Optional[int] = 1
+
+    # other
+    prepare_before_insert: Optional[bool] = False
+    hybrid_search_counts: Optional[int] = 1
+    new_connect: Optional[bool] = False
+
+    # use user
+    new_user: Optional[bool] = False
+
+    # for gen hybrid_search data
+    all_fields_params: ParserFieldsParams = None
+    anns_field: Optional[str] = None
+
+    def set_random_data(self):
+        for r in self.reqs:
+            _field_params = self.all_fields_params.get_fields_params(r.anns_field)
+            r._data = gen_vectors(nb=len(r.data), dim=_field_params.dim, field_name=r.anns_field)
+
+    @property
+    def hybrid_search_obj_params(self):
+        _p = {
+            "reqs": self.reqs,
+            "rerank": self.rerank,
+            "limit": self.limit,
+            "output_fields": self.output_fields,
+            "timeout": self.timeout
+        }
+
+        if self.guarantee_timestamp is not None:
+            _p["guarantee_timestamp"] = self.guarantee_timestamp
+
+        if self.ignore_growing in [True]:
+            _p["ignore_growing"] = self.ignore_growing
+
+        if self.partition_names is not None:
+            _p["partition_names"] = self.partition_names
+        return copy.deepcopy(_p)
+
+    @property
+    def get_all_hybrid_search_params(self):
+        return {
+            "reqs": [{
+                "anns_field": r.anns_field,
+                "param": r.param,
+                "limit": r.limit,
+                "expr": r.expr,
+                "nq": len(r.data)
+            } for r in self.reqs],
+            "rerank": self.rerank.dict(),
+            "limit": self.limit,
+            "output_fields": self.output_fields,
+            "ignore_growing": self.ignore_growing,
+            "guarantee_timestamp": self.guarantee_timestamp,
+            "partition_names": self.partition_names,
+            "timeout": self.timeout
+        }
 
 
 @dataclass
@@ -998,6 +1272,8 @@ class ConcurrentTasksParams(ConcurrentTasksParamsBase):
         default_factory=lambda: ConcurrentObjParams(**{"params": ConcurrentTaskSceneInsertPartition}))
     scene_test_partition: Optional[ConcurrentObjParams] = field(
         default_factory=lambda: ConcurrentObjParams(**{"params": ConcurrentTaskSceneTestPartition}))
+    scene_test_partition_hybrid_search: Optional[ConcurrentObjParams] = field(
+        default_factory=lambda: ConcurrentObjParams(**{"params": ConcurrentTaskSceneTestPartitionHybridSearch}))
     iterate_search: Optional[ConcurrentObjParams] = field(
         default_factory=lambda: ConcurrentObjParams(**{"params": ConcurrentTaskIterateSearch}))
     load_search_release: Optional[ConcurrentObjParams] = field(
@@ -1006,6 +1282,8 @@ class ConcurrentTasksParams(ConcurrentTasksParamsBase):
         default_factory=lambda: ConcurrentObjParams(**{"params": ConcurrentTaskLoadHybridSearchRelease}))
     scene_search_test: Optional[ConcurrentObjParams] = field(
         default_factory=lambda: ConcurrentObjParams(**{"params": ConcurrentTaskSceneSearchTest}))
+    scene_hybrid_search_test: Optional[ConcurrentObjParams] = field(
+        default_factory=lambda: ConcurrentObjParams(**{"params": ConcurrentTaskSceneHybridSearchTest}))
 
 
 @dataclass

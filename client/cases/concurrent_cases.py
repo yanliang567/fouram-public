@@ -3,7 +3,7 @@ import dacite
 
 from client.common.common_type import Precision, CaseIterParams
 from client.common.common_func import (
-    ParserInputParams, GoSearchParams, GoBenchParams, ParserFieldsParams,
+    ParserInputParams, GoSearchParams, GoBenchParams, ParserFieldsParams, parser_scalar_index,
     gen_combinations, get_vector_type, get_default_field_name, parser_time, update_dict_value)
 from client.util.params_check import check_params
 from client.util.api_request import info_logout
@@ -28,8 +28,10 @@ from client.parameters.params import (
     ConcurrentTaskLoadSearchRelease, ConcurrentInputParamsLoadSearchRelease,
     ConcurrentInputParamsLoadHybridSearchRelease, ConcurrentTaskLoadHybridSearchRelease,
     ConcurrentTaskSceneSearchTest, ConcurrentInputParamsSceneSearchTest,
+    ConcurrentInputParamsSceneHybridSearchTest, ConcurrentTaskSceneHybridSearchTest,
     ConcurrentTaskSceneInsertPartition, ConcurrentInputParamsSceneInsertPartition,
-    ConcurrentInputParamsSceneTestPartition, ConcurrentTaskSceneTestPartition
+    ConcurrentInputParamsSceneTestPartition, ConcurrentTaskSceneTestPartition,
+    ConcurrentInputParamsSceneTestPartitionHybridSearch, ConcurrentTaskSceneTestPartitionHybridSearch
 )
 
 from utils.util_log import log
@@ -41,15 +43,14 @@ class GoBenchCases(CommonCases):
     def __str__(self):
         return """
         1. create a collection or use an existing collection
-        2. build index on vector column
+        2. build indexes on vector and scalar columns
         3. insert a certain number of vectors
         4. flush collection
-        5. build index on vector column with the same parameters
-        6. build index on on scalars column or not
-        7. count the total number of rows
-        8. load collection
-        9. call the go program to perform search concurrent operations
-        10. clean all collections or not
+        5. build indexes on vector and scalar columns with the same parameters
+        6. count the total number of rows
+        7. load collection
+        8. call the go program to perform search concurrent operations
+        9. clean all collections or not
         """
 
     def prepare_go_search(self, index_type: str, go_search_params: GoSearchParams, concurrent_number: int,
@@ -281,15 +282,14 @@ class ConcurrentClientBase(CommonCases):
     def __str__(self):
         return """
         1. create a collection or use an existing collection
-        2. build index on vector column
+        2. build indexes on vector and scalar columns
         3. insert a certain number of vectors
         4. flush collection
-        5. build index on vector column with the same parameters
-        6. build index on on scalars column or not
-        7. count the total number of rows
-        8. load collection
-        9. perform concurrent operations
-        10. clean all collections or not
+        5. build indexes on vector and scalar columns with the same parameters
+        6. count the total number of rows
+        7. load collection
+        8. call the go program to perform search concurrent operations
+        9. clean all collections or not
         """
 
     @staticmethod
@@ -335,7 +335,9 @@ class ConcurrentClientBase(CommonCases):
             return _p
 
         elif req_type == pn.scene_test:
-            return ConcurrentTaskSceneTest(**ConcurrentInputParamsSceneTest(**req_params).to_dict)
+            _p = ConcurrentInputParamsSceneTest(**req_params)
+            _p.scalars_index = parser_scalar_index(_p.scalars_index)
+            return ConcurrentTaskSceneTest(**_p.to_dict)
 
         elif req_type in [pn.flush, pn.load, pn.release, pn.delete, "debug"]:
             return eval(
@@ -354,11 +356,26 @@ class ConcurrentClientBase(CommonCases):
 
         elif req_type == pn.scene_insert_partition:
             params = ConcurrentInputParamsSceneInsertPartition(**req_params).to_dict
+            params.update({"dim": self.params_obj.dataset_params[pn.dim],
+                           "anns_field": vector_field_name})
             return ConcurrentTaskSceneInsertPartition(**params)
 
         elif req_type == pn.scene_test_partition:
             params = ConcurrentInputParamsSceneTestPartition(**req_params).to_dict
+            params.update({"dim": self.params_obj.dataset_params[pn.dim],
+                           "anns_field": vector_field_name})
             return ConcurrentTaskSceneTestPartition(**params)
+
+        elif req_type == pn.scene_test_partition_hybrid_search:
+            params = ConcurrentInputParamsSceneTestPartitionHybridSearch(**req_params)
+            all_fields_params = ParserFieldsParams(self.params_obj.dataset_params, self.params_obj.collection_params,
+                                                   main_field_name=vector_field_name)
+            result = self.hybrid_search_param_analysis(_search_params=params.to_dict,
+                                                       all_fields_params=all_fields_params)[0]
+            result.update({"all_fields_params": all_fields_params,
+                           "dim": self.params_obj.dataset_params[pn.dim],
+                           "anns_field": vector_field_name})
+            return ConcurrentTaskSceneTestPartitionHybridSearch(**result)
 
         elif req_type == pn.iterate_search:
             params = ConcurrentInputParamsIterateSearch(**req_params)
@@ -383,7 +400,18 @@ class ConcurrentClientBase(CommonCases):
             return ConcurrentTaskLoadHybridSearchRelease(**result)
 
         elif req_type == pn.scene_search_test:
-            return ConcurrentTaskSceneSearchTest(**ConcurrentInputParamsSceneSearchTest(**req_params).to_dict)
+            _p = ConcurrentInputParamsSceneSearchTest(**req_params)
+            _p.scalars_index = parser_scalar_index(_p.scalars_index)
+            return ConcurrentTaskSceneSearchTest(**_p.to_dict)
+
+        elif req_type == pn.scene_hybrid_search_test:
+            params = ConcurrentInputParamsSceneHybridSearchTest(**req_params)
+            params.scalars_index = parser_scalar_index(params.scalars_index)
+            result = self.hybrid_search_param_analysis(_search_params=params.to_dict,
+                                                       all_fields_params=params.set_all_fields_params_obj)[0]
+            result.update({"all_fields_params": params.set_all_fields_params_obj,
+                           "anns_field": params.anns_field})
+            return ConcurrentTaskSceneHybridSearchTest(**result)
 
         return DataClassBase()
 

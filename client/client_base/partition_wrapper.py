@@ -11,7 +11,6 @@ from client.common.common_param import InterfaceResponse
 from parameters.input_params import param_info
 from utils.util_log import log
 
-
 TIMEOUT = None
 
 
@@ -58,7 +57,7 @@ class ApiPartitionWrapper:
         start = time.perf_counter()
         _res = self.partition.num_entities
         rt = time.perf_counter() - start
-        return InterfaceResponse(_res, rt,  True, True)
+        return InterfaceResponse(_res, rt, True, True)
 
     def flush(self, check_task=None, check_items=None, **kwargs):
         if not hasattr(self.partition, "flush"):
@@ -104,6 +103,16 @@ class ApiPartitionWrapper:
         check_result = ResponseChecker(res, func_name, check_task, check_items, is_succ=res_result, data=data,
                                        anns_field=anns_field, params=params, limit=limit, expr=expr,
                                        output_fields=output_fields, **kwargs).run()
+        return InterfaceResponse(*res, res_result, check_result)
+
+    def hybrid_search(self, reqs, rerank, limit, output_fields=None, timeout=None, round_decimal=-1, check_task=None,
+                      check_items=None, **kwargs):
+        func_name = sys._getframe().f_code.co_name
+        res, res_result = api_request([self.partition.hybrid_search, reqs, rerank, limit, output_fields, timeout,
+                                       round_decimal], **kwargs)
+        check_result = ResponseChecker(res, func_name, check_task, check_items, is_succ=res_result, reqs=reqs,
+                                       rerank=rerank, limit=limit, output_fields=output_fields, timeout=timeout,
+                                       round_decimal=round_decimal, **kwargs).run()
         return InterfaceResponse(*res, res_result, check_result)
 
     def query(self, expr, output_fields=None, timeout=None, check_task=None, check_items=None, **kwargs):

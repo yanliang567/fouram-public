@@ -18,7 +18,7 @@ from client.common.common_func import (
     gen_combinations, update_dict_value,
     get_vector_type, get_default_field_name, get_vectors_from_binary,
     get_ground_truth_ids, get_search_ids, get_recall_value,
-    parser_search_params_expr, write_json_file, gen_go_bench_json_file, deal_insert_result,
+    parser_search_params_expr, parser_scalar_index, write_json_file, gen_go_bench_json_file, deal_insert_result,
     check_vector_index_params, check_params_exist
 )
 
@@ -150,8 +150,7 @@ class CommonCases(Base):
             self.prepare_scalars_index()
 
     def prepare_scalars_index(self, update_report_data=True):
-        scalars = self.params_obj.dataset_params.get(pn.scalars_index, {})
-        scalars = {s: {} for s in scalars} if isinstance(scalars, list) else scalars
+        scalars = parser_scalar_index(self.params_obj.dataset_params.get(pn.scalars_index, {}))
         scalars_field = list(scalars.keys())
 
         vectors_index = self.params_obj.dataset_params.get(pn.vectors_index, {})
@@ -164,7 +163,7 @@ class CommonCases(Base):
 
         other_fields = self.params_obj.collection_params.get(pn.other_fields, [])
         for _field in scalars_field + vectors_field:
-            if _field not in other_fields:
+            if _field not in other_fields + ["id"]:
                 log.error("[CommonCases] The field `{0}` is not in the collection {1}.".format(_field, other_fields))
                 return False
 
@@ -684,15 +683,14 @@ class Search(CommonCases):
     def __str__(self):
         return """
         1. create a collection or use an existing collection
-        2. build index on vector column
+        2. build indexes on vector and scalar columns
         3. insert a certain number of vectors
         4. flush collection
-        5. build index on vector column with the same parameters
-        6. build index on on scalars column or not
-        7. count the total number of rows
-        8. load collection
-        9. search collection with different parameters
-        10. clean all collections or not
+        5. build indexes on vector and scalar columns with the same parameters
+        6. count the total number of rows
+        7. load collection
+        8. search collection with different parameters
+        9. clean all collections or not
         """
 
     @check_params(ParamsFormat.common_scene_search)
@@ -782,15 +780,14 @@ class SearchRecall(CommonCases):
     def __str__(self):
         return """
         1. create a collection or use an existing collection
-        2. build index on vector column
+        2. build indexes on vector and scalar columns
         3. insert a certain number of vectors
         4. flush collection
-        5. build index on vector column with the same parameters
-        6. build index on on scalars column or not
-        7. count the total number of rows
-        8. load collection
-        9. search collection with different parameters and calculate recall
-        10. clean all collections or not
+        5. build indexes on vector and scalar columns with the same parameters
+        6. count the total number of rows
+        7. load collection
+        8. search collection with different parameters and calculate recall
+        9. clean all collections or not
         """
 
     @check_params(ParamsFormat.common_scene_search_recall)
@@ -884,15 +881,14 @@ class HybridSearch(CommonCases):
     def __str__(self):
         return """
         1. create a collection or use an existing collection
-        2. build index on vector column
+        2. build indexes on vector and scalar columns
         3. insert a certain number of vectors
         4. flush collection
-        5. build index on vector column with the same parameters
-        6. build index on on scalars column or not
-        7. count the total number of rows
-        8. load collection
-        9. search collection with different parameters
-        10. clean all collections or not
+        5. build indexes on vector and scalar columns with the same parameters
+        6. count the total number of rows
+        7. load collection
+        8. search collection with different parameters
+        9. clean all collections or not
         """
 
     @check_params(ParamsFormat.common_scene_hybrid_search)

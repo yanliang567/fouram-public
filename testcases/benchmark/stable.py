@@ -230,11 +230,12 @@ class TestConcurrentCases(PerfTemplate):
             other_fields=["float_vector_1", "array_varchar_1", "int64_1", "binary_vector_1"],
             vectors_index=dict_merge([cdp.DefaultVectorIndexParams.HNSW("float_vector_1"),
                                       cdp.DefaultVectorIndexParams.BIN_IVF_FLAT("binary_vector_1")]),
-            scalars_index=["int64_1"],
+            scalars_index=dict_merge([*cdp.DefaultScalarIndexParams.default_index_list(["int64_1"]),
+                                      *cdp.DefaultScalarIndexParams.INVERTED_list(["id"])]),
             scalars_params=dict_merge([cdp.DefaultScalarParams.text2img("float_vector_1"),
                                        cdp.DefaultScalarParams.binary("binary_vector_1"),
                                        cdp.DefaultScalarParams.array_varchar("array_varchar_1")]),
-            ni_per=5000, concurrent_number=[100], during_time=1800, interval=20, **cdp.DefaultIndexParams.IVF_SQ8)
+            ni_per=5000, concurrent_number=[100], during_time="3h", interval=20, **cdp.DefaultIndexParams.IVF_SQ8)
 
         self.concurrency_template(
             input_params=input_params, cpu=8, mem=32, deploy_mode=deploy_mode,
@@ -260,11 +261,12 @@ class TestConcurrentCases(PerfTemplate):
             other_fields=["float_vector_1", "array_varchar_1", "int64_1", "binary_vector_1"],
             vectors_index=dict_merge([cdp.DefaultVectorIndexParams.HNSW("float_vector_1"),
                                       cdp.DefaultVectorIndexParams.BIN_IVF_FLAT("binary_vector_1")]),
-            scalars_index=["int64_1"],
+            scalars_index=dict_merge([*cdp.DefaultScalarIndexParams.default_index_list(["int64_1"]),
+                                      *cdp.DefaultScalarIndexParams.INVERTED_list(["id"])]),
             scalars_params=dict_merge([cdp.DefaultScalarParams.text2img("float_vector_1"),
                                        cdp.DefaultScalarParams.binary("binary_vector_1"),
                                        cdp.DefaultScalarParams.array_varchar("array_varchar_1")]),
-            ni_per=5000, concurrent_number=[100], during_time=1800, interval=20, **cdp.DefaultIndexParams.IVF_SQ8)
+            ni_per=5000, concurrent_number=[100], during_time="3h", interval=20, **cdp.DefaultIndexParams.IVF_SQ8)
 
         node_resources = [
             NodeResource(nodes=[indexNode], cpu=4, mem=8),
@@ -717,6 +719,45 @@ class TestConcurrentCases(PerfTemplate):
 
     @pytest.mark.locust
     @pytest.mark.parametrize("deploy_mode", [CLUSTER])
+    def test_concurrent_locust_resource_groups_multi_vector_cluster(self, input_params: InputParamsBase, deploy_mode):
+        """
+        :test steps:
+            1. concurrent test and calculation of RT and QPS
+        """
+        dataset_size = parser_data_size("10m")
+        other_fields = ["float_vector_1", "float_vector_2", "float_vector_3"]
+        groups = [1, 1, 1]
+
+        concurrent_tasks = [
+            ConcurrentParams.params_search(weight=1, nq=1000, top_k=1, search_param={"nprobe": 64}, timeout=600),
+            ConcurrentParams.params_hybrid_search(
+                nq=1, top_k=100, timeout=600, output_fields=["*"],
+                reqs=[HybridSearchReqParams(anns_field="float_vector", search_param={"nprobe": 128}, top_k=101,
+                                            expr=f'id > {int(dataset_size * 0.1)}'),
+                      HybridSearchReqParams(anns_field="float_vector_1", search_param={"ef": 64}, top_k=53,
+                                            expr=f'id <= {int(dataset_size * 0.9)}'),
+                      HybridSearchReqParams(anns_field="float_vector_2", search_param={"search_list": 102}, top_k=100),
+                      HybridSearchReqParams(anns_field="float_vector_3", search_param={"nprobe": 201}, top_k=200)],
+                rerank=HybridSearchRerankParams(RRFRanker=[]))
+        ]
+
+        default_case_params = ConcurrentParams().params_scene_concurrent(
+            concurrent_tasks, concurrent_number=[50], during_time="6h", interval=20,
+            dataset_size=dataset_size, ni_per=12500, other_fields=other_fields,
+            scalars_params=dict_merge(cdp.DefaultScalarParams.sift_list(other_fields)),
+            vectors_index=dict_merge([cdp.DefaultVectorIndexParams.HNSW("float_vector_1"),
+                                      cdp.DefaultVectorIndexParams.DISKANN_IP("float_vector_2"),
+                                      cdp.DefaultVectorIndexParams.IVF_SQ8_2048("float_vector_3")]),
+            reset_rg=True, groups=groups, replica_number=3, resource_groups=3, **cdp.DefaultIndexParams.IVF_FLAT)
+
+        self.concurrency_template(
+            input_params=input_params, cpu=dp.default_cpu, mem=48, queryNode=3, deploy_mode=deploy_mode,
+            old_version_format=self.get_report_version_format(False),
+            case_callable_obj=self.get_callable_object(ConcurrentClientBase().scene_concurrent_locust),
+            default_case_params=default_case_params)
+
+    @pytest.mark.locust
+    @pytest.mark.parametrize("deploy_mode", [CLUSTER])
     def test_concurrent_locust_score_balance_cluster(self, input_params: InputParamsBase, deploy_mode):
         """
         Used to check whether the memory usage of queryNodes is balanced.
@@ -823,6 +864,129 @@ class TestConcurrentCases(PerfTemplate):
             old_version_format=self.get_report_version_format(False),
             case_callable_obj=self.get_callable_object(ConcurrentClientBase().scene_concurrent_locust),
             default_case_params=default_case_params)
+
+    @pytest.mark.locust
+    @pytest.mark.parametrize("deploy_mode", [STANDALONE])
+    def test_concurrent_locust_50m_multi_ivf_sq8_ddl_dql_standalone(self, input_params: InputParamsBase, deploy_mode):
+        """
+        :test steps:
+            1. concurrent test and calculation of RT and QPS
+        """
+        concurrent_tasks = [
+            ConcurrentParams.params_search(weight=20, nq=10, top_k=10, search_param={"nprobe": 16}),
+            ConcurrentParams.params_query(weight=10, expr=" 110 > id > 100"),
+            ConcurrentParams.params_load(weight=1),
+            ConcurrentParams.params_scene_test(weight=2),
+            ConcurrentParams.params_hybrid_search(
+                weight=20, nq=1, top_k=10, output_fields=["*"], timeout=600,
+                reqs=[HybridSearchReqParams(anns_field="float_vector", search_param={"nprobe": 128}, top_k=100),
+                      HybridSearchReqParams(anns_field="float_vector_1", search_param={"nprobe": 64}, top_k=10)],
+                rerank=HybridSearchRerankParams(WeightedRanker=[0.85, 0.95])),
+            ConcurrentParams.params_scene_hybrid_search_test(
+                weight=1, nq=1, top_k=1, timeout=600,  # output_fields=["*"],
+                reqs=[HybridSearchReqParams(anns_field="float_vector", search_param={"nprobe": 128}, top_k=100),
+                      HybridSearchReqParams(anns_field="float_vector_1", search_param={"nprobe": 32}, top_k=10),
+                      HybridSearchReqParams(anns_field="float_vector_2", search_param={"ef": 32}, top_k=5),
+                      HybridSearchReqParams(anns_field="float_vector_3", search_param={"search_list": 20}, top_k=10)],
+                rerank=HybridSearchRerankParams(RRFRanker=[]),
+                data_size=3000, nb=3000, hybrid_search_counts=10,
+                other_fields=["float_vector_1", "float_vector_2", "float_vector_3", "int64_1", "bool_1", "varchar_1"],
+                scalars_params=dict_merge(
+                    cdp.DefaultScalarParams.sift_list([f"float_vector_{i}" for i in range(1, 4)])),
+                scalars_index=dict_merge([
+                    cdp.DefaultScalarIndexParams.default_index("int64_1"),
+                    *cdp.DefaultScalarIndexParams.INVERTED_list(["bool_1", "varchar_1"])]),
+                vectors_index=dict_merge([
+                    cdp.DefaultVectorIndexParams.IVF_FLAT("float_vector_1"),
+                    cdp.DefaultVectorIndexParams.HNSW("float_vector_2"),
+                    cdp.DefaultVectorIndexParams.DISKANN_IP("float_vector_3")])
+            )
+        ]
+        default_case_params = ConcurrentParams().params_scene_concurrent(
+            concurrent_tasks, concurrent_number=[20], during_time="240h", interval=20, dataset_size="50m", ni_per=25000,
+            other_fields=["float_vector_1"],
+            vectors_index=cdp.DefaultVectorIndexParams.IVF_SQ8("float_vector_1"),
+            scalars_index=cdp.DefaultScalarIndexParams.default_index("id"),
+            scalars_params=cdp.DefaultScalarParams.text2img("float_vector_1"),
+            **cdp.DefaultIndexParams.IVF_SQ8_2048)
+
+        self.concurrency_template(
+            input_params=input_params, cpu=32, mem=128, deploy_mode=deploy_mode,
+            old_version_format=self.get_report_version_format(False),
+            case_callable_obj=self.get_callable_object(ConcurrentClientBase().scene_concurrent_locust),
+            default_case_params=default_case_params)
+
+    @pytest.mark.locust
+    @pytest.mark.parametrize("deploy_mode", [CLUSTER])
+    def test_concurrent_locust_25m_multi_hnsw_ddl_dql_dml_cluster(self, input_params: InputParamsBase, deploy_mode):
+        """
+        :test steps:
+            1. concurrent test and calculation of RT and QPS
+        """
+        data_size = "25m"
+
+        concurrent_tasks = [
+            ConcurrentParams.params_insert(weight=1, nb=1, random_id=True, random_vector=True,
+                                           start_id=parser_data_size(data_size), timeout=600),
+            ConcurrentParams.params_delete(weight=1, delete_length=1),
+            ConcurrentParams.params_search(
+                weight=20, nq=10, top_k=10, search_param={"ef": 32}, timeout=600,
+                output_fields=["float_1", "float_vector_1"],
+                expr=eval('{"float_1": {"GT": -1.0, "LT": parser_data_size(data_size) * 0.5}}')),
+            ConcurrentParams.params_query(weight=10, expr=eval("{'float_1': {'GT': 0, 'LT': 100}}"), timeout=600),
+            ConcurrentParams.params_load(weight=1),
+            ConcurrentParams.params_scene_test(weight=2),
+            ConcurrentParams.params_hybrid_search(
+                weight=20, nq=1, top_k=10, output_fields=["*"], timeout=600,
+                reqs=[HybridSearchReqParams(anns_field="float_vector", search_param={"ef": 128}, top_k=100),
+                      HybridSearchReqParams(anns_field="float_vector_1", search_param={"ef": 64}, top_k=10),
+                      HybridSearchReqParams(anns_field="float_vector_2", search_param={"ef": 256}, top_k=200),
+                      HybridSearchReqParams(anns_field="float_vector_3", search_param={"ef": 64}, top_k=30)],
+                rerank=HybridSearchRerankParams(WeightedRanker=[0.85, 0.95, 0.5, 0.5])),
+            ConcurrentParams.params_scene_hybrid_search_test(
+                weight=2, nq=1, top_k=1, timeout=600,  # output_fields=["*"],
+                reqs=[HybridSearchReqParams(anns_field="float_vector", search_param={"nprobe": 128}, top_k=100),
+                      HybridSearchReqParams(anns_field="float_vector_1", search_param={"nprobe": 32}, top_k=10),
+                      HybridSearchReqParams(anns_field="float_vector_2", search_param={"ef": 32}, top_k=5),
+                      HybridSearchReqParams(anns_field="float_vector_3", search_param={"search_list": 20}, top_k=10)],
+                rerank=HybridSearchRerankParams(RRFRanker=[]),
+                data_size=3000, nb=3000, hybrid_search_counts=10,
+                other_fields=["float_vector_1", "float_vector_2", "float_vector_3", "int64_1", "bool_1", "varchar_1"],
+                scalars_params=dict_merge(
+                    cdp.DefaultScalarParams.sift_list([f"float_vector_{i}" for i in range(1, 4)])),
+                scalars_index=dict_merge([
+                    cdp.DefaultScalarIndexParams.default_index("int64_1"),
+                    *cdp.DefaultScalarIndexParams.INVERTED_list(["bool_1", "varchar_1"])]),
+                vectors_index=dict_merge([
+                    cdp.DefaultVectorIndexParams.IVF_FLAT("float_vector_1"),
+                    cdp.DefaultVectorIndexParams.HNSW("float_vector_2"),
+                    cdp.DefaultVectorIndexParams.DISKANN_IP("float_vector_3")])
+            )
+        ]
+        default_case_params = ConcurrentParams().params_scene_concurrent(
+            concurrent_tasks, concurrent_number=[100], during_time="240h", interval=20, dataset_size=data_size,
+            ni_per=10000, other_fields=["float_vector_1", "float_vector_2", "float_vector_3", "float_1"],
+            vectors_index=dict_merge([cdp.DefaultVectorIndexParams.HNSW("float_vector_1"),
+                                      cdp.DefaultVectorIndexParams.HNSW("float_vector_2"),
+                                      cdp.DefaultVectorIndexParams.HNSW("float_vector_3")]),
+            scalars_index=cdp.DefaultScalarIndexParams.default_index("id"),
+            scalars_params=dict_merge([cdp.DefaultScalarParams.text2img("float_vector_1"),
+                                       cdp.DefaultScalarParams.sift("float_vector_2"),
+                                       cdp.DefaultScalarParams.text2img("float_vector_3")]),
+            **cdp.DefaultIndexParams.HNSW)
+
+        node_resources = [
+            NodeResource(nodes=[dataNode], replicas=2),
+            NodeResource(nodes=[indexNode], replicas=4, cpu=6, mem=4),
+            NodeResource(nodes=[queryNode], replicas=6).custom_resource(limits_cpu=16, requests_cpu=8,
+                                                                        limits_mem=32, requests_mem=16)
+        ]
+
+        self.concurrency_template(
+            input_params=input_params, cpu=dp.min_cpu, mem=dp.min_mem, deploy_mode=deploy_mode,
+            old_version_format=self.get_report_version_format(False),
+            case_callable_obj=self.get_callable_object(ConcurrentClientBase().scene_concurrent_locust),
+            default_case_params=default_case_params, node_resources=node_resources)
 
     """ Big data """
 

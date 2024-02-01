@@ -21,7 +21,7 @@ from client.common.common_func import (
     gen_collection_schema, gen_unique_str, parser_data_size, gen_vectors, gen_entities, gen_random_query_data,
     go_bench, go_bench_refine, GoSearchParams,
     remove_list_values, parser_segment_info, update_dict_value, hide_dict_value,
-    get_default_search_params, parser_search_params_expr, get_ann_search_request_params
+    get_default_search_params, parser_search_params_expr, get_ann_search_request_params, check_vector_index_params
 )
 from client.common.common_param import TransferNodesParams, TransferReplicasParams
 from client.common.common_type import Precision, CheckTasks
@@ -46,8 +46,10 @@ from client.parameters.params import (
     ConcurrentTaskLoadSearchRelease,
     ConcurrentTaskLoadHybridSearchRelease,
     ConcurrentTaskSceneSearchTest,
+    ConcurrentTaskSceneHybridSearchTest,
     ConcurrentTaskSceneInsertPartition,
-    ConcurrentTaskSceneTestPartition
+    ConcurrentTaskSceneTestPartition,
+    ConcurrentTaskSceneTestPartitionHybridSearch
 )
 from client.util.api_request import func_time_catch
 
@@ -433,22 +435,26 @@ class Base:
         }
 
     def build_index(self, field_name, index_type, metric_type, index_param, collection_obj: callable = None,
-                    collection_name="", log_level=LogLevel.INFO, **kwargs):
+                    log_level=LogLevel.INFO, **kwargs):
         """
         {"index_type": "IVF_FLAT", "metric_type": "L2", "params": {"nlist": 128}}
         """
         index_params = {"index_type": index_type, "metric_type": metric_type, "params": index_param}
-        collection_name = collection_name or self.collection_name
+        collection_obj = collection_obj or self.collection_wrap
 
         log.customize(log_level)(
             "[Base] Start build index of {0} for field:{1} collection:{2}, params:{3}".format(
-                index_type, field_name, collection_name, index_params))
-        collection_obj = collection_obj or self.collection_wrap
+                index_type, field_name, collection_obj.name, index_params))
         return self.index_wrap.init_index(collection_obj.collection, field_name, index_params, **kwargs)
 
-    def build_scalar_index(self, field_name, index_params: dict = {}):
-        log.info("[Base] Start build scalar index of {0}, index_params:{1}".format(field_name, index_params))
-        return self.index_wrap.init_index(self.collection_wrap.collection, field_name, index_params=index_params)
+    def build_scalar_index(self, field_name, index_params: dict = {}, collection_obj: callable = None,
+                           log_level=LogLevel.INFO):
+        collection_obj = collection_obj or self.collection_wrap
+
+        log.customize(log_level)(
+            "[Base] Start build scalar index of {0} for field:{1}, index_params:{2}".format(
+                collection_obj.name, field_name, index_params))
+        return self.index_wrap.init_index(collection_obj.collection, field_name, index_params=index_params)
 
     def show_index(self, collection_name=""):
         collection_name = collection_name or self.collection_name
@@ -461,9 +467,9 @@ class Base:
         log.info("[Base] Collection:{0} is not building index".format(self.collection_wrap.name))
         return {}
 
-    def describe_collection_index(self):
+    def describe_collection_index(self, log_level=LogLevel.INFO):
         indexes = self.collection_wrap.indexes
-        log.info("[Base] Collection:{0} indexes: {1}".format(self.collection_wrap.name, indexes))
+        log.customize(log_level)("[Base] Collection:{0} indexes: {1}".format(self.collection_wrap.name, indexes))
         return indexes
 
     def clean_index(self):
@@ -505,8 +511,8 @@ class Base:
         """
         :return: InterfaceResponse
         """
-        msg = "[Base] Params of search: nq:{0}, anns_field:{1}, param:{2}, limit:{3}, expr:\"{4}\", kwargs:{5}"
-        log.info(msg.format(len(data), anns_field, param, limit, expr, kwargs))
+        msg = '[Base] Params of search nq:{0}, anns_field:{1}, param:{2}, limit:{3}, expr:"{4}", timeout:{5} kwargs:{6}'
+        log.info(msg.format(len(data), anns_field, param, limit, expr, timeout, kwargs))
         return self.collection_wrap.search(data, anns_field, param, limit, expr=expr, timeout=timeout, **kwargs)
 
     def hybrid_search(self, reqs, rerank, limit, timeout=300, **kwargs):
@@ -733,9 +739,9 @@ class Base:
         log.customize(log_level)(
             "[Base] Create partition {0} of collection({1})".format(partition_name, collection.name))
 
-    def drop_partition(self, partition_obj: callable = None, log_level=LogLevel.DEBUG):
+    def drop_partition(self, partition_obj: callable = None, log_level=LogLevel.DEBUG, **kwargs):
         partition_obj = partition_obj or self.partition_wrap
-        partition_obj.drop()
+        partition_obj.drop(**kwargs)
         log.customize(log_level)("[Base] Drop partition {0} done.".format(partition_obj.name))
 
     def count_partition_entities(self, partition_obj: callable = None, log_level=LogLevel.DEBUG):
@@ -743,43 +749,58 @@ class Base:
         counts = partition_obj.num_entities
         log.customize(log_level)("[Base] Partition {0} num entities: ({1})".format(partition_obj.name, counts))
 
-    def flush_partition(self, partition_obj: callable = None, log_level=LogLevel.DEBUG):
+    def flush_partition(self, partition_obj: callable = None, log_level=LogLevel.DEBUG, **kwargs):
         partition_obj = partition_obj or self.partition_wrap
-        log.customize(log_level)("[Base] Start flush partition {}".format(partition_obj.name))
-        return partition_obj.flush()
+        log.customize(log_level)("[Base] Start flush partition {0}, kwargs: {1}".format(partition_obj.name, kwargs))
+        return partition_obj.flush(**kwargs)
 
     def load_partition(self, partition_obj: callable = None, replica_number=1, log_level=LogLevel.DEBUG, **kwargs):
         partition_obj = partition_obj or self.partition_wrap
         kwargs = self.get_resource_groups(**kwargs)
         log.customize(log_level)(
-            f"[Base] Start load partition {partition_obj.name},replica_number:{replica_number},kwargs:{kwargs}")
+            f"[Base] Start load partition {partition_obj.name}, replica_number:{replica_number}, kwargs:{kwargs}")
         return partition_obj.load(replica_number=replica_number, **kwargs)
 
     def release_partition(self, partition_obj: callable = None, log_level=LogLevel.DEBUG, **kwargs):
         partition_obj = partition_obj or self.partition_wrap
-        log.customize(log_level)("[Base] Start release partition {}".format([partition_obj.name]))
+        log.customize(log_level)("[Base] Start release partition {0}".format(partition_obj.name))
         return partition_obj.release(**kwargs)
 
     def search_partition(self, data, anns_field, param, limit, expr=None, partition_obj: callable = None, timeout=300,
                          log_level=LogLevel.DEBUG, **kwargs):
         """
-        :return: (result, rt), check_result
+        :return: InterfaceResponse
         """
         partition_obj = partition_obj or self.partition_wrap
         msg = "[Base] Params of search: nq:{0}, anns_field:{1}, param:{2}, limit:{3}, expr:\"{4}\", kwargs:{5}"
         log.customize(log_level)(msg.format(len(data), anns_field, param, limit, expr, kwargs))
         return partition_obj.search(data, anns_field, param, limit, expr=expr, timeout=timeout, **kwargs)
 
+    def hybrid_search_partition(self, reqs, rerank, limit, output_fields=None, partition_obj: callable = None,
+                                timeout=300, log_level=LogLevel.DEBUG, **kwargs):
+        """
+        :return: InterfaceResponse
+        """
+        partition_obj = partition_obj or self.partition_wrap
+
+        msg = "[Base] Params of partition:{0} hybrid_search: reqs:{1}, rerank:{2}, limit:{3}, timeout:{4}, kwargs:{5}"
+        log.customize(log_level)(msg.format(
+            partition_obj.name, get_ann_search_request_params(reqs, print_vectors=kwargs.pop("print_vectors", False)),
+            rerank, limit, timeout, kwargs))
+        return partition_obj.hybrid_search(reqs, rerank, limit, output_fields=output_fields, timeout=timeout, **kwargs)
+
     def concurrent_search(self, params: ConcurrentTaskSearch):
-        if params.random_data:
-            params.data = gen_vectors(nb=len(params.data), dim=params.dim, field_name=params.anns_field)
-        return self.collection_wrap.search(check_task=CheckTasks.assert_result, **params.obj_params)
+        _data = gen_vectors(nb=len(params.data), dim=params.dim,
+                            field_name=params.anns_field) if params.random_data else params.data
+        return self.collection_wrap.search(data=_data, check_task=CheckTasks.assert_result, **params.obj_params)
 
     def concurrent_hybrid_search(self, params: ConcurrentTaskHybridSearch):
-        if params.random_data:
-            params.set_random_data()
-        log.debug("[Base] Params of concurrent_hybrid_search: {}".format(params.get_all_params))
-        return self.collection_wrap.hybrid_search(check_task=CheckTasks.assert_result, **params.obj_params)
+        log_level = LogLevel.DEBUG
+
+        _reqs, _reqs_params = params.get_random_data()
+        log.customize(log_level)(
+            f"[Base] Params of concurrent_hybrid_search reqs: {_reqs_params}, {params.get_all_params}")
+        return self.collection_wrap.hybrid_search(reqs=_reqs, check_task=CheckTasks.assert_result, **params.obj_params)
 
     def concurrent_query(self, params: ConcurrentTaskQuery):
         _extra_expr = ""
@@ -828,11 +849,13 @@ class Base:
     def concurrent_scene_test(self, params: ConcurrentTaskSceneTest):
         log_level = LogLevel.DEBUG
         collection_obj = ApiCollectionWrapper()
-        collection_name = gen_unique_str()
+        collection_name = gen_unique_str("scene_test")
 
         # create collection
         self.create_collection(collection_obj=collection_obj, collection_name=collection_name,
-                               vector_field_name=params.vector_field_name, dim=params.dim, log_level=log_level)
+                               vector_field_name=params.vector_field_name, dim=params.dim,
+                               other_fields=params.other_fields, scalars_params=params.scalars_params,
+                               log_level=log_level)
         time.sleep(1)
 
         # insert vectors
@@ -849,8 +872,18 @@ class Base:
 
         # build index
         self.build_index(field_name=params.vector_field_name, index_type=params.index_type,
-                         metric_type=params.metric_type, index_param=params.index_param,
-                         collection_name=collection_name, collection_obj=collection_obj, log_level=log_level)
+                         metric_type=params.metric_type, index_param=params.index_param, collection_obj=collection_obj,
+                         log_level=log_level)
+
+        # build other vector index
+        for k, v in params.vectors_index.items():
+            if check_vector_index_params(field_name=k, params=v):
+                self.build_index(k, log_level=log_level, collection_obj=collection_obj, **v)
+
+        # build scalar index
+        for scalar, scalar_index_params in params.scalars_index.items():
+            self.build_scalar_index(field_name=scalar, index_params=scalar_index_params, collection_obj=collection_obj,
+                                    log_level=log_level)
 
         time.sleep(59)
         # drop collection
@@ -879,7 +912,6 @@ class Base:
     @func_time_catch()
     def concurrent_scene_insert_partition(self, params: ConcurrentTaskSceneInsertPartition):
         log_level = LogLevel.DEBUG
-        _vector_field_name, _dim, _, _, _ = self.get_collection_params(self.collection_wrap)
         partition_obj = ApiPartitionWrapper()
         partition_name = gen_unique_str("p")
 
@@ -888,10 +920,10 @@ class Base:
                               log_level=log_level)
 
         # insert vectors
-        self.insert(data_type="local", dim=_dim, size=params.data_size, ni=params.ni,
+        self.insert(data_type="local", dim=params.dim, size=params.data_size, ni=params.ni,
                     collection_obj=self.collection_wrap, collection_name=self.collection_wrap.name,
                     collection_schema=self.collection_schema, log_level=log_level, partition_name=partition_name,
-                    anns_field=_vector_field_name, **params.obj_params)
+                    anns_field=params.anns_field, **params.obj_params)
 
         if params.with_flush:
             self.flush_partition(partition_obj, log_level)
@@ -906,8 +938,6 @@ class Base:
     @func_time_catch()
     def concurrent_scene_test_partition(self, params: ConcurrentTaskSceneTestPartition):
         log_level = LogLevel.DEBUG
-        _vector_field_name, _dim, _metric_type, _index_type, _index_param = self.get_collection_params(
-            self.collection_wrap)
         partition_obj = ApiPartitionWrapper()
         partition_name = gen_unique_str("sp")
 
@@ -916,10 +946,10 @@ class Base:
                               log_level=log_level)
 
         # insert vectors
-        self.insert(data_type="local", dim=_dim, size=params.data_size, ni=params.ni,
+        self.insert(data_type="local", dim=params.dim, size=params.data_size, ni=params.ni,
                     collection_obj=self.collection_wrap, collection_name=self.collection_wrap.name,
                     collection_schema=self.collection_schema, log_level=log_level, partition_name=partition_name,
-                    anns_field=_vector_field_name, **params.obj_params)
+                    anns_field=params.anns_field, **params.obj_params)
 
         # flush partition
         self.flush_partition(partition_obj, log_level=log_level)
@@ -927,30 +957,80 @@ class Base:
         # count vectors
         self.count_partition_entities(partition_obj, log_level=log_level)
 
-        # create index again
-        self.build_index(field_name=_vector_field_name, index_type=_index_type,
-                         metric_type=_metric_type, index_param=_index_param, log_level=log_level)
+        # create indexes again
+        for _index in self.describe_collection_index(log_level=log_level):
+            log.customize(log_level)(
+                f"[Base] Start building index, field_name:{_index.field_name}, index_params:{_index.params}")
+            self.index_wrap.init_index(self.collection_wrap.collection, _index.field_name, index_params=_index.params)
 
         # load and search
         self.load_partition(partition_obj, log_level=log_level)
 
         # search partition
-        data = gen_vectors(nb=params.nq, dim=_dim, field_name=_vector_field_name)
-        self.search_partition(data=data, anns_field=_vector_field_name, param=params.search_param, limit=params.limit,
+        data = gen_vectors(nb=params.nq, dim=params.dim, field_name=params.anns_field)
+        self.search_partition(data=data, anns_field=params.anns_field, param=params.search_param, limit=params.limit,
                               partition_obj=partition_obj, check_task=CheckTasks.assert_result, log_level=log_level,
                               **params.search_obj_params)
 
         # release partition and search failed
         self.release_partition(partition_obj, log_level=log_level, timeout=params.timeout,
                                check_task=CheckTasks.assert_result)
-        self.search_partition(data=data, anns_field=_vector_field_name, param=params.search_param, limit=params.limit,
+        self.search_partition(data=data, anns_field=params.anns_field, param=params.search_param, limit=params.limit,
                               partition_obj=partition_obj, check_task=CheckTasks.err_res,
                               check_items={dv.err_code: 65535, dv.err_msg: f"partition not loaded"},
                               log_level=log_level, **params.search_obj_params)
 
         # drop partition
-        self.drop_partition(partition_obj, log_level)
+        self.drop_partition(partition_obj, log_level=log_level)
         return "[Base] concurrent_scene_test_partition finished."
+
+    @func_time_catch()
+    def concurrent_scene_test_partition_hybrid_search(self, params: ConcurrentTaskSceneTestPartitionHybridSearch):
+        log_level = LogLevel.DEBUG
+        partition_obj = ApiPartitionWrapper()
+        partition_name = gen_unique_str("hsp")
+
+        # create partition
+        self.create_partition(self.collection_wrap.collection, partition_name, partition_obj=partition_obj,
+                              log_level=log_level)
+
+        # insert vectors
+        self.insert(data_type="local", dim=params.dim, size=params.data_size, ni=params.ni,
+                    collection_obj=self.collection_wrap, collection_name=self.collection_wrap.name,
+                    collection_schema=self.collection_schema, log_level=log_level, partition_name=partition_name,
+                    anns_field=params.anns_field, **params.obj_params)
+
+        # flush partition
+        self.flush_partition(partition_obj, log_level=log_level, **params.obj_params)
+
+        # count vectors
+        self.count_partition_entities(partition_obj, log_level=log_level)
+
+        # create indexes again
+        for _index in self.describe_collection_index(log_level=log_level):
+            log.customize(log_level)(
+                "[Base] Partition:{0} start building index, field_name:{1}, index_params:{2}".format(
+                    partition_name, _index.field_name, _index.params))
+            self.index_wrap.init_index(self.collection_wrap.collection, _index.field_name, index_params=_index.params)
+
+        # load and search
+        self.load_partition(partition_obj, log_level=log_level, **params.obj_params)
+
+        # hybrid_search partition
+        _reqs, _ = params.get_random_data()
+        self.hybrid_search_partition(reqs=_reqs, partition_obj=partition_obj, check_task=CheckTasks.assert_result,
+                                     log_level=log_level, **params.search_obj_params)
+
+        # release partition and hybrid_search failed
+        self.release_partition(partition_obj, log_level=log_level, check_task=CheckTasks.assert_result,
+                               **params.obj_params)
+        self.hybrid_search_partition(reqs=_reqs, partition_obj=partition_obj, check_task=CheckTasks.err_res,
+                                     check_items={dv.err_code: 65535, dv.err_msg: f"partition not loaded"},
+                                     log_level=log_level, **params.search_obj_params)
+
+        # drop partition
+        self.drop_partition(partition_obj, log_level=log_level, **params.obj_params)
+        return "[Base] concurrent_scene_test_partition_hybrid_search finished."
 
     @func_time_catch()
     def concurrent_debug(self, params: DataClassBase):
@@ -1015,7 +1095,7 @@ class Base:
     def concurrent_scene_search_test(self, params: ConcurrentTaskSceneSearchTest):
         log_level = LogLevel.DEBUG
         collection_obj = ApiCollectionWrapper()
-        collection_name, user, password, role_name = gen_unique_str(), "", "", ""
+        collection_name, user, password, role_name = gen_unique_str("scene_search_test"), "", "", ""
 
         # connect params
         connect_using = DefaultConfig.DEFAULT_USING
@@ -1030,7 +1110,8 @@ class Base:
         # create collection
         self.create_collection(collection_obj=collection_obj, collection_name=collection_name,
                                shards_num=params.shards_num, vector_field_name=params.anns_field, dim=params.dim,
-                               using=connect_using, log_level=log_level)
+                               using=connect_using, other_fields=params.other_fields,
+                               scalars_params=params.scalars_params, log_level=log_level)
         time.sleep(1)
 
         # prepare before inserting
@@ -1038,7 +1119,17 @@ class Base:
             # build index
             self.build_index(field_name=params.anns_field, index_type=params.index_type,
                              metric_type=params.metric_type, index_param=params.index_param,
-                             collection_name=collection_name, collection_obj=collection_obj, log_level=log_level)
+                             collection_obj=collection_obj, log_level=log_level)
+
+            # build other vector index
+            for k, v in params.vectors_index.items():
+                if check_vector_index_params(field_name=k, params=v):
+                    self.build_index(k, log_level=log_level, collection_obj=collection_obj, **v)
+
+            # build scalar index
+            for scalar, scalar_index_params in params.scalars_index.items():
+                self.build_scalar_index(field_name=scalar, index_params=scalar_index_params,
+                                        collection_obj=collection_obj, log_level=log_level)
 
             # load collection
             self.load_collection(replica_number=params.replica_number, collection_obj=collection_obj,
@@ -1058,8 +1149,18 @@ class Base:
 
         # build index
         self.build_index(field_name=params.anns_field, index_type=params.index_type,
-                         metric_type=params.metric_type, index_param=params.index_param,
-                         collection_name=collection_name, collection_obj=collection_obj, log_level=log_level)
+                         metric_type=params.metric_type, index_param=params.index_param, collection_obj=collection_obj,
+                         log_level=log_level)
+
+        # build other vector index
+        for k, v in params.vectors_index.items():
+            if check_vector_index_params(field_name=k, params=v):
+                self.build_index(k, log_level=log_level, collection_obj=collection_obj, **v)
+
+        # build scalar index
+        for scalar, scalar_index_params in params.scalars_index.items():
+            self.build_scalar_index(field_name=scalar, index_params=scalar_index_params, collection_obj=collection_obj,
+                                    log_level=log_level)
 
         # load collection
         self.load_collection(replica_number=params.replica_number, collection_obj=collection_obj, log_level=log_level)
@@ -1090,3 +1191,104 @@ class Base:
             raise Exception("[Base] Search of concurrent_scene_search_test failed, please check.")
 
         return "[Base] concurrent_scene_search_test finished."
+
+    @func_time_catch()
+    def concurrent_scene_hybrid_search_test(self, params: ConcurrentTaskSceneHybridSearchTest):
+        log_level = LogLevel.DEBUG
+        collection_obj = ApiCollectionWrapper()
+        collection_name, user, password, role_name = gen_unique_str("scene_hybrid_search_test"), "", "", ""
+
+        # connect params
+        connect_using = DefaultConfig.DEFAULT_USING
+        if params.new_connect:
+            connect_using = collection_name
+            # create new user, role
+            if params.new_user:
+                user, password, role_name = collection_name, dv.default_rbac_password, dv.default_rbac_role_name
+                self.create_user_role(user=user, password=password, role_name=role_name, log_level=log_level)
+            self.connect(user=user, password=password, alias=connect_using, log_level=log_level)
+
+        # create collection
+        self.create_collection(collection_obj=collection_obj, collection_name=collection_name,
+                               shards_num=params.shards_num, vector_field_name=params.anns_field, dim=params.dim,
+                               using=connect_using, other_fields=params.other_fields,
+                               scalars_params=params.scalars_params, log_level=log_level)
+        time.sleep(1)
+
+        # prepare before inserting
+        if params.prepare_before_insert:
+            # build index
+            self.build_index(field_name=params.anns_field, index_type=params.index_type,
+                             metric_type=params.metric_type, index_param=params.index_param,
+                             collection_obj=collection_obj, log_level=log_level)
+
+            # build other vector index
+            for k, v in params.vectors_index.items():
+                if check_vector_index_params(field_name=k, params=v):
+                    self.build_index(k, log_level=log_level, collection_obj=collection_obj, **v)
+
+            # build scalar index
+            for scalar, scalar_index_params in params.scalars_index.items():
+                self.build_scalar_index(field_name=scalar, index_params=scalar_index_params,
+                                        collection_obj=collection_obj, log_level=log_level)
+
+            # load collection
+            self.load_collection(replica_number=params.replica_number, collection_obj=collection_obj,
+                                 log_level=log_level)
+
+        # insert vectors
+        self.insert(data_type=params.dataset, dim=params.dim, size=params.data_size, ni=params.nb,
+                    collection_obj=collection_obj, collection_name=collection_name,
+                    collection_schema=collection_obj.schema.to_dict(), log_level=log_level,
+                    anns_field=params.anns_field)
+
+        # flush collection
+        self.flush_collection(collection_obj=collection_obj, log_level=log_level)
+
+        # count vectors
+        self.count_entities(collection_obj=collection_obj, log_level=log_level)
+
+        # build index
+        self.build_index(field_name=params.anns_field, index_type=params.index_type,
+                         metric_type=params.metric_type, index_param=params.index_param, collection_obj=collection_obj,
+                         log_level=log_level)
+
+        # build other vector index
+        for k, v in params.vectors_index.items():
+            if check_vector_index_params(field_name=k, params=v):
+                self.build_index(k, log_level=log_level, collection_obj=collection_obj, **v)
+
+        # build scalar index
+        for scalar, scalar_index_params in params.scalars_index.items():
+            self.build_scalar_index(field_name=scalar, index_params=scalar_index_params, collection_obj=collection_obj,
+                                    log_level=log_level)
+
+        # load collection
+        self.load_collection(replica_number=params.replica_number, collection_obj=collection_obj, log_level=log_level)
+
+        # search collection
+        hybrid_search_results = []
+        log.customize(log_level)(
+            f"[Base] Collection:{collection_obj.name} hybrid_search params: {params.get_all_hybrid_search_params}")
+        for i in range(params.hybrid_search_counts):
+            if params.random_data:
+                params.set_random_data()
+            res = collection_obj.hybrid_search(check_task=CheckTasks.assert_result, **params.hybrid_search_obj_params)
+            hybrid_search_results.append(res.check_result)
+
+        # drop collection
+        log.customize(log_level)("[Base] Drop collection {}.".format(collection_name))
+        self.utility_wrap.drop_collection(collection_name, using=connect_using)
+
+        # remove connect
+        if params.new_connect:
+            # delete role, user
+            if params.new_user:
+                self.delete_user_from_role(user=user, role_name=role_name, log_level=log_level)
+                self.delete_users(user=user, log_level=log_level)
+            self.remove_connect(alias=connect_using, log_level=log_level)
+
+        if params.hybrid_search_counts > sum(hybrid_search_results):
+            raise Exception("[Base] Hybrid_search of concurrent_scene_hybrid_search_test failed, please check.")
+
+        return "[Base] concurrent_scene_hybrid_search_test finished."

@@ -18,15 +18,14 @@ class FunctionalCases(CommonCases):
     def __str__(self):
         return """
         1. create a collection or use an existing collection
-        2. build index on vector column
+        2. build indexes on vector and scalar columns
         3. insert a certain number of vectors
         4. flush collection
-        5. build index on vector column with the same parameters
-        6. build index on on scalars column or not
-        7. count the total number of rows
-        8. load collection
-        9. Execute test steps that require verification
-        10. clean all collections or not
+        5. build indexes on vector and scalar columns with the same parameters
+        6. count the total number of rows
+        7. load collection
+        8. Execute test steps that require verification
+        9. clean all collections or not
         """
 
     def run_case(self, func_obj: callable, *arg, **kwargs):

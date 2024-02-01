@@ -33,10 +33,12 @@ scene_test = "scene_test"
 scene_insert_delete_flush = "scene_insert_delete_flush"
 scene_insert_partition = "scene_insert_partition"
 scene_test_partition = "scene_test_partition"
+scene_test_partition_hybrid_search = "scene_test_partition_hybrid_search"
 iterate_search = "iterate_search"
 load_search_release = "load_search_release"
 load_hybrid_search_release = "load_hybrid_search_release"
 scene_search_test = "scene_search_test"
+scene_hybrid_search_test = "scene_hybrid_search_test"
 
 # all used
 timeout = "timeout"
@@ -206,13 +208,13 @@ class IndexTypeName:
     RNSG = "RNSG"
     HNSW = "HNSW"  # M=[4, 64], efConstruction=[8, 512], ef=[top_k, 32768]
     ANNOY = "ANNOY"  # n_trees=[1, 1024], search_k={-1} ∪ [top_k, n × n_trees]
-    BIN_FLAT = "BIN_FLAT"
-    BIN_IVF_FLAT = "BIN_IVF_FLAT"
+    BIN_FLAT = "BIN_FLAT"  # nlist=[1, 65536], nprobe=[1, nlist]
+    BIN_IVF_FLAT = "BIN_IVF_FLAT"  # nlist=[1, 65536], nprobe=[1, nlist]
     RHNSW_FLAT = "RHNSW_FLAT"
     RHNSW_PQ = "RHNSW_PQ"
     RHNSW_SQ = "RHNSW_SQ"
     IVF_HNSW = "IVF_HNSW"
-    DISKANN = "DISKANN"
+    DISKANN = "DISKANN"  # search_list=[topk, ∞]
     AUTOINDEX = "AUTOINDEX"  # level=[1, 2, 3]
 
 
