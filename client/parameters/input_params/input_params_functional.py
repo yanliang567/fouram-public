@@ -40,7 +40,7 @@ class FunctionalParams(CommonParams):
         delete_range + delete_batch not supported varchar pk
         """
         return {"delete_expr_list": delete_expr_list, "delete_range": delete_range, "delete_batch": delete_batch,
-                partition_name: partition_name, "with_flush": with_flush}
+                "partition_name": partition_name, "with_flush": with_flush}
 
     @staticmethod
     def params_scene_functional_rebuild_partial_index(

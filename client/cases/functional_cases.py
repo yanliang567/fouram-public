@@ -14,6 +14,8 @@ from client.common.common_func import (
     get_vector_type, get_default_field_name, check_sparse_range
 )
 from client.common.common_type import DefaultValue as dv
+from client.common.common_func import get_vector_type, get_default_field_name, ParserInputParams, loop_ids, \
+    ExtraPartitionsParams, parser_data_size
 from client.util.params_check import functional_check_params
 from client.util.api_request import docstring_decorator
 from client.cases.common_cases import CommonCases
@@ -48,6 +50,7 @@ class FunctionalCases(CommonCases):
             return self.case_report.to_dict(), True
         except Exception as e:
             log.error("[FunctionalCases] Run {0} raise error: {1}".format(func_obj.__name__, e))
+            log.info(str(e))
             return {}, False
 
     @functional_check_params(ParamsFormat.common_functional)
@@ -310,12 +313,15 @@ class FunctionalCases(CommonCases):
         # parser input params for test case
         params = self.parsing_functional_params(data_class=GetParamObj().scene_functional_query_all_deleted,
                                                 all_params=kwargs)
-        delete_expr_list = params.delete_expr_list
-        delete_range = params.delete_range
-        delete_batch = params.delete_batch
+        log.info(f"[scene_functional_query_all_deleted] functional params: {params}")
         deleted_exprs = []
         deleted_count = 0
         actual_partition_names = [p.name for p in self.collection_wrap.partitions]
+
+        # get extra partitions and parser datasize
+        extra_partitions = self.params_obj.dataset_params.get(pn.extra_partitions, None)
+        ep = dacite.from_dict(data_class=ExtraPartitionsParams, data=extra_partitions)
+        data_sizes = ep.parser_datasize(parser_data_size(self.params_obj.dataset_params.get(pn.dataset_size, 0)))
 
         def delete_query_empty(_expr, partition_name=params.partition_name):
             # delete
@@ -330,46 +336,58 @@ class FunctionalCases(CommonCases):
             for deleted_expr in deleted_exprs:
                 res_query = self.collection_query(expr=deleted_expr, partition_names=[partition_name],
                                                   consistency_level=types.CONSISTENCY_STRONG)
-                assert len(res_query.response) == 0
+                if len(res_query.response) != 0:
+                    raise Exception(f"[scene_functional_query_all_deleted] Query partitions {[partition_name]} "
+                                    f"with the deldted expr: {deleted_expr} should return empty result.")
 
-            # verify query from other partitions
+            # verify query result with deleted expr from other partitions
             other_partitions = [p for p in actual_partition_names if p != partition_name]
+
             if len(other_partitions) > 0:
-                repeated_data = self.params_obj.dataset_params.get(pn.extra_partitions, None).get("data_repeated",
-                                                                                                  False)
                 res_query = self.collection_query(expr=_expr, partition_names=other_partitions,
                                                   consistency_level=types.CONSISTENCY_STRONG)
-                if repeated_data:
-                    assert len(res_query.response) > 0
-                else:
-                    assert len(res_query.response) == 0
+
+                # Only check deleted data can be queried in the non-delete partition
+                # when the data of extra partitions is repeated and the data size of each partition is same
+                if ep.data_repeated and partition_same_size:
+                    if len(res_query.response) <= 0:
+                        raise Exception(
+                            f"[scene_functional_query_all_deleted] Query partitions {other_partitions} "
+                            f"with expr: {deleted_expr} shouldn't return empty.")
 
             return res_delete.response.delete_count
 
-        # before delete
+        # query before delete
         count_before = self.collection_query(expr="", consistency_level=types.CONSISTENCY_STRONG,
                                              output_fields=["count(*)"])
         log.info(f"[scene_functional_query_all_deleted] Before delete, query count* is {count_before}")
 
+        # check all data_size of partition is same
+        partition_same_size = True
+        for d in range(1, len(data_sizes)):
+            if data_sizes[d] != data_sizes[d - 1]:
+                partition_same_size = False
+
         # expr_list mode
-        if len(delete_expr_list) > 0:
-            for expr in delete_expr_list:
-                del_count = delete_query_empty(expr)
+        if len(params.delete_expr_list) > 0:
+            for expr in params.delete_expr_list:
+                del_count = delete_query_empty(expr, partition_name=params.partition_name)
                 deleted_count += del_count
 
         # range_batch mode
         else:
-            if len(delete_range) < 2 or delete_batch <= 0:
-                raise Exception("You must choose one of the two modes expr_list and range_batch. "
+            if len(params.delete_range) < 2 or params.delete_batch <= 0:
+                raise Exception("[scene_functional_query_all_deleted] "
+                                "You must choose one of the two modes expr_list and range_batch. "
                                 "If expr_list is selected, parameter delete_expr_list cannot be empty; "
                                 "if range_batch is selected, parameter delete_range must specify the deletion range, "
                                 "such as [0, 100], and parameter delete_batch is greater than 0.")
             else:
-                delete_len = delete_range[1] - delete_range[0]
-                ni_count = int(delete_len / delete_batch)
-                last_delete = delete_len % delete_batch
-                log.info(f"delete_len={delete_len}, ni_count={ni_count}, last_delete={last_delete}")
-                delete_pks = loop_ids(delete_batch, start_id=delete_range[0])
+                delete_len = params.delete_range[1] - params.delete_range[0]
+                ni_count = int(delete_len / params.delete_batch)
+                last_delete = delete_len % params.delete_batch
+                log.info(f"[scene_functional_query_all_deleted] delete_len={delete_len}, ni_count={ni_count}, last_delete={last_delete}")
+                delete_pks = loop_ids(params.delete_batch, start_id=params.delete_range[0])
 
                 # get pk field name
                 if self.collection_wrap.schema.primary_field.dtype != DataType.INT64:
@@ -377,11 +395,11 @@ class FunctionalCases(CommonCases):
                 pk = self.collection_wrap.schema.primary_field.name
 
                 for i in range(0, ni_count):
-                    del_count = delete_query_empty(f"{pk} in {next(delete_pks)}")
+                    del_count = delete_query_empty(f"{pk} in {next(delete_pks)}", partition_name=params.partition_name)
                     deleted_count += del_count
 
                 if last_delete > 0:
-                    del_count = delete_query_empty(f"{pk} in {next(delete_pks)[:last_delete]}")
+                    del_count = delete_query_empty(f"{pk} in {next(delete_pks)[:last_delete]}", partition_name=params.partition_name)
                     deleted_count += del_count
 
         log.info(f"[scene_functional_query_all_deleted] Total delete count is {deleted_count}")
