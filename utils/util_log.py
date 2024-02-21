@@ -7,12 +7,13 @@ from commons.common_params import EnvVariable
 
 
 class TestLogConfig:
-    def __init__(self, logger, log_debug, log_info, log_err, log_level, use_stream=True):
+    def __init__(self, logger, log_debug, log_info, log_err, log_level, log_file_level=LogLevel.DEBUG, use_stream=True):
         self.logger = logger
         self.log_debug = log_debug
         self.log_info = log_info
         self.log_err = log_err
         self.log_level = eval("logging.{0}".format(log_level)) if hasattr(LogLevel, log_level) else logging.DEBUG
+        self.log_file_level = getattr(LogLevel, log_file_level, LogLevel.DEBUG)
         self.handlers = []
 
         # self.log = logging.getLogger(self.logger)
@@ -45,17 +46,19 @@ class TestLogConfig:
             _format = "[%(asctime)s - %(levelname)5s - {0}]: %(message)s (%(filename)s:%(lineno)s)".format(self.logger)
             formatter = logging.Formatter(_format)
 
-            dh = logging.FileHandler(self.log_debug)
-            dh.setLevel(logging.DEBUG)
-            dh.setFormatter(formatter)
-            self.log.addHandler(dh)
-            self.handlers.append(dh)
+            if self.log_file_level == LogLevel.DEBUG:
+                dh = logging.FileHandler(self.log_debug)
+                dh.setLevel(logging.DEBUG)
+                dh.setFormatter(formatter)
+                self.log.addHandler(dh)
+                self.handlers.append(dh)
 
-            fh = logging.FileHandler(self.log_info)
-            fh.setLevel(logging.INFO)
-            fh.setFormatter(formatter)
-            self.log.addHandler(fh)
-            self.handlers.append(fh)
+            if self.log_file_level in [LogLevel.DEBUG, LogLevel.INFO]:
+                fh = logging.FileHandler(self.log_info)
+                fh.setLevel(logging.INFO)
+                fh.setFormatter(formatter)
+                self.log.addHandler(fh)
+                self.handlers.append(fh)
 
             eh = logging.FileHandler(self.log_err)
             eh.setLevel(logging.ERROR)
@@ -76,6 +79,7 @@ class TestLogConfig:
 
 class TestLog:
     log_level = str(EnvVariable.LOG_LEVEL).upper()
+    log_file_level = str(EnvVariable.LOG_FILE_LEVEL).upper()
 
     def __init__(self, logger="fouram", log_debug=log_config.log_debug, log_info=log_config.log_info,
                  log_err=log_config.log_err):
@@ -86,9 +90,11 @@ class TestLog:
         self.log_handlers_parents = []
         self.log_handlers = []
 
-        self.test_log = TestLogConfig(logger, self.log_debug, self.log_info, self.log_err, self.log_level).log
-        print("[TestLog] Test log level:{0}, log file:{1},{2},{3}".format(self.log_level, self.log_debug, self.log_info,
-                                                                          self.log_err))
+        self.test_log = TestLogConfig(logger, self.log_debug, self.log_info, self.log_err, self.log_level,
+                                      self.log_file_level).log
+        # print("[TestLog] Test log level:{0}, log file:{1},{2},{3}".format(
+        #     self.log_level, self.log_debug, self.log_info, self.log_err))
+        print(self.log_msg)
 
         self.log_handlers_parents.extend(self.test_log.handlers)
 
@@ -99,8 +105,8 @@ class TestLog:
 
     @property
     def log_msg(self):
-        return "[TestLog] Test log level:{0}, log file:{1},{2},{3}".format(self.log_level, self.log_debug,
-                                                                           self.log_info, self.log_err)
+        return "[TestLog] Test log level:{0}, log file:{1},{2},{3}, log file level:{4}".format(
+            self.log_level, self.log_debug, self.log_info, self.log_err, self.log_file_level)
 
     def customize(self, log_level=LogLevel.DEBUG):
         if log_level == LogLevel.DEBUG:
@@ -156,9 +162,10 @@ class TestLog:
         self.log_err = log_config.log_err
 
         self.test_log = TestLogConfig(self.logger, self.log_debug, self.log_info, self.log_err, self.log_level,
-                                      use_stream=use_stream).log
-        print("[TestLog] Test log level:{0}, log file:{1},{2},{3}".format(self.log_level, self.log_debug, self.log_info,
-                                                                          self.log_err))
+                                      self.log_file_level, use_stream=use_stream).log
+        # print("[TestLog] Test log level:{0}, log file:{1},{2},{3}".format(
+        #     self.log_level, self.log_debug, self.log_info, self.log_err))
+        print(self.log_msg)
         self.log_handlers.extend(self.test_log.handlers)
 
     def remove_log_handlers(self):

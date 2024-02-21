@@ -12,8 +12,11 @@ class EnvVariable:
     FOURAM_LOG_SUB_FOLDER_PREFIX = BaseConfig.get_env_variable(default_var=FOURAM_LOG_SUB_FOLDER_PREFIX_NAME,
                                                                default_value="")
 
-    FOURAM_LOG_LEVEL = "FOURAM_LOG_LEVEL"
+    FOURAM_LOG_LEVEL = "FOURAM_LOG_LEVEL"  # Control the log level output by the terminal
     LOG_LEVEL = BaseConfig.get_env_variable(default_var=FOURAM_LOG_LEVEL, default_value="INFO").upper()
+
+    FOURAM_LOG_FILE_LEVEL = "FOURAM_LOG_FILE_LEVEL"  # Control the log level of log file output
+    LOG_FILE_LEVEL = BaseConfig.get_env_variable(default_var=FOURAM_LOG_FILE_LEVEL, default_value="DEBUG").upper()
 
     WORK_DIR_NAME = "FOURAM_WORK_DIR"
     WORK_DIR = BaseConfig.get_env_variable(default_var=WORK_DIR_NAME, default_value="/Users/wt/Desktop/")
