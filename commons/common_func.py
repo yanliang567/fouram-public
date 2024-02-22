@@ -11,7 +11,6 @@ from deploy.commons.common_params import Helm, Operator, OP, VDC, CLUSTER, STAND
 from utils.util_log import log
 from utils.util_catch import func_request
 
-
 """ common func """
 
 
@@ -230,6 +229,16 @@ def get_sync_report_flag(case_flag, sync_report=False, async_report=False):
         return case_flag
 
 
+def list_rm_point(_list, _charts):
+    if isinstance(_list, list):
+        for v in _list:
+            if isinstance(v, dict):
+                dict_rm_point(v, _charts)
+            if isinstance(v, list):
+                list_rm_point(v, _charts)
+    return _list
+
+
 def dict_rm_point(_dict, _charts):
     flag = 0
     for key, value in _dict.items():
@@ -244,6 +253,8 @@ def dict_rm_point(_dict, _charts):
                     break
         if isinstance(value, dict) and flag == 0:
             dict_rm_point(value, _charts)
+        if isinstance(value, list):
+            list_rm_point(value, _charts)
     return _dict
 
 

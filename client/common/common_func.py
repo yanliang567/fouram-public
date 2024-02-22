@@ -835,6 +835,66 @@ def check_vector_index_params(field_name: str, params):
     return False
 
 
+def check_set_properties_params(params):
+    if isinstance(params, dict):
+        _check = [i for i in ["properties"] if i not in params.keys()]
+        if not _check:
+            return True
+        log.error(f"[check_set_properties_params] Set properties params does not contain:{_check}")
+    else:
+        log.error(f"[check_set_properties_params] Set properties params is not dict:{params}, type:{type(params)}")
+    return False
+
+
+def parser_set_properties_params(params: Union[dict, list, None]) -> List[dict]:
+    _params = []
+
+    if isinstance(params, dict) and check_set_properties_params(params):
+        _params.append(params)
+    elif isinstance(params, list):
+        for p in params:
+            if isinstance(p, dict) and check_set_properties_params(p):
+                _params.append(p)
+            else:
+                log.error(f"[parser_set_properties_params] Can't parser set_properties subparams:{p}, type:{type(p)}")
+    elif params is not None:
+        log.error(f"[parser_set_properties_params] Can't parser set_properties params:{params}, type:{type(params)}")
+
+    log.debug(f"[parser_set_properties_params] Parser set properties params done: {_params}")
+    return _params
+
+
+def check_alter_index_params(params):
+    if isinstance(params, dict):
+        _check = [i for i in ["index_name", "extra_params"] if i not in params.keys()]
+        if not _check:
+            return True
+        log.error(f"[check_alter_index_params] Alter index params does not contain:{_check}")
+    else:
+        log.error(f"[check_alter_index_params] Alter index params is not dict:{params}, type:{type(params)}")
+    return False
+
+
+def parser_alter_index_params(params: Union[dict, list, None]) -> List[dict]:
+    _params = []
+
+    if isinstance(params, dict) and check_alter_index_params(params):
+        _params.append(params)
+    elif isinstance(params, list):
+        for p in params:
+            if isinstance(p, str):
+                _params.append({"index_name": p, "extra_params": dv.default_alter_index_params})
+            elif isinstance(p, dict) and check_alter_index_params(p):
+                _params.append(p)
+            else:
+                log.error(f"[parser_alter_index_params] Can't parser alter index subparams:{p}, type:{type(p)}")
+    elif params is not None:
+        log.error(f"[parser_alter_index_params] Can't parser alter index params:{params}, type:{type(params)}")
+
+    log.debug(f"[parser_alter_index_params] Parser alter index params done: {_params}")
+    return _params
+
+
 def get_spawn_rate(total_num: int, default_max_step: int = 5, default_max_spawn_rate: int = 100):
     _spawn_rate = math.ceil(total_num / default_max_step)
     return _spawn_rate if _spawn_rate <= default_max_spawn_rate else default_max_spawn_rate

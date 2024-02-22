@@ -2,8 +2,10 @@ import time
 import random
 import copy
 from pprint import pformat
+from typing import Union
 
 from pymilvus import DefaultConfig, DataType
+from pymilvus.client.types import LoadState
 
 from client.client_base import (
     ApiConnectionsWrapper,
@@ -21,7 +23,8 @@ from client.common.common_func import (
     gen_collection_schema, gen_unique_str, parser_data_size, gen_vectors, gen_entities, gen_random_query_data,
     go_bench, go_bench_refine, GoSearchParams,
     remove_list_values, parser_segment_info, update_dict_value, hide_dict_value,
-    get_default_search_params, parser_search_params_expr, get_ann_search_request_params, check_vector_index_params
+    get_default_search_params, parser_search_params_expr, get_ann_search_request_params, check_vector_index_params,
+    parser_set_properties_params, parser_alter_index_params
 )
 from client.common.common_param import TransferNodesParams, TransferReplicasParams
 from client.common.common_type import Precision, CheckTasks
@@ -322,6 +325,20 @@ class Base:
         self.collection_schema = self.collection_wrap.schema.to_dict()
         log.info("[Base] Collection schema: {0}".format(self.collection_schema))
 
+    def get_collection_load_state(self, collection_obj: callable = None, log_level=LogLevel.DEBUG):
+        """
+        class LoadState(IntEnum):
+            NotExist = 0  # collection or partition isn't existed
+            NotLoad = 1  # collection or partition isn't loaded
+            Loading = 2  # collection or partition is loading
+            Loaded = 3  # collection or partition is loaded
+        """
+        collection_obj = collection_obj or self.collection_wrap
+        res = self.utility_wrap.load_state(collection_name=collection_obj.name)
+        log.customize(log_level)(
+            f"[Base] Collection:{collection_obj.name} LoadState:{LoadState(int(res.response)).name}")
+        return res.response
+
     def collection_create_partition(self, partition_name: str, **kwargs):
         if not self.collection_wrap.has_partition(partition_name).response:
             log.info(f"[Base] Start create partition:{partition_name} for collection:{self.collection_wrap.name}")
@@ -443,18 +460,18 @@ class Base:
         collection_obj = collection_obj or self.collection_wrap
 
         log.customize(log_level)(
-            "[Base] Start build index of {0} for field:{1} collection:{2}, params:{3}".format(
-                index_type, field_name, collection_obj.name, index_params))
+            "[Base] Start build index of {0} for field:{1} collection:{2}, params:{3}, kwargs:{4}".format(
+                index_type, field_name, collection_obj.name, index_params, kwargs))
         return self.index_wrap.init_index(collection_obj.collection, field_name, index_params, **kwargs)
 
     def build_scalar_index(self, field_name, index_params: dict = {}, collection_obj: callable = None,
-                           log_level=LogLevel.INFO):
+                           log_level=LogLevel.INFO, **kwargs):
         collection_obj = collection_obj or self.collection_wrap
 
         log.customize(log_level)(
-            "[Base] Start build scalar index of {0} for field:{1}, index_params:{2}".format(
-                collection_obj.name, field_name, index_params))
-        return self.index_wrap.init_index(collection_obj.collection, field_name, index_params=index_params)
+            "[Base] Start build scalar index of {0} for field:{1}, index_params:{2}, kwargs: {3}".format(
+                collection_obj.name, field_name, index_params, kwargs))
+        return self.index_wrap.init_index(collection_obj.collection, field_name, index_params=index_params, **kwargs)
 
     def show_index(self, collection_name=""):
         collection_name = collection_name or self.collection_name
@@ -471,6 +488,12 @@ class Base:
         indexes = self.collection_wrap.indexes
         log.customize(log_level)("[Base] Collection:{0} indexes: {1}".format(self.collection_wrap.name, indexes))
         return indexes
+
+    def describe_collection(self, collection_obj: callable = None, log_level=LogLevel.INFO):
+        collection_obj = collection_obj or self.collection_wrap
+        describe = collection_obj.describe()
+        log.customize(log_level)("[Base] Collection:{0} describe: {1}".format(collection_obj.name, describe))
+        return describe
 
     def clean_index(self):
         _indexes = self.collection_wrap.indexes
@@ -676,10 +699,19 @@ class Base:
             kwargs.update({resource_groups: _rg})
         return kwargs
 
+    def get_collection_properties(self, collection_obj: callable = None, log_level=LogLevel.DEBUG):
+        res = self.describe_collection(collection_obj=collection_obj, log_level=log_level).response
+        return res.get("properties", None) if isinstance(res, dict) else None
+
     def show_all_db_user(self, _flag=False):
         if _flag:
             log.info(f"[Base] Select all users and roles: {self.get_all_users_roles()}")
             log.info(f"[Base] Select all databases and collections: {self.get_all_db_and_collections()}")
+
+    def show_collection_properties(self, collection_obj: callable = None):
+        properties = self.get_collection_properties(collection_obj=collection_obj, log_level=LogLevel.DEBUG)
+        if properties:
+            log.info(f"[Base] Collection {self.collection_wrap.name} properties: {properties}")
 
     def show_resource_groups(self, _flag=True):
         if RESOURCE_GROUPS_FLAG and _flag:
@@ -701,10 +733,38 @@ class Base:
         log.info(f"[Base] Parser segment info: \n{pformat(res_seg, sort_dicts=False)}")
 
     def show_all_resource(self, collection_name="", shards_num=2, show_resource_groups=True, show_db_user=False):
+        self.show_collection_properties()
+        self.show_index()
         # self.show_all_db_user(_flag=show_db_user)
         self.show_resource_groups(_flag=show_resource_groups)
         self.show_collection_replicas()
         self.show_segment_info(collection_name=collection_name, shards_num=shards_num)
+
+    def collection_set_properties(self, properties: dict, timeout=None, collection_obj: callable = None,
+                                  log_level=LogLevel.INFO, **kwargs):
+        collection_obj = collection_obj or self.collection_wrap
+        log.customize(log_level)(
+            f"[Base] Collection {collection_obj.name} set properties:{properties}, kwargs:{kwargs}")
+        collection_obj.set_properties(properties=properties, timeout=timeout, **kwargs)
+
+    def set_all_properties(self, params: Union[dict, list, None], collection_obj: callable = None,
+                           log_level=LogLevel.INFO):
+        for p in parser_set_properties_params(params):
+            self.collection_set_properties(**p, collection_obj=collection_obj, log_level=log_level)
+
+    def collection_alter_index(self, index_name, extra_params, timeout=None, collection_obj: callable = None,
+                               log_level=LogLevel.INFO, **kwargs):
+        collection_obj = collection_obj or self.collection_wrap
+        log.customize(log_level)(
+            "[Base] Collection {0} alter index: index_name:{1}, extra_params:{2}".format(
+                collection_obj.name, index_name, extra_params))
+        collection_obj.alter_index(index_name=index_name, extra_params=extra_params, timeout=timeout)
+
+    def set_alter_index(self, params: Union[list, dict, None], collection_obj: callable = None,
+                        log_level=LogLevel.INFO):
+        if params is not None and self.get_collection_load_state(collection_obj=collection_obj) == LoadState.NotLoad:
+            for p in parser_alter_index_params(params):
+                self.collection_alter_index(**p, collection_obj=collection_obj, log_level=log_level)
 
     @staticmethod
     def get_collection_params(collection_obj: ApiCollectionWrapper):
@@ -826,9 +886,12 @@ class Base:
 
     @func_time_catch()
     def concurrent_load_release(self, params: ConcurrentTaskLoadRelease):
-        self.collection_wrap.load(check_task=CheckTasks.assert_result, replica_number=params.replica_number,
-                                  timeout=params.timeout)
-        self.collection_wrap.release(check_task=CheckTasks.assert_result, timeout=params.timeout)
+        load_res = self.collection_wrap.load(check_task=CheckTasks.assert_result, replica_number=params.replica_number,
+                                             timeout=params.timeout)
+        release_res = self.collection_wrap.release(check_task=CheckTasks.assert_result, timeout=params.timeout)
+        if not (load_res.check_result and release_res.check_result):
+            raise ValueError("[Base] Check concurrent_load_release result failed, load: {0}, release: {1}".format(
+                load_res.check_result, release_res.check_result))
         return "[Base] concurrent_load_release finished."
 
     def concurrent_insert(self, params: ConcurrentTaskInsert):
@@ -1113,6 +1176,7 @@ class Base:
                                using=connect_using, other_fields=params.other_fields,
                                scalars_params=params.scalars_params, log_level=log_level)
         time.sleep(1)
+        self.set_all_properties(params=params.set_properties, collection_obj=collection_obj, log_level=log_level)
 
         # prepare before inserting
         if params.prepare_before_insert:
@@ -1130,6 +1194,8 @@ class Base:
             for scalar, scalar_index_params in params.scalars_index.items():
                 self.build_scalar_index(field_name=scalar, index_params=scalar_index_params,
                                         collection_obj=collection_obj, log_level=log_level)
+
+            self.set_alter_index(params=params.alter_index, collection_obj=collection_obj, log_level=log_level)
 
             # load collection
             self.load_collection(replica_number=params.replica_number, collection_obj=collection_obj,
@@ -1161,6 +1227,8 @@ class Base:
         for scalar, scalar_index_params in params.scalars_index.items():
             self.build_scalar_index(field_name=scalar, index_params=scalar_index_params, collection_obj=collection_obj,
                                     log_level=log_level)
+
+        self.set_alter_index(params=params.alter_index, collection_obj=collection_obj, log_level=log_level)
 
         # load collection
         self.load_collection(replica_number=params.replica_number, collection_obj=collection_obj, log_level=log_level)
@@ -1214,6 +1282,7 @@ class Base:
                                using=connect_using, other_fields=params.other_fields,
                                scalars_params=params.scalars_params, log_level=log_level)
         time.sleep(1)
+        self.set_all_properties(params=params.set_properties, collection_obj=collection_obj, log_level=log_level)
 
         # prepare before inserting
         if params.prepare_before_insert:
@@ -1231,6 +1300,8 @@ class Base:
             for scalar, scalar_index_params in params.scalars_index.items():
                 self.build_scalar_index(field_name=scalar, index_params=scalar_index_params,
                                         collection_obj=collection_obj, log_level=log_level)
+
+            self.set_alter_index(params=params.alter_index, collection_obj=collection_obj, log_level=log_level)
 
             # load collection
             self.load_collection(replica_number=params.replica_number, collection_obj=collection_obj,
@@ -1262,6 +1333,8 @@ class Base:
         for scalar, scalar_index_params in params.scalars_index.items():
             self.build_scalar_index(field_name=scalar, index_params=scalar_index_params, collection_obj=collection_obj,
                                     log_level=log_level)
+
+        self.set_alter_index(params=params.alter_index, collection_obj=collection_obj, log_level=log_level)
 
         # load collection
         self.load_collection(replica_number=params.replica_number, collection_obj=collection_obj, log_level=log_level)

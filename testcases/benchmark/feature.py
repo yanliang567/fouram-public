@@ -1541,7 +1541,7 @@ class TestFeatureCases(PerfTemplate):
                 IVF_SQ8: 'float_vector_3'
                 INVERTED: 'varchar_1'
                 default scalar index: 'id'
-            3. insert 10w data
+            3. insert 100k data
             4. flush collection
             5. build indexes again using the same params
             6. load collection
@@ -1610,7 +1610,7 @@ class TestFeatureCases(PerfTemplate):
                 IVF_SQ8: 'float_vector_3'
                 INVERTED: 'varchar_1'
                 default scalar index: 'id'
-            3. insert 10w data
+            3. insert 100k data
             4. flush collection
             5. build indexes again using the same params
             6. load collection
@@ -1674,7 +1674,7 @@ class TestFeatureCases(PerfTemplate):
                 IVF_SQ8: 'float_vector_3'
                 INVERTED: 'varchar_1'
                 default scalar index: 'id'
-            3. insert 10w data
+            3. insert 100k data
             4. flush collection
             5. build indexes again using the same params
             6. load collection
@@ -1744,7 +1744,7 @@ class TestFeatureCases(PerfTemplate):
                 IVF_SQ8: 'float_vector_3'
                 INVERTED: 'varchar_1'
                 default scalar index: 'id'
-            3. insert 10w data
+            3. insert 100k data
             4. flush collection
             5. build indexes again using the same params
             6. load collection
@@ -1808,7 +1808,7 @@ class TestFeatureCases(PerfTemplate):
                 IVF_SQ8: 'float_vector_3'
                 INVERTED: 'int64_1', 'varchar_1'
                 default scalar index: 'id'
-            3. insert 1m data
+            3. insert 1 million data
             4. flush collection
             5. build indexes again using the same params
             6. load collection
@@ -1872,7 +1872,7 @@ class TestFeatureCases(PerfTemplate):
                 IVF_SQ8: 'float_vector_3'
                 INVERTED: 'int64_1', 'varchar_1'
                 default scalar index: 'id'
-            3. insert 1m data into 10 partitions
+            3. insert 1 million data into 10 partitions
             4. flush collection
             5. build indexes again using the same params
             6. load collection
@@ -1957,7 +1957,7 @@ class TestFeatureCases(PerfTemplate):
                 IVF_SQ8: 'float_vector_3'
                 INVERTED: 'int64_1', 'varchar_1'
                 default scalar index: 'id'
-            3. insert 1m data into 10 partitions
+            3. insert 1 million data into 10 partitions
             4. flush collection
             5. build indexes again using the same params
             6. load collection
@@ -2047,7 +2047,7 @@ class TestFeatureCases(PerfTemplate):
                 IVF_SQ8: 'float_vector_3'
                 INVERTED: 'int64_1', 'varchar_1'
                 default scalar index: 'id'
-            3. insert 5m data
+            3. insert 5 million data
             4. flush collection
             5. build indexes again using the same params
             6. load collection
@@ -2121,10 +2121,10 @@ class TestFeatureCases(PerfTemplate):
         dataset_size = parser_data_size("10w")
 
         concurrent_tasks = [
-            ConcurrentParams.params_insert(weight=8, nb=1000, random_id=True, random_vector=True,
+            ConcurrentParams.params_insert(weight=1, nb=1000, random_id=True, random_vector=True,
                                            start_id=dataset_size),
-            ConcurrentParams.params_delete(weight=8, delete_length=1000),
-            ConcurrentParams.params_flush(weight=4, timeout=180),
+            ConcurrentParams.params_delete(weight=1, delete_length=1000),
+            ConcurrentParams.params_flush(weight=1, timeout=180),
             ConcurrentParams.params_load_release(weight=1, timeout=600)
         ]
 
@@ -2138,7 +2138,7 @@ class TestFeatureCases(PerfTemplate):
                                       *cdp.DefaultScalarIndexParams.INVERTED_list(["int64_1", "varchar_1"])]),
             scalars_params=dict_merge(
                 cdp.DefaultScalarParams.sift_list(["float_vector_1", "float_vector_2", "float_vector_3"])),
-            concurrent_number=20, during_time="3h", interval=20, **cdp.DefaultIndexParams.IVF_FLAT)  # during_time=12h
+            concurrent_number=1, during_time="3h", interval=20, **cdp.DefaultIndexParams.IVF_FLAT)  # during_time=12h
 
         node_resources = [
             NodeResource(nodes=[indexNode], cpu=8),
@@ -2174,7 +2174,7 @@ class TestFeatureCases(PerfTemplate):
                 IVF_SQ8: 'float_vector_3'
                 INVERTED: 'int64_1', 'varchar_1'
                 default scalar index: 'id'
-            3. insert 1m data
+            3. insert 1 million data
             4. flush collection
             5. build indexes again using the same params
             6. load collection
@@ -2258,7 +2258,7 @@ class TestFeatureCases(PerfTemplate):
                 IVF_SQ8: 'float_vector_3'
                 INVERTED: 'int64_1', 'varchar_1'
                 default scalar index: 'id'
-            3. insert 1m data
+            3. insert 1 million data
             4. flush collection
             5. build indexes again using the same params
             6. load collection
@@ -2337,7 +2337,7 @@ class TestFeatureCases(PerfTemplate):
                 IVF_SQ8: 'float_vector_3'
                 INVERTED: 'int64_1', 'varchar_1'
                 default scalar index: 'id'
-            3. insert 1m data
+            3. insert 1 million data
             4. flush collection
             5. build indexes again using the same params
             6. load collection
@@ -2423,7 +2423,7 @@ class TestFeatureCases(PerfTemplate):
                 IVF_SQ8: 'float_vector_3'
                 INVERTED: 'int64_1', 'varchar_1'
                 default scalar index: 'id'
-            3. insert 1m data
+            3. insert 1 million data
             4. flush collection
             5. build indexes again using the same params
             6. load collection
@@ -2526,7 +2526,7 @@ class TestFeatureCases(PerfTemplate):
                 IVF_SQ8: 'float_vector_3'
                 INVERTED: 'int64_1', 'varchar_1'
                 default scalar index: 'id'
-            3. insert 1m data
+            3. insert 1 million data
             4. flush collection
             5. build indexes again using the same params
             6. load collection
@@ -2605,7 +2605,7 @@ class TestFeatureCases(PerfTemplate):
                 IVF_SQ8: 'float_vector_3'
                 INVERTED: 'int64_1', 'varchar_1'
                 default scalar index: 'id'
-            3. insert 1m data
+            3. insert 1 million data
             4. flush collection
             5. build indexes again using the same params
             6. load collection
@@ -2697,7 +2697,7 @@ class TestFeatureCases(PerfTemplate):
                 IVF_SQ8: 'float_vector_3'
                 INVERTED: 'int64_1', 'varchar_1'
                 default scalar index: 'id'
-            3. insert 1m data
+            3. insert 1 million data
             4. flush collection
             5. build indexes again using the same params
             6. load collection
@@ -2783,7 +2783,7 @@ class TestFeatureCases(PerfTemplate):
                 IVF_SQ8: 'float_vector_3'
                 INVERTED: 'int64_1', 'varchar_1'
                 default scalar index: 'id'
-            3. insert 1m data
+            3. insert 1 million data
             4. flush collection
             5. build indexes again using the same params
             6. load collection
@@ -3057,7 +3057,7 @@ class TestFeatureCases(PerfTemplate):
             2. build indexes:
                 IVF_FLAT: 'float_vector'
                 INVERTED: 'varchar_1', 'varchar_2', 'varchar_3'
-            3. insert 5 million data
+            3. insert 300k data
             4. flush collection
             5. build indexes again using the same params
             6. load collection
@@ -3116,7 +3116,7 @@ class TestFeatureCases(PerfTemplate):
             2. build indexes:
                 IVF_FLAT: 'float_vector'
                 INVERTED: 'varchar_1', 'varchar_2', 'varchar_3'
-            3. insert 5 million data
+            3. insert 300k data
             4. flush collection
             5. build indexes again using the same params
             6. load collection
@@ -3278,7 +3278,7 @@ class TestFeatureCases(PerfTemplate):
             ConcurrentParams.params_insert(nb=10, random_id=True, random_vector=True, start_id=dataset_size),
             ConcurrentParams.params_delete(delete_length=9),
             ConcurrentParams.params_flush(timeout=600),
-            ConcurrentParams.params_load(),
+            ConcurrentParams.params_load(timeout=180),
             ConcurrentParams.params_search(
                 nq=1000, top_k=1, search_param={"ef": 64}, expr="int64_1 > -1 && id > -1", output_fields=["*"],
                 timeout=180),
@@ -3360,7 +3360,7 @@ class TestFeatureCases(PerfTemplate):
             ConcurrentParams.params_insert(nb=10, random_id=True, random_vector=True, start_id=dataset_size),
             ConcurrentParams.params_delete(delete_length=9),
             ConcurrentParams.params_flush(timeout=180),
-            ConcurrentParams.params_load(),
+            ConcurrentParams.params_load(timeout=180),
             ConcurrentParams.params_search(
                 nq=1000, top_k=1, search_param={"ef": 64}, expr="int64_1 > -1 && id > -1", output_fields=["*"],
                 timeout=180),

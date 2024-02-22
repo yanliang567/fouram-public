@@ -79,15 +79,18 @@ class FunctionalCases(CommonCases):
                                 vector_field_name=vector_default_field_name)
             self.prepare_flush()
             self.prepare_index(vector_field_name=vector_default_field_name,
-                               metric_type=self.params_obj.dataset_params[pn.metric_type])
+                               metric_type=self.params_obj.dataset_params[pn.metric_type], extra_setting=False)
         else:
             # if pass in rebuild_index, indexes of collection will be dropped before building index
             if input_params.rebuild_index:
                 self.prepare_index(vector_field_name=vector_default_field_name,
                                    metric_type=self.params_obj.dataset_params[pn.metric_type],
-                                   clean_index_before=input_params.rebuild_index)
+                                   clean_index_before=input_params.rebuild_index, extra_setting=False)
             if _release_of_reload:
                 self.prepare_release(**self.params_obj.release_params)
+
+        # setting alter_index again to cover not prepare scene
+        self.set_alter_index(params=self.params_obj.common_params.get(pn.alter_index, None))
 
         self.count_entities()
         # load collection

@@ -4,7 +4,9 @@ import dacite
 from client.common.common_type import Precision, CaseIterParams
 from client.common.common_func import (
     ParserInputParams, GoSearchParams, GoBenchParams, ParserFieldsParams, parser_scalar_index,
-    gen_combinations, get_vector_type, get_default_field_name, parser_time, update_dict_value)
+    gen_combinations, get_vector_type, get_default_field_name, parser_time, update_dict_value,
+    parser_set_properties_params, parser_alter_index_params
+)
 from client.util.params_check import check_params
 from client.util.api_request import info_logout
 from client.cases.common_cases import CommonCases
@@ -230,15 +232,18 @@ class GoBenchCases(CommonCases):
                                 vector_field_name=vector_default_field_name)
             self.prepare_flush()
             self.prepare_index(vector_field_name=vector_default_field_name,
-                               metric_type=self.params_obj.dataset_params[pn.metric_type])
+                               metric_type=self.params_obj.dataset_params[pn.metric_type], extra_setting=False)
         else:
             # if pass in rebuild_index, indexes of collection will be dropped before building index
             if input_params.rebuild_index:
                 self.prepare_index(vector_field_name=vector_default_field_name,
                                    metric_type=self.params_obj.dataset_params[pn.metric_type],
-                                   clean_index_before=input_params.rebuild_index)
+                                   clean_index_before=input_params.rebuild_index, extra_setting=False)
             if _release_of_reload:
                 self.prepare_release(**self.params_obj.release_params)
+
+        # setting alter_index again to cover not prepare scene
+        self.set_alter_index(params=self.params_obj.common_params.get(pn.alter_index, None))
 
         self.count_entities()
         # load collection
@@ -402,11 +407,16 @@ class ConcurrentClientBase(CommonCases):
         elif req_type == pn.scene_search_test:
             _p = ConcurrentInputParamsSceneSearchTest(**req_params)
             _p.scalars_index = parser_scalar_index(_p.scalars_index)
+            _p.set_properties = parser_set_properties_params(_p.set_properties)
+            _p.alter_index = parser_alter_index_params(_p.alter_index)
             return ConcurrentTaskSceneSearchTest(**_p.to_dict)
 
         elif req_type == pn.scene_hybrid_search_test:
             params = ConcurrentInputParamsSceneHybridSearchTest(**req_params)
             params.scalars_index = parser_scalar_index(params.scalars_index)
+            params.set_properties = parser_set_properties_params(params.set_properties)
+            params.alter_index = parser_alter_index_params(params.alter_index)
+
             result = self.hybrid_search_param_analysis(_search_params=params.to_dict,
                                                        all_fields_params=params.set_all_fields_params_obj)[0]
             result.update({"all_fields_params": params.set_all_fields_params_obj,
@@ -479,15 +489,18 @@ class ConcurrentClientBase(CommonCases):
                                 vector_field_name=vector_default_field_name)
             self.prepare_flush()
             self.prepare_index(vector_field_name=vector_default_field_name,
-                               metric_type=self.params_obj.dataset_params[pn.metric_type])
+                               metric_type=self.params_obj.dataset_params[pn.metric_type], extra_setting=False)
         else:
             # if pass in rebuild_index, collection will be released, indexes will be dropped before building index
             if input_params.rebuild_index:
                 self.prepare_index(vector_field_name=vector_default_field_name,
                                    metric_type=self.params_obj.dataset_params[pn.metric_type],
-                                   clean_index_before=input_params.rebuild_index)
+                                   clean_index_before=input_params.rebuild_index, extra_setting=False)
             if _release_of_reload:
                 self.prepare_release(**self.params_obj.release_params)
+
+        # setting alter_index again to cover not prepare scene
+        self.set_alter_index(params=self.params_obj.common_params.get(pn.alter_index, None))
 
         self.count_entities()
         # load collection

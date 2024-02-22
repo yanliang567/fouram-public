@@ -17,6 +17,7 @@ concurrent_tasks = "concurrent_tasks"
 resource_groups_params = "resource_groups_params"
 database_user_params = "database_user_params"
 functional_params = "functional_params"
+common_params = "common_params"
 
 # request type
 search = "search"
@@ -120,7 +121,6 @@ interval = "interval"
 # concurrent
 spawn_rate = "spawn_rate"
 
-
 # resource groups
 groups = "groups"
 reset = "reset"
@@ -128,6 +128,10 @@ transfer_replicas = "transfer_replicas"
 transfer_nodes = "transfer_nodes"
 reset_rbac = "reset_rbac"
 reset_db = "reset_db"
+
+# common params
+set_properties = "set_properties"
+alter_index = "alter_index"
 
 # hdf5
 neighbors = "neighbors"
@@ -216,5 +220,3 @@ class IndexTypeName:
     IVF_HNSW = "IVF_HNSW"
     DISKANN = "DISKANN"  # search_list=[topk, ∞]
     AUTOINDEX = "AUTOINDEX"  # level=[1, 2, 3]
-
-

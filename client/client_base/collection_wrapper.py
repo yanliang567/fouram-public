@@ -84,6 +84,13 @@ class ApiCollectionWrapper:
         check_result = ResponseChecker(res, func_name, check_task, check_items, res_result, **kwargs).run()
         return InterfaceResponse(*res, res_result, check_result)
 
+    def set_properties(self, properties, timeout=None, check_task=None, check_items=None, **kwargs):
+        func_name = sys._getframe().f_code.co_name
+        res, res_result = api_request([self.collection.set_properties, properties, timeout], **kwargs)
+        check_result = ResponseChecker(res, func_name, check_task, check_items, res_result, properties=properties,
+                                       **kwargs).run()
+        return InterfaceResponse(*res, res_result, check_result)
+
     def load(self, partition_names=None, replica_number=NaN, timeout=None, check_task=None, check_items=None, **kwargs):
         replica_number = param_info.param_replica_num if replica_number is NaN else replica_number
 
@@ -208,6 +215,13 @@ class ApiCollectionWrapper:
                                        index_params=index_params, **kwargs).run()
         return InterfaceResponse(*res, res_result, check_result)
 
+    def alter_index(self, index_name, extra_params, timeout=None, check_task=None, check_items=None):
+        func_name = sys._getframe().f_code.co_name
+        res, res_result = api_request([self.collection.alter_index, index_name, extra_params, timeout])
+        check_result = ResponseChecker(res, func_name, check_task, check_items, res_result, index_name=index_name,
+                                       extra_params=extra_params, timeout=timeout).run()
+        return InterfaceResponse(*res, res_result, check_result)
+
     def has_index(self, check_task=None, check_items=None, **kwargs):
         func_name = sys._getframe().f_code.co_name
         res, res_result = api_request([self.collection.has_index], **kwargs)
@@ -269,5 +283,11 @@ class ApiCollectionWrapper:
     def get_replicas(self, timeout=None, check_task=None, check_items=None, **kwargs):
         func_name = sys._getframe().f_code.co_name
         res, res_result = api_request([self.collection.get_replicas, timeout], **kwargs)
+        check_result = ResponseChecker(res, func_name, check_task, check_items, res_result, **kwargs).run()
+        return InterfaceResponse(*res, res_result, check_result)
+
+    def describe(self, timeout=None, check_task=None, check_items=None, **kwargs):
+        func_name = sys._getframe().f_code.co_name
+        res, res_result = api_request([self.collection.describe, timeout], **kwargs)
         check_result = ResponseChecker(res, func_name, check_task, check_items, res_result, **kwargs).run()
         return InterfaceResponse(*res, res_result, check_result)

@@ -53,7 +53,8 @@ class CommonParams:
              search_param=None, search_expr=None, top_k=None, nq=None, guarantee_timestamp=None, group_by_field=None,
              reqs=None, rerank=None, hybrid_search_top_k=None, hybrid_search_nq=None,
              hybrid_search_guarantee_timestamp=None,
-             reset_rg=None, groups=None, reset_rbac=None, reset_db=None):
+             reset_rg=None, groups=None, reset_rbac=None, reset_db=None,
+             set_properties=None, alter_index=None):
         dataset_params = {pn.dataset_name: dataset_name,
                           pn.dim: dim,
                           pn.dataset_size: dataset_size,
@@ -99,6 +100,9 @@ class CommonParams:
                                   pn.groups: groups}
         database_user_params = {pn.reset_rbac: reset_rbac,
                                 pn.reset_db: reset_db}
+        common_params = {pn.set_properties: set_properties,
+                         pn.alter_index: alter_index
+                         }
 
         return {k: v for k, v in dict_recursive_key({
             pn.dataset_params: dataset_params,
@@ -111,6 +115,7 @@ class CommonParams:
             pn.hybrid_search_params: hybrid_search_params,
             pn.resource_groups_params: resource_groups_params,
             pn.database_user_params: database_user_params,
+            pn.common_params: common_params,
         }).items() if v != {}}
 
 

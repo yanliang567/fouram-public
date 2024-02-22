@@ -33,6 +33,7 @@ class ParamsBase:
     resource_groups_params: Optional[dict] = field(default_factory=lambda: {})
     database_user_params: Optional[dict] = field(default_factory=lambda: {})
     functional_params: Optional[dict] = field(default_factory=lambda: {})
+    common_params: Optional[dict] = field(default_factory=lambda: {})
 
     @staticmethod
     def search_params_parser(_params):
@@ -60,20 +61,28 @@ class ParamsFormat:
             show_db_user: ([type(bool())], OPTION),
             extra_partitions: ([type(dict())], OPTION),
         },
-        collection_params: {other_fields: ([type(list())], OPTION),
-                            shards_num: ([type(int())], OPTION),
-                            enable_dynamic_field: ([type(bool())], OPTION),
-                            varchar_id: ([type(bool())], OPTION),
-                            collection_name: ([type(str())], OPTION),
-                            auto_id: ([type(bool())], OPTION),
-                            num_partitions: ([type(int())], OPTION)},
-        load_params: {replica_number: ([type(int())], OPTION),
-                      refresh: ([type(bool())], OPTION),
-                      resource_groups: ([type(int()), type(list())], OPTION)},
+        collection_params: {
+            other_fields: ([type(list())], OPTION),
+            shards_num: ([type(int())], OPTION),
+            enable_dynamic_field: ([type(bool())], OPTION),
+            varchar_id: ([type(bool())], OPTION),
+            collection_name: ([type(str())], OPTION),
+            auto_id: ([type(bool())], OPTION),
+            num_partitions: ([type(int())], OPTION)
+        },
+        load_params: {
+            replica_number: ([type(int())], OPTION),
+            refresh: ([type(bool())], OPTION),
+            resource_groups: ([type(int()), type(list())], OPTION)
+        },
         release_params: {},
-        flush_params: {prepare_flush: ([type(bool())], OPTION)},
-        query_params: {output_fields: ([type(list()), type(None)], OPTION),
-                       ignore_growing: ([type(bool())], OPTION)},
+        flush_params: {
+            prepare_flush: ([type(bool())], OPTION)
+        },
+        query_params: {
+            output_fields: ([type(list()), type(None)], OPTION),
+            ignore_growing: ([type(bool())], OPTION)
+        },
         search_params: {
             expr: ([type(str()), type(list()), type(None)], OPTION),
             guarantee_timestamp: ([type(int())], OPTION),
@@ -89,10 +98,18 @@ class ParamsFormat:
             timeout: ([type(int())], OPTION),
             print_vectors: ([type(bool())], OPTION),
         },
-        resource_groups_params: {groups: ([type(list()), type(dict()), type(None)], OPTION),
-                                 reset: ([type(bool())], OPTION)},
-        database_user_params: {reset_rbac: ([type(bool())], OPTION),
-                               reset_db: ([type(bool())], OPTION)}
+        resource_groups_params: {
+            groups: ([type(list()), type(dict()), type(None)], OPTION),
+            reset: ([type(bool())], OPTION)
+        },
+        database_user_params: {
+            reset_rbac: ([type(bool())], OPTION),
+            reset_db: ([type(bool())], OPTION)
+        },
+        common_params: {
+            set_properties: ([type(dict()), type(list()), type(None)], OPTION),
+            alter_index: ([type(dict()), type(list()), type(None)], OPTION)
+        }
     }
 
     acc_scene_recall = update_dict_value({
@@ -998,6 +1015,10 @@ class ConcurrentInputParamsSceneSearchTest(DataClassBase):
     # use db and user
     new_user: Optional[bool] = False
 
+    # common setting
+    set_properties: Union[dict, list, None] = None
+    alter_index: Union[dict, list, None] = None
+
 
 @dataclass
 class ConcurrentTaskSceneSearchTest(DataClassBase):
@@ -1030,6 +1051,10 @@ class ConcurrentTaskSceneSearchTest(DataClassBase):
 
     # use user
     new_user: Optional[bool] = False
+
+    # common setting
+    set_properties: Optional[list] = field(default_factory=lambda: [])
+    alter_index: Optional[list] = field(default_factory=lambda: [])
 
     @property
     def anns_field(self):
@@ -1077,6 +1102,10 @@ class ConcurrentInputParamsSceneHybridSearchTest(DataClassBase):
 
     # use db and user
     new_user: Optional[bool] = False
+
+    # common setting
+    set_properties: Union[dict, list, None] = None
+    alter_index: Union[dict, list, None] = None
 
     @property
     def anns_field(self):
@@ -1139,6 +1168,10 @@ class ConcurrentTaskSceneHybridSearchTest(DataClassBase):
     # for gen hybrid_search data
     all_fields_params: ParserFieldsParams = None
     anns_field: Optional[str] = None
+
+    # common setting
+    set_properties: Optional[list] = field(default_factory=lambda: [])
+    alter_index: Optional[list] = field(default_factory=lambda: [])
 
     def set_random_data(self):
         for r in self.reqs:

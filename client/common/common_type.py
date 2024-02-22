@@ -78,6 +78,8 @@ class DefaultValue:
     default_scalar_types = [i for i in dict(DataType.__members__).keys() if
                             i not in ["NONE", "UNKNOWN", "BINARY_VECTOR", "FLOAT_VECTOR"]]
 
+    default_alter_index_params = {'mmap.enabled': True}
+
 
 class SimilarityMetrics:
     L2 = "L2"

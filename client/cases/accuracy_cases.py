@@ -74,6 +74,10 @@ class CommonCases(Base):
                 pn.scalars_params: self.params_obj.dataset_params.get(pn.scalars_params, {})
             }, self.params_obj.collection_params)
             self.create_collection(**_collection_params)
+
+            # setting collection properties
+            self.set_all_properties(params=self.params_obj.common_params.get(pn.set_properties, None))
+
             self.get_collection_schema()
 
             # insert vectors
@@ -118,10 +122,6 @@ class CommonCases(Base):
                 self.flush_collection()
 
             self.rebuild_index(vector_default_field_name, metric_type)
-            self.show_index()
-
-            # load collection
-            self.load_collection(**self.params_obj.load_params)
         else:
             collection_names = self.utility_wrap.list_collections().response if not self.params_obj.collection_params.get(
                 pn.collection_name, None) else [self.params_obj.collection_params[pn.collection_name]]
@@ -131,14 +131,19 @@ class CommonCases(Base):
                 raise Exception(msg)
 
             self.connect_collection(collection_names[0])
+
+            # setting collection properties
+            self.set_all_properties(params=self.params_obj.common_params.get(pn.set_properties, None))
+
             self.get_collection_schema()
+
             self.show_index()
 
             if rebuild_index:
                 self.rebuild_index(vector_default_field_name, metric_type)
-                self.show_index()
 
-            self.load_collection(**self.params_obj.load_params)
+        # load collection
+        self.load_collection(**self.params_obj.load_params)
 
         counts = self.collection_wrap.num_entities
         log.info("[AccCases] Number of vectors in the collection({0}): {1}".format(self.collection_wrap.name, counts))
@@ -158,6 +163,11 @@ class CommonCases(Base):
         self.case_report.add_attr(**{"index": {"build_time": round(res_index.rt, Precision.INDEX_PRECISION)}})
 
         self.prepare_scalars_index()
+
+        # setting alter_index
+        self.set_alter_index(params=self.params_obj.common_params.get(pn.alter_index, None))
+
+        self.show_index()
 
     def prepare_scalars_index(self, update_report_data=True):
         scalars = parser_scalar_index(self.params_obj.dataset_params.get(pn.scalars_index, {}))
@@ -197,7 +207,6 @@ class CommonCases(Base):
             log.info("[AccCases] RT of build scalar index `{1}`: {0}s".format(rt, scalar))
 
         log.info("[AccCases] Prepare scalars:{0} vectors:{1} index done.".format(scalars_field, vectors_field))
-        self.show_index()
 
     def parser_search_params(self):
         search_params = copy.deepcopy(self.params_obj.search_params_parser(self.params_obj.search_params))

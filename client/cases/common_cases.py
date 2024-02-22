@@ -68,6 +68,10 @@ class CommonCases(Base):
                 raise Exception(msg)
 
             self.connect_collection(collection_names[0])
+
+        # setting collection properties
+        self.set_all_properties(params=self.params_obj.common_params.get(pn.set_properties, None))
+
         self.get_collection_schema()
         log.info("[CommonCases] Prepare collection {0} done.".format(self.collection_wrap.name))
 
@@ -122,12 +126,14 @@ class CommonCases(Base):
         else:
             log.info("[CommonCases] Collection {0} was not flushed while preparing.".format(self.collection_wrap.name))
 
-    def prepare_index(self, vector_field_name, metric_type, clean_index_before=False, build_scalars_index=True):
+    def prepare_index(self, vector_field_name, metric_type, clean_index_before=False, build_scalars_index=True,
+                      extra_setting=True):
         # build vector index and scalars index
         self.show_index()
-        self.release_collection()
 
         if clean_index_before:
+            # release collection before dropping indexes
+            self.release_collection()
             self.clean_index()
 
         if self.params_obj.index_params != {}:
@@ -143,11 +149,16 @@ class CommonCases(Base):
 
             log.info(
                 "[CommonCases] RT of build index {1}: {0}s".format(rt, self.params_obj.index_params[pn.index_type]))
-            self.show_index()
             log.info("[CommonCases] Prepare index {0} done.".format(self.params_obj.index_params[pn.index_type]))
 
         if build_scalars_index:
             self.prepare_scalars_index()
+
+        if extra_setting:
+            # setting alter_index
+            self.set_alter_index(params=self.params_obj.common_params.get(pn.alter_index, None))
+
+        self.show_index()
 
     def prepare_scalars_index(self, update_report_data=True):
         scalars = parser_scalar_index(self.params_obj.dataset_params.get(pn.scalars_index, {}))
@@ -187,7 +198,6 @@ class CommonCases(Base):
             log.info("[CommonCases] RT of build scalar field index `{1}`: {0}s".format(rt, scalar))
 
         log.info("[CommonCases] Prepare scalars:{0} vectors:{1} index done.".format(scalars_field, vectors_field))
-        self.show_index()
 
     def prepare_query(self, req_run_counts, **kwargs):
         query_rt = []
@@ -728,13 +738,17 @@ class Search(CommonCases):
                                 vector_field_name=vector_default_field_name)
             self.prepare_flush()
             self.prepare_index(vector_field_name=vector_default_field_name,
-                               metric_type=self.params_obj.dataset_params[pn.metric_type])
+                               metric_type=self.params_obj.dataset_params[pn.metric_type], extra_setting=False)
         else:
             # if pass in rebuild_index, indexes of collection will be dropped before building index
             if input_params.rebuild_index:
                 self.prepare_index(vector_field_name=vector_default_field_name,
                                    metric_type=self.params_obj.dataset_params[pn.metric_type],
-                                   clean_index_before=input_params.rebuild_index)
+                                   clean_index_before=input_params.rebuild_index, extra_setting=False)
+
+        # setting alter_index again to cover not prepare scene
+        self.set_alter_index(params=self.params_obj.common_params.get(pn.alter_index, None))
+
         self.count_entities()
         # load collection
         self.prepare_load(**self.params_obj.load_params)
@@ -825,13 +839,16 @@ class SearchRecall(CommonCases):
                                 vector_field_name=vector_default_field_name)
             self.prepare_flush()
             self.prepare_index(vector_field_name=vector_default_field_name,
-                               metric_type=self.params_obj.dataset_params[pn.metric_type])
+                               metric_type=self.params_obj.dataset_params[pn.metric_type], extra_setting=False)
         else:
             # if pass in rebuild_index, indexes of collection will be dropped before building index
             if input_params.rebuild_index:
                 self.prepare_index(vector_field_name=vector_default_field_name,
                                    metric_type=self.params_obj.dataset_params[pn.metric_type],
-                                   clean_index_before=input_params.rebuild_index)
+                                   clean_index_before=input_params.rebuild_index, extra_setting=False)
+
+        # setting alter_index again to cover not prepare scene
+        self.set_alter_index(params=self.params_obj.common_params.get(pn.alter_index, None))
 
         self.count_entities()
         # load collection
@@ -926,13 +943,17 @@ class HybridSearch(CommonCases):
                                 vector_field_name=vector_default_field_name)
             self.prepare_flush()
             self.prepare_index(vector_field_name=vector_default_field_name,
-                               metric_type=self.params_obj.dataset_params[pn.metric_type])
+                               metric_type=self.params_obj.dataset_params[pn.metric_type], extra_setting=False)
         else:
             # if pass in rebuild_index, indexes of collection will be dropped before building index
             if input_params.rebuild_index:
                 self.prepare_index(vector_field_name=vector_default_field_name,
                                    metric_type=self.params_obj.dataset_params[pn.metric_type],
-                                   clean_index_before=input_params.rebuild_index)
+                                   clean_index_before=input_params.rebuild_index, extra_setting=False)
+
+        # setting alter_index again to cover not prepare scene
+        self.set_alter_index(params=self.params_obj.common_params.get(pn.alter_index, None))
+
         self.count_entities()
         # load collection
         self.prepare_load(**self.params_obj.load_params)

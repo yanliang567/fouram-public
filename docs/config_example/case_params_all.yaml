@@ -303,6 +303,20 @@ resource_groups_params:
        collection_name: 'collection_name_2'
        num_replica: 2
 
+common_params:
+  # please remove keys if don't want to set them
+
+  # collection set_properties, set_properties after connecting to collection
+  # <dict> e.g.: {"properties": <dict>, "timeout": None / <float>}
+  # <list> e.g.: [{"properties": <dict>, "timeout": None / <float>}, ...]
+  set_properties: None / <dict> / <List[dict]>
+
+  # Only executed after the index is built and the collection is released !!!
+  # <dict> e.g.: {"index_name": "float_vector", "extra_params": {"mmap.enabled": True}}
+  # <list> e.g.: [<index_name>, ..., {"index_name": "float_vector", "extra_params": {"mmap.enabled": True}, ...]
+  #              if only <index_name> is set, default value: {"mmap.enabled": True} will be set to extra_params
+  alter_index: None / <List[Union[str, dict]]> / <dict>
+
 # the parameters of each case are different, please pass them according to actual use.
 # refer to `GetParamObj` in the file `fouram/client/parameters/functional_params.py` to map parameter objects.
 # if there is no parameter mapping in the case, it means that there is no need to pass parameters.
@@ -639,6 +653,10 @@ concurrent_tasks:
       # use db and user
       new_user: Optional[bool] = False
 
+      # common setting
+      set_properties: Union[dict, list, None] = None  # same as `common_params.set_properties`
+      alter_index: Union[dict, list, None] = None   # same as `common_params.alter_index`
+
   - type: scene_hybrid_search_test
     weight: 1
     params:
@@ -686,3 +704,7 @@ concurrent_tasks:
 
       # use db and user
       new_user: Optional[bool] = False
+
+      # common setting
+      set_properties: Union[dict, list, None] = None  # same as `common_params.set_properties`
+      alter_index: Union[dict, list, None] = None   # same as `common_params.alter_index`
