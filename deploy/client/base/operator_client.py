@@ -99,11 +99,11 @@ class OperatorClient(BaseClient):
 
         if return_release_name:
             self.release_name = body["metadata"]["name"]
-            return self.release_name
-        return self.dc.result_to_dict(res) if parser_result else res
+            return self.release_name, {}
+        return self.dc.result_to_dict(res) if parser_result else res, {}
 
     def upgrade(self, body: dict, release_name="", namespace=None, content_type="application/merge-patch+json",
-                parser_result=True):
+                parser_result=True, **kwargs):
         namespace = namespace or self.namespace
         release_name = release_name or self.release_name
 

@@ -53,11 +53,14 @@ class DefaultClient:
         return gen_release_name(prefix)
 
     def install(self, configs, check_health=True):
-        self.release_name = self.obj.install(configs, return_release_name=True, check_health=check_health)
-        return self.release_name
+        """
+        return: str, dict
+        """
+        self.release_name, _config = self.obj.install(configs, return_release_name=True, check_health=check_health)
+        return self.release_name, _config
 
-    def upgrade(self, configs):
-        return self.obj.upgrade(configs)
+    def upgrade(self, configs, timeout=1800):
+        return self.obj.upgrade(configs, timeout=timeout)
 
     def uninstall(self, release_name=""):
         release_name = release_name or self.release_name
@@ -83,9 +86,9 @@ class DefaultClient:
         release_name = release_name or self.release_name
         return self.obj.get_all_values(release_name)
 
-    def wait_for_healthy(self, release_name=""):
+    def wait_for_healthy(self, release_name="", timeout=1800):
         release_name = release_name or self.release_name
-        return self.obj.wait_for_healthy(release_name)
+        return self.obj.wait_for_healthy(release_name, timeout=timeout)
 
     def set_global_params(self, release_name=""):
         release_name = release_name or self.release_name

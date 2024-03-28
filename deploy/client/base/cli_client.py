@@ -8,7 +8,6 @@ from parameters.input_params import param_info
 from utils.util_cmd import CmdExe
 from utils.util_log import log
 
-
 CHECK_LIST = "NAME|{0}-milvus|{0}-minio|{0}-etcd|{0}-pulsar|{0}-zookeeper|{0}-kafka|{0}-log|{0}-tikv"
 
 
@@ -61,19 +60,21 @@ class CliClient(BaseClient):
         _cmd = " helm %s upgrade --install %s %s %s %s %s " % \
                (self.ns, set_params, default_params, params, self.release_name, chart)
         res_cmd = CmdExe(_cmd).run_cmd()
-        return self.release_name if return_release_name else res_cmd
+        return self.release_name if return_release_name else res_cmd, {}
 
-    def upgrade(self, set_params="", release_name="", chart="", default_params=" --wait --timeout 30m ",
-                params=" --reuse-values ", return_release_name=True, **kwargs):
+    def upgrade(self, set_params="", release_name="", chart="", default_params=" --wait ", params=" --reuse-values ",
+                timeout=1800, return_release_name=True, **kwargs):
         """
         :param set_params: image.all.pullPolicy=IfNotPresent,image.all.tag=v2.0.2
         :param release_name: less than 63 characters
         :param chart: name of helm chart or use local path of helm chart
-        :param default_params: --wait --timeout 30m
+        :param default_params: --wait
         :param params: --reuse-values
         :param return_release_name: bool
+        :param timeout: int
         :return: None
         """
+        default_params += f" --timeout {timeout}s "
         release_name = release_name or self.release_name
         chart = chart if chart != "" else self.chart
         if set_params != "":

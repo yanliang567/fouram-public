@@ -70,6 +70,10 @@ def pytest_addoption(parser):
                      help="rebuild index if case_skip_prepare")
     parser.addoption('--case_skip_clean_collection', action='store_true', default=False, help="skip remove collection")
 
+    # upgrade server
+    parser.addoption("--upgrade_waiting_time", action="store", default=1800,
+                     help="time to wait for server health, only used for rolling upgrade instance")
+
 
 @pytest.fixture
 def host(request):
@@ -79,6 +83,11 @@ def host(request):
 @pytest.fixture
 def port(request):
     return request.config.getoption("--port")
+
+
+@pytest.fixture
+def upgrade_waiting_time(request):
+    return request.config.getoption("--upgrade_waiting_time")
 
 
 """ fixture func """

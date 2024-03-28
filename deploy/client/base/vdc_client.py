@@ -43,7 +43,7 @@ class VDCClient(BaseClient):
         :param parser_result: bool
         :param return_release_name: bool
         :param check_health: bool
-        :return: str or tuple
+        :return: str or tuple, dict
         """
         self.release_name = release_name or self.release_name or gen_release_name("fouram-vdc")
         self.deploy_class_id = eval(f'ClassID.{body.get("deploy_mode")}') or self.deploy_class_id
@@ -59,7 +59,7 @@ class VDCClient(BaseClient):
             obj = self._delicate_install
 
         return obj(image_tag=image_tag, server_resource=server_resource, milvus_config=milvus_config,
-                   return_release_name=return_release_name)
+                   return_release_name=return_release_name), {"image_tag": image_tag}
 
     def _delicate_install(self, image_tag, server_resource, milvus_config, return_release_name, **kwargs):
         log.debug(f"[VDCClient] Final config for VDC deployment, release_name: {self.release_name}, " +
@@ -87,7 +87,7 @@ class VDCClient(BaseClient):
         self.instance_id_maps.update({self.release_name: instance_id})
         return self.release_name if return_release_name else (self.release_name, instance_id)
 
-    def upgrade(self, body: dict, release_name="", parser_result=True, check_release_exist=True):
+    def upgrade(self, body: dict, release_name="", parser_result=True, check_release_exist=True, timeout=1800):
         """
         Only 4 upgrades are supported: image_tag, deploy_mode, server_resource, milvus_config
         """
@@ -105,23 +105,24 @@ class VDCClient(BaseClient):
         if image_tag:
             log.info("[VDCClient] Upgrade release_name: %s, image_tag: %s, instance_type: %s" % (
                 release_name, image_tag, get_class_key_name(InstanceType, self.INSTANCE_TYPE)))
-            self.client.rm_update_image(image_tag=image_tag)
+            self.client.rm_update_image(image_tag=image_tag, timeout=timeout)
 
         if deploy_mode and hasattr(ClassID, deploy_mode) and eval(f"ClassID.{deploy_mode}") and \
                 self.INSTANCE_TYPE == InstanceType.Milvus:
             log.info(f"[VDCClient] Upgrade release_name: {release_name}, deploy_mode: {deploy_mode}")
-            self.client.modify_instance(class_mode=deploy_mode)
+            self.client.modify_instance(class_mode=deploy_mode, timeout=timeout)
 
         if milvus_config:
             log.info("[VDCClient] Upgrade release_name: %s, milvus_config: %s, instance_type: %s" % (
                 release_name, milvus_config, get_class_key_name(InstanceType, self.INSTANCE_TYPE)))
             self.client.rm_modify_instance_parameters(modify_params_dict=milvus_config,
-                                                      instance_type=self.INSTANCE_TYPE)
+                                                      instance_type=self.INSTANCE_TYPE, timeout=timeout)
 
         if server_resource:
             log.info("[VDCClient] Upgrade release_name: %s, server_resource: %s, instance_type %s" % (
                 release_name, server_resource, get_class_key_name(InstanceType, self.INSTANCE_TYPE)))
-            self.client.infra_update_resource(resource=server_resource, instance_type=self.INSTANCE_TYPE)
+            self.client.infra_update_resource(resource=server_resource, instance_type=self.INSTANCE_TYPE,
+                                              timeout=timeout)
 
         # if milvus_config:
         #     log.info("[VDCClient] Upgrade release_name: %s, milvus_config: %s, instance_type: %s" % (

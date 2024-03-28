@@ -284,46 +284,46 @@ class VDCClientBase:
         self.cloud_service_api.resume(self.instance_id)
         assert self.check_server_status()
 
-    def rm_stop_server(self):
+    def rm_stop_server(self, timeout: int = 1800):
         log.info(f"[VDCClientBase] RM API stop instance: {self.instance_id}")
         # stop server and wait stopped
         self.cloud_rm_api.stop(self.instance_id)
         # check server status stopped
-        assert self.check_server_status(status=InstanceStatus.STOPPED)
+        assert self.check_server_status(timeout=timeout, status=InstanceStatus.STOPPED)
 
-    def rm_resume_server(self):
+    def rm_resume_server(self, timeout: int = 1800):
         # resume server
         log.info(f"[VDCClientBase] RM API resume instance: {self.instance_id}")
         self.cloud_rm_api.resume(self.instance_id)
-        assert self.check_server_status()
+        assert self.check_server_status(timeout=timeout)
 
-    def rm_stop_serverless_host(self):
+    def rm_stop_serverless_host(self, timeout: int = 1800):
         log.info(f"[VDCClientBase] RM API stop serverless instance: {self.real_instance_id}")
         # stop server and wait stopped
         self.cloud_rm_api.stop(instance_id=self.real_instance_id, user_id=self.real_user_id)
         # check server status stopped
-        assert self.rm_check_server_status(status=InstanceStatus.STOPPED)
+        assert self.rm_check_server_status(timeout=timeout, status=InstanceStatus.STOPPED)
 
-    def rm_resume_serverless_host(self):
+    def rm_resume_serverless_host(self, timeout: int = 1800):
         # resume server
         log.info(f"[VDCClientBase] RM API resume serverless instance: {self.real_instance_id}")
         self.cloud_rm_api.resume(instance_id=self.real_instance_id, user_id=self.real_user_id)
-        assert self.rm_check_server_status()
+        assert self.rm_check_server_status(timeout=timeout)
 
-    def rm_update_image(self, image_tag: str):
+    def rm_update_image(self, image_tag: str, timeout: int = 1800):
         """ Update server's image """
         _db_version = self.get_server_image(instance_id=self.real_instance_id, user_id=self.real_user_id)
 
         self.cloud_rm_api.rolling_upgrade(instance_id=self.real_instance_id, db_version=image_tag,
                                           user_id=self.real_user_id)
 
-        assert self.rm_check_server_status() and \
+        assert self.rm_check_server_status(timeout=timeout) and \
                self.rm_check_server_image(image_tag=image_tag, instance_id=self.real_instance_id,
                                           user_id=self.real_user_id)
         log.info("[VDCClientBase] Update instance's:%s, instance_id:%s  image from %s to %s done" % (
             self.instance_name, self.real_instance_id, _db_version, image_tag))
 
-    def modify_instance(self, class_mode):
+    def modify_instance(self, class_mode, timeout: int = 1800):
         """ Upgrade server's class mode """
         class_id = eval(f"ClassID.{class_mode}")
 
@@ -334,7 +334,7 @@ class VDCClientBase:
         res = self.cloud_service_api.modify(instance_id=self.instance_id, class_id=class_id)
 
         # verify instance status is running after modify
-        assert self.check_server_status()
+        assert self.check_server_status(timeout=timeout)
 
         # display server after modification
         self.display_server(log_level=LogLevel.DEBUG)
@@ -347,7 +347,7 @@ class VDCClientBase:
         log.info(f"[VDCClientBase] Instance: {self.instance_name} upgrade to class_mode: {class_mode} completed.")
 
     def rm_modify_instance_parameters(self, modify_params_dict: dict,
-                                      instance_type: InstanceType = InstanceType.Milvus):
+                                      instance_type: InstanceType = InstanceType.Milvus, timeout: int = 1800):
         """
         Update milvus.yaml configs, and follow the configuration format of milvus.yaml
         """
@@ -375,20 +375,20 @@ class VDCClientBase:
 
         if instance_type == InstanceType.Milvus:
             # stop instance and check stopped
-            self.rm_stop_server()
+            self.rm_stop_server(timeout=timeout)
             # self.stop_server()
 
             # resume stopped instance and wait running
-            self.rm_resume_server()
+            self.rm_resume_server(timeout=timeout)
             # self.resume_server()
 
             log.info(f"[VDCClientBase] Modify instance's: {self.instance_name} parameters completed.")
         elif instance_type == InstanceType.Serverless:
             # stop instance serverless and check stopped
-            self.rm_stop_serverless_host()
+            self.rm_stop_serverless_host(timeout=timeout)
 
             # resume stopped serverless instance and wait running
-            self.rm_resume_serverless_host()
+            self.rm_resume_serverless_host(timeout=timeout)
             log.info(f"[VDCClientBase] Modify serverless instance:{self.real_instance_id} parameters completed.")
         else:
             self._raise(f"[VDCClientBase] Unrecognized instance type {instance_type}")
@@ -408,7 +408,8 @@ class VDCClientBase:
             self._raise(
                 f"[VDCClientBase] Modify instance params failed, modify_params:{modify_params}, result:{res.data}")
 
-    def infra_update_resource(self, resource: dict, instance_type: InstanceType = InstanceType.Milvus):
+    def infra_update_resource(self, resource: dict, instance_type: InstanceType = InstanceType.Milvus,
+                              timeout: int = 1800):
         """
         Upgrade Pods's resources
 
@@ -466,7 +467,7 @@ class VDCClientBase:
         # todo need to check pod resources
         self.infra_api.get_milvus(instance_id=self.real_instance_id)
 
-        assert self.infra_check_server_status()
+        assert self.infra_check_server_status(timeout=timeout)
         log.info(f"[VDCClientBase] Update resource done.")
 
         # serverless does not support rewrite db

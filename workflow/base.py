@@ -179,7 +179,7 @@ class Base:
 
         # install server and get endpoint
         server_install_params = check_deploy_config(deploy_tool=deploy_tool, configs=self.deploy_config[0])
-        self.deploy_release_name = self.deploy_client.install(server_install_params)
+        self.deploy_release_name, install_new_config = self.deploy_client.install(server_install_params)
         self.deploy_client.wait_for_healthy(release_name=self.deploy_release_name)
         # endpoint = self.deploy_client.endpoint(release_name=self.deploy_release_name)
 
@@ -192,10 +192,10 @@ class Base:
         self.set_global_function_before_test(release_name=self.deploy_release_name)
 
         log.info("[Base] Service deployed successfully:{0}".format(self.deploy_release_name))
-        return self.deploy_release_name
+        return self.deploy_release_name, install_new_config
 
     def upgrade_service(self, release_name=None, tag=None, repository=None, deploy_tool=Operator,
-                        deploy_mode=STANDALONE, upgrade_config=None):
+                        deploy_mode=STANDALONE, upgrade_config=None, upgrade_waiting_time=1800):
         release_name = release_name or param_info.release_name
         if not release_name:
             raise Exception(f"[Base] Can not upgrade empty release name:{release_name}, please check.")
@@ -231,10 +231,10 @@ class Base:
         # check upgrade config and upgrade service
         server_upgrade_params = check_deploy_config(deploy_tool=deploy_tool, configs=self.upgrade_config[0])
         log.info("[Base] upgrade configs: {}".format(upgrade_configs))
-        self.deploy_client.upgrade(server_upgrade_params)
+        self.deploy_client.upgrade(server_upgrade_params, timeout=upgrade_waiting_time)
 
         # wait for healthy
-        self.deploy_client.wait_for_healthy(release_name=release_name)
+        self.deploy_client.wait_for_healthy(release_name=release_name, timeout=upgrade_waiting_time)
 
         # display server values
         log.debug(self.deploy_client.get_all_values(release_name=release_name))
