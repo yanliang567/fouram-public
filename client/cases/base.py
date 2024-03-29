@@ -1132,26 +1132,38 @@ class Base:
 
     @func_time_catch()
     def concurrent_load_search_release(self, params: ConcurrentTaskLoadSearchRelease):
-        self.collection_wrap.load(check_task=CheckTasks.assert_result, replica_number=params.replica_number,
-                                  timeout=params.timeout)
+        load_res = self.collection_wrap.load(check_task=CheckTasks.assert_result, replica_number=params.replica_number,
+                                             timeout=params.timeout)
 
         if params.random_data:
             params.data = gen_vectors(nb=len(params.data), dim=params.dim, field_name=params.anns_field)
-        self.collection_wrap.search(check_task=CheckTasks.assert_result, **params.obj_params)
+        search_res = self.collection_wrap.search(check_task=CheckTasks.assert_result, **params.obj_params)
 
-        self.collection_wrap.release(check_task=CheckTasks.assert_result, timeout=params.timeout)
+        release_res = self.collection_wrap.release(check_task=CheckTasks.assert_result, timeout=params.timeout)
+
+        if not (load_res.check_result and search_res.check_result and release_res.check_result):
+            msg = "[Base] Check concurrent_load_search_release result failed, load:{0}, search:{1}, release:{2}"
+            raise ValueError(msg.format(load_res.check_result, search_res.check_result, release_res.check_result))
+
         return "[Base] concurrent_load_search_release finished."
 
     @func_time_catch()
     def concurrent_load_hybrid_search_release(self, params: ConcurrentTaskLoadHybridSearchRelease):
-        self.collection_wrap.load(check_task=CheckTasks.assert_result, replica_number=params.replica_number,
-                                  timeout=params.timeout)
+        load_res = self.collection_wrap.load(check_task=CheckTasks.assert_result, replica_number=params.replica_number,
+                                             timeout=params.timeout)
         if params.random_data:
             params.set_random_data()
         log.debug(f"[Base] Params of concurrent_load_hybrid_search_release: {params.get_all_hybrid_search_params}")
-        self.collection_wrap.hybrid_search(check_task=CheckTasks.assert_result, **params.hybrid_search_obj_params)
+        hybrid_search_res = self.collection_wrap.hybrid_search(check_task=CheckTasks.assert_result,
+                                                               **params.hybrid_search_obj_params)
 
-        self.collection_wrap.release(check_task=CheckTasks.assert_result, timeout=params.timeout)
+        release_res = self.collection_wrap.release(check_task=CheckTasks.assert_result, timeout=params.timeout)
+
+        if not (load_res.check_result and hybrid_search_res.check_result and release_res.check_result):
+            msg = "[Base] Check concurrent_load_hybrid_search_release result failed, load:{0}, hybrid_search:{1}, release:{2}"
+            raise ValueError(
+                msg.format(load_res.check_result, hybrid_search_res.check_result, release_res.check_result))
+
         return "[Base] concurrent_load_hybrid_search_release finished."
 
     @func_time_catch()

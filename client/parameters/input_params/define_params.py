@@ -161,6 +161,18 @@ class DefaultScalarParams:
     """ setting `dataset_params.scalars_params` """
 
     @staticmethod
+    def local(field: str, dim: int = 128):
+        """
+        :param field: float_vector_1
+        :param dim: int
+        """
+        return {
+            field: {
+                "params": {"dim": dim}
+            }
+        }
+
+    @staticmethod
     def text2img(field: str):
         """
         :param field: float_vector_1

@@ -113,8 +113,11 @@ class CliClient(BaseClient):
         #        (self.ns, release_name, self.ns)
         # _cmd = " kubectl get pvc $(kubectl get pvc -l \"app.kubernetes.io/instance=%s\"" % release_name +\
         #        " -o jsonpath='{range.items[*]}{.metadata.name} ') %s " % self.ns
-        _cmd = "kubectl delete pvc -l app.kubernetes.io/instance={0} {1}; kubectl delete pvc -l release={0} {1}".format(
-            release_name, self.ns)
+        msg = "kubectl delete pvc -l app.kubernetes.io/instance={0} {1}; " + \
+              "kubectl delete pvc -l release={0} {1}; " + \
+              "kubectl delete pvc -l app.kubernetes.io/instance={0}-log {1}; " + \
+              "kubectl delete pvc -l app.kubernetes.io/instance={0}-tikv {1} "
+        _cmd = msg.format(release_name, self.ns)
         return CmdExe(_cmd).run_cmd()
 
     def get_helm_repo(self, repo_name=""):

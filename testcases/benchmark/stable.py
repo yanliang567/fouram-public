@@ -869,8 +869,31 @@ class TestConcurrentCases(PerfTemplate):
     @pytest.mark.parametrize("deploy_mode", [STANDALONE])
     def test_concurrent_locust_50m_multi_ivf_sq8_ddl_dql_standalone(self, input_params: InputParamsBase, deploy_mode):
         """
+        concurrent test and calculation of RT and QPS
+
         :test steps:
-            1. concurrent test and calculation of RT and QPS
+            1. create collection with fields:
+                'float_vector': 128dim,
+                'float_vector_1': 200dim,
+                scalar field: id(pk)
+            2. build indexes:
+                IVF_SQ8(nlist=2048): 'float_vector'
+                IVF_SQ8(nlist=1024): 'float_vector_1',
+                DEFAULT index type(STL_SORT): 'id'
+            3. insert 50 million data
+            4. flush collection
+            5. build indexes again using the same params
+            6. load collection
+                replica: 1
+            7. concurrent request:
+                - search
+                - query
+                - load
+                - hybrid_search
+                - scene_test
+                    (collection: create->insert->flush->index->drop)
+                - scene_hybrid_search_test: 4 vector fields, 3 scalar fields
+                    (collection: create->insert->flush->index->load->hybrid_search->drop)
         """
         concurrent_tasks = [
             ConcurrentParams.params_search(weight=20, nq=10, top_k=10, search_param={"nprobe": 16}),
@@ -903,7 +926,7 @@ class TestConcurrentCases(PerfTemplate):
             )
         ]
         default_case_params = ConcurrentParams().params_scene_concurrent(
-            concurrent_tasks, concurrent_number=[20], during_time="240h", interval=20, dataset_size="50m", ni_per=25000,
+            concurrent_tasks, concurrent_number=[20], during_time="12h", interval=20, dataset_size="50m", ni_per=25000,
             other_fields=["float_vector_1"],
             vectors_index=cdp.DefaultVectorIndexParams.IVF_SQ8("float_vector_1"),
             scalars_index=cdp.DefaultScalarIndexParams.default_index("id"),
@@ -920,8 +943,34 @@ class TestConcurrentCases(PerfTemplate):
     @pytest.mark.parametrize("deploy_mode", [CLUSTER])
     def test_concurrent_locust_25m_multi_hnsw_ddl_dql_dml_cluster(self, input_params: InputParamsBase, deploy_mode):
         """
+        concurrent test and calculation of RT and QPS
+
         :test steps:
-            1. concurrent test and calculation of RT and QPS
+            1. create collection with fields:
+                'float_vector': 128dim,
+                'float_vector_1': 200dim,
+                'float_vector_2': 128dim,
+                'float_vector_3': 200dim,
+                scalar field: id(pk), float_1
+            2. build indexes:
+                HNSW: 'float_vector', 'float_vector_1', 'float_vector_2', 'float_vector_3'
+                DEFAULT index type(STL_SORT): 'id'
+            3. insert 25 million data
+            4. flush collection
+            5. build indexes again using the same params
+            6. load collection
+                replica: 1
+            7. concurrent request:
+                - insert
+                - delete
+                - search
+                - query
+                - load
+                - hybrid_search
+                - scene_test: 1 vector field, 1 primaryKey field
+                    (collection: create->insert->flush->index->drop)
+                - scene_hybrid_search_test: 4 vector fields, 3 scalar fields, 1 primaryKey field
+                    (collection: create->insert->flush->index->load->hybrid_search->drop)
         """
         data_size = "25m"
 
@@ -964,7 +1013,7 @@ class TestConcurrentCases(PerfTemplate):
             )
         ]
         default_case_params = ConcurrentParams().params_scene_concurrent(
-            concurrent_tasks, concurrent_number=[100], during_time="240h", interval=20, dataset_size=data_size,
+            concurrent_tasks, concurrent_number=[100], during_time="12h", interval=20, dataset_size=data_size,
             ni_per=10000, other_fields=["float_vector_1", "float_vector_2", "float_vector_3", "float_1"],
             vectors_index=dict_merge([cdp.DefaultVectorIndexParams.HNSW("float_vector_1"),
                                       cdp.DefaultVectorIndexParams.HNSW("float_vector_2"),

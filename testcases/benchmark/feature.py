@@ -241,10 +241,10 @@ class TestFeatureCases(PerfTemplate):
 
         :test steps:
             1. create collection with fields:
-                'float_vector': 32768dim,
-                'float_vector_1': 32768dim,
-                'float_vector_2': 32768dim,
-                'float_vector_3': 32768dim,
+                'float_vector': 2048dim,
+                'float_vector_1': 2048dim,
+                'float_vector_2': 2048dim,
+                'float_vector_3': 2048dim,
                 all scalar fields: varchar max_length=10, array max_capacity=7
             2. build indexes:
                 DISKANN: 'float_vector', 'float_vector_1', 'float_vector_2', 'float_vector_3'
@@ -258,7 +258,7 @@ class TestFeatureCases(PerfTemplate):
             7. concurrent request:
                 - hybrid_search
         """
-        dataset_size = parser_data_size("10w")
+        dataset_size = parser_data_size("150w")
 
         # set 60 field scalars, `id` is default primary key field
         _other_fields = [f"{name}_{number}" for number in range(1, 4) for name in cdp.all_field_names]
@@ -269,7 +269,7 @@ class TestFeatureCases(PerfTemplate):
 
         concurrent_tasks = [
             ConcurrentParams.params_hybrid_search(
-                nq=1, top_k=100, output_fields=["float_vector"],
+                nq=1, top_k=100, output_fields=["float_vector"], timeout=90,
                 reqs=[HybridSearchReqParams(anns_field="float_vector", search_param={"search_list": 30}, top_k=10,
                                             expr=f'id > {int(dataset_size * 0.1)}'),
                       HybridSearchReqParams(anns_field="float_vector_1", search_param={"search_list": 100}, top_k=50,
@@ -282,7 +282,7 @@ class TestFeatureCases(PerfTemplate):
         ]
 
         default_case_params = ConcurrentParams().params_scene_concurrent(
-            concurrent_tasks, dataset_size=dataset_size, dataset_name="local", dim=32768, ni_per=100,
+            concurrent_tasks, dataset_size=dataset_size, dataset_name="local", dim=2048, ni_per=100,
             shards_num=1, other_fields=all_other_fields, max_length=10,
             vectors_index=dict_merge([cdp.DefaultVectorIndexParams.DISKANN("float_vector_1"),
                                       cdp.DefaultVectorIndexParams.DISKANN("float_vector_2"),
@@ -449,7 +449,7 @@ class TestFeatureCases(PerfTemplate):
         :test steps:
             1. create collection with fields:
                 'float_vector': 32768dim,
-                'float_vector_1': 32768dim,
+                'float_vector_1': 2048dim,
                 'float_vector_2': 32768dim,
                 'float_vector_3': 32768dim,
                 all scalar fields: varchar max_length=10, array max_capacity=7
@@ -499,8 +499,11 @@ class TestFeatureCases(PerfTemplate):
                                       cdp.DefaultVectorIndexParams.IVF_SQ8("float_vector_3")]),
             scalars_index=dict_merge([*cdp.DefaultScalarIndexParams.default_index_list(["int64_1"]),
                                       *cdp.DefaultScalarIndexParams.INVERTED_list(["id", "bool_3"])]),
-            scalars_params=dict_merge(cdp.DefaultScalarParams.array_max_capacity_list(
-                7, [i for i in all_other_fields if str(i).startswith("array_")])),
+            scalars_params=dict_merge([
+                *cdp.DefaultScalarParams.array_max_capacity_list(7, [i for i in all_other_fields if
+                                                                     str(i).startswith("array_")]),
+                cdp.DefaultScalarParams.local("float_vector_1", 2048)
+            ]),
             concurrent_number=[1, 20], during_time="1h", interval=20, **cdp.DefaultIndexParams.HNSW)
 
         # 16C, 36G
@@ -670,7 +673,7 @@ class TestFeatureCases(PerfTemplate):
             1. create collection with fields:
                 'float_vector': 32768dim,
                 'binary_vector_1': 32768dim,
-                'float_vector_2': 32768dim,
+                'float_vector_2': 2048dim,
                 'binary_vector_3': 32768dim,
                 all scalar fields: varchar max_length=10, array max_capacity=7
             2. build indexes:
@@ -719,8 +722,11 @@ class TestFeatureCases(PerfTemplate):
                                       cdp.DefaultVectorIndexParams.BIN_FLAT("binary_vector_3")]),
             scalars_index=dict_merge([*cdp.DefaultScalarIndexParams.default_index_list(["int64_1"]),
                                       *cdp.DefaultScalarIndexParams.INVERTED_list(["id", "bool_3"])]),
-            scalars_params=dict_merge(cdp.DefaultScalarParams.array_max_capacity_list(
-                7, [i for i in all_other_fields if str(i).startswith("array_")])),
+            scalars_params=dict_merge([
+                *cdp.DefaultScalarParams.array_max_capacity_list(7, [i for i in all_other_fields if
+                                                                     str(i).startswith("array_")]),
+                cdp.DefaultScalarParams.local("float_vector_2", 2048)
+            ]),
             concurrent_number=[1, 20], during_time="5h", interval=20, **cdp.DefaultIndexParams.HNSW)
 
         node_resources = [
@@ -813,10 +819,10 @@ class TestFeatureCases(PerfTemplate):
 
         :test steps:
             1. create collection with fields:
-                'float_vector': 32768dim,
-                'float_vector_1': 32768dim,
-                'float_vector_2': 32768dim,
-                'float_vector_3': 32768dim,
+                'float_vector': 2048dim,
+                'float_vector_1': 2048dim,
+                'float_vector_2': 2048dim,
+                'float_vector_3': 2048dim,
                 all scalar fields: varchar max_length=10, array max_capacity=7
             2. build indexes:
                 DISKANN: 'float_vector', 'float_vector_1', 'float_vector_2', 'float_vector_3'
@@ -830,7 +836,7 @@ class TestFeatureCases(PerfTemplate):
             7. concurrent request:
                 - hybrid_search
         """
-        dataset_size = parser_data_size("10w")
+        dataset_size = parser_data_size("150w")
 
         # set 60 field scalars, `id` is default primary key field
         _other_fields = [f"{name}_{number}" for number in range(1, 4) for name in cdp.all_field_names]
@@ -854,7 +860,7 @@ class TestFeatureCases(PerfTemplate):
         ]
 
         default_case_params = ConcurrentParams().params_scene_concurrent(
-            concurrent_tasks, dataset_size=dataset_size, dataset_name="local", dim=32768, ni_per=100,
+            concurrent_tasks, dataset_size=dataset_size, dataset_name="local", dim=2048, ni_per=100,
             shards_num=16, other_fields=all_other_fields, max_length=10,
             vectors_index=dict_merge([cdp.DefaultVectorIndexParams.DISKANN("float_vector_1"),
                                       cdp.DefaultVectorIndexParams.DISKANN("float_vector_2"),
@@ -1024,7 +1030,7 @@ class TestFeatureCases(PerfTemplate):
         :test steps:
             1. create collection with fields:
                 'float_vector': 32768dim,
-                'float_vector_1': 32768dim,
+                'float_vector_1': 2048dim,
                 'float_vector_2': 32768dim,
                 'float_vector_3': 32768dim,
                 all scalar fields: varchar max_length=10, array max_capacity=7
@@ -1074,8 +1080,11 @@ class TestFeatureCases(PerfTemplate):
                                       cdp.DefaultVectorIndexParams.IVF_SQ8("float_vector_3")]),
             scalars_index=dict_merge([*cdp.DefaultScalarIndexParams.default_index_list(["int8_1"]),
                                       *cdp.DefaultScalarIndexParams.INVERTED_list(["id", "bool_3"])]),
-            scalars_params=dict_merge(cdp.DefaultScalarParams.array_max_capacity_list(
-                7, [i for i in all_other_fields if str(i).startswith("array_")])),
+            scalars_params=dict_merge([
+                *cdp.DefaultScalarParams.array_max_capacity_list(7, [i for i in all_other_fields if
+                                                                     str(i).startswith("array_")]),
+                cdp.DefaultScalarParams.local("float_vector_1", 2048)
+            ]),
             concurrent_number=[1, 20], during_time="1h", interval=20, **cdp.DefaultIndexParams.HNSW)
 
         # 16C, 36G
@@ -1248,7 +1257,7 @@ class TestFeatureCases(PerfTemplate):
             1. create collection with fields:
                 'float_vector': 32768dim,
                 'binary_vector_1': 32768dim,
-                'float_vector_2': 32768dim,
+                'float_vector_2': 2048dim,
                 'binary_vector_3': 32768dim,
                 all scalar fields: varchar max_length=10, array max_capacity=7
             2. build indexes:
@@ -1256,7 +1265,7 @@ class TestFeatureCases(PerfTemplate):
                 BIN_IVF_FLAT: 'binary_vector_1',
                 DISKANN: 'float_vector_2'
                 BIN_FLAT: 'binary_vector_3'
-                default_scalar_index: 'int64_1'
+                default_scalar_index: 'int8_1'
                 INVERTED: 'id', 'bool_3'
             3. insert 100k data
             4. flush collection
@@ -1298,8 +1307,11 @@ class TestFeatureCases(PerfTemplate):
                                       cdp.DefaultVectorIndexParams.BIN_FLAT("binary_vector_3")]),
             scalars_index=dict_merge([*cdp.DefaultScalarIndexParams.default_index_list(["int8_1"]),
                                       *cdp.DefaultScalarIndexParams.INVERTED_list(["id", "bool_3"])]),
-            scalars_params=dict_merge(cdp.DefaultScalarParams.array_max_capacity_list(
-                7, [i for i in all_other_fields if str(i).startswith("array_")])),
+            scalars_params=dict_merge([
+                *cdp.DefaultScalarParams.array_max_capacity_list(7, [i for i in all_other_fields if
+                                                                     str(i).startswith("array_")]),
+                cdp.DefaultScalarParams.local("float_vector_2", 2048)
+            ]),
             concurrent_number=[1, 20], during_time="5h", interval=20, **cdp.DefaultIndexParams.HNSW)
 
         node_resources = [
@@ -2141,8 +2153,9 @@ class TestFeatureCases(PerfTemplate):
             concurrent_number=1, during_time="3h", interval=20, **cdp.DefaultIndexParams.IVF_FLAT)  # during_time=12h
 
         node_resources = [
+            NodeResource(nodes=[dataNode], replicas=2),
             NodeResource(nodes=[indexNode], cpu=8),
-            NodeResource(nodes=[queryNode], cpu=8, mem=32)
+            NodeResource(nodes=[queryNode], cpu=8, mem=64, replicas=2)
         ]
 
         self.concurrency_template(
