@@ -1567,8 +1567,9 @@ class TestFeatureCases(PerfTemplate):
         dataset_size = parser_data_size("10w")
 
         concurrent_tasks = [
-            ConcurrentParams.params_insert(nb=1000, random_id=True, random_vector=True, start_id=dataset_size),
-            ConcurrentParams.params_delete(delete_length=1000),
+            ConcurrentParams.params_insert(weight=30, nb=1000, random_id=True, random_vector=True,
+                                           start_id=dataset_size),
+            ConcurrentParams.params_delete(weight=30, delete_length=1000),
             ConcurrentParams.params_flush(timeout=600),
             ConcurrentParams.params_load(timeout=600)
         ]

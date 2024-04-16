@@ -310,6 +310,12 @@ class VDCClientBase:
         self.cloud_rm_api.resume(instance_id=self.real_instance_id, user_id=self.real_user_id)
         assert self.rm_check_server_status(timeout=timeout)
 
+    def rm_restart_server(self, timeout: int = 1800):
+        # resume server
+        log.info(f"[VDCClientBase] RM API restart instance: {self.instance_id}")
+        self.cloud_rm_api.restart(self.instance_id)
+        assert self.check_server_status(timeout=timeout)
+
     def rm_update_image(self, image_tag: str, timeout: int = 1800):
         """ Update server's image """
         _db_version = self.get_server_image(instance_id=self.real_instance_id, user_id=self.real_user_id)
@@ -373,25 +379,28 @@ class VDCClientBase:
             if res.code not in [RMErrorCode.INSTANCE_PARAM_NO_NEED_MODIFY, 0]:
                 self._raise(f"[VDCClientBase] Update milvus param {param_name}:{param_value} failed:{res.to_dict}")
 
-        if instance_type == InstanceType.Milvus:
-            # stop instance and check stopped
-            self.rm_stop_server(timeout=timeout)
-            # self.stop_server()
+        self.rm_restart_server(timeout=timeout)
+        log.info(f"[VDCClientBase] Modify instance's: {self.instance_name} parameters completed.")
 
-            # resume stopped instance and wait running
-            self.rm_resume_server(timeout=timeout)
-            # self.resume_server()
-
-            log.info(f"[VDCClientBase] Modify instance's: {self.instance_name} parameters completed.")
-        elif instance_type == InstanceType.Serverless:
-            # stop instance serverless and check stopped
-            self.rm_stop_serverless_host(timeout=timeout)
-
-            # resume stopped serverless instance and wait running
-            self.rm_resume_serverless_host(timeout=timeout)
-            log.info(f"[VDCClientBase] Modify serverless instance:{self.real_instance_id} parameters completed.")
-        else:
-            self._raise(f"[VDCClientBase] Unrecognized instance type {instance_type}")
+        # if instance_type == InstanceType.Milvus:
+        #     # stop instance and check stopped
+        #     self.rm_stop_server(timeout=timeout)
+        #     # self.stop_server()
+        #
+        #     # resume stopped instance and wait running
+        #     self.rm_resume_server(timeout=timeout)
+        #     # self.resume_server()
+        #
+        #     log.info(f"[VDCClientBase] Modify instance's: {self.instance_name} parameters completed.")
+        # elif instance_type == InstanceType.Serverless:
+        #     # stop instance serverless and check stopped
+        #     self.rm_stop_serverless_host(timeout=timeout)
+        #
+        #     # resume stopped serverless instance and wait running
+        #     self.rm_resume_serverless_host(timeout=timeout)
+        #     log.info(f"[VDCClientBase] Modify serverless instance:{self.real_instance_id} parameters completed.")
+        # else:
+        #     self._raise(f"[VDCClientBase] Unrecognized instance type {instance_type}")
 
         # check values
         res = self.cloud_rm_api.params_list(instance_id=self.real_instance_id)

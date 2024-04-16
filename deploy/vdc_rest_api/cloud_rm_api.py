@@ -125,6 +125,16 @@ class CloudRMApi:
         return self.req.post(url=url, body=body, headers=self.update_headers(user_id=user_id), log_level=log_level)
 
     @request_catch()
+    def restart(self, instance_id: str, user_id: str = "", switch_type: int = 0,
+                log_level=Log_Level) -> RequestResponseParser:
+        url = self.host + "/resource/v1/instance/milvus/restart"
+        body = {
+            "instanceId": instance_id,
+            "switchType": switch_type
+        }
+        return self.req.post(url=url, body=body, headers=self.update_headers(user_id=user_id), log_level=log_level)
+
+    @request_catch()
     def upgrade_version(self, instance_id: str, db_version: str, user_id: str = "",
                         log_level=Log_Level) -> RequestResponseParser:
         url = self.host + "/resource/v1/instance/milvus/upgradeVersion"
