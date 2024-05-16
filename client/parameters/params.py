@@ -114,7 +114,8 @@ class ParamsFormat:
 
     acc_scene_recall = update_dict_value({
         dataset_params: {dataset_name: ([type(str())], MUST),
-                         ni_per: ([type(int()), type(str())], OPTION)},
+                         ni_per: ([type(int()), type(str())], OPTION),
+                         req_run_counts: ([type((int()))], OPTION)},
         index_params: {index_type: ([type(str())], MUST),
                        index_param: ([type(dict())], MUST)},
         search_params: {top_k: ([type(int()), type(list())], MUST),
@@ -171,7 +172,8 @@ class ParamsFormat:
     }, common_scene_build_index)
 
     common_scene_search_recall = update_dict_value({
-        dataset_params: {ground_truth_file_name: ([type(str())], OPTION)},
+        dataset_params: {req_run_counts: ([type((int()))], OPTION),
+                         ground_truth_file_name: ([type(str())], OPTION)},
         search_params: {top_k: ([type(int()), type(list())], MUST),
                         nq: ([type(int()), type(list())], MUST),
                         search_param: ([type(dict())], MUST),
@@ -874,10 +876,11 @@ class ConcurrentInputParamsLoadSearchRelease(DataClassBase):
     guarantee_timestamp: Optional[int] = None
     output_fields: Optional[list] = None
     group_by_field: Optional[str] = None
-    random_data: Optional[bool] = False
+    timeout: Optional[int] = DefaultValue.default_timeout
 
     replica_number: Optional[int] = 1
-    timeout: Optional[int] = DefaultValue.default_timeout
+    random_data: Optional[bool] = False
+    search_counts: Optional[int] = 1
 
 
 @dataclass
@@ -898,6 +901,7 @@ class ConcurrentTaskLoadSearchRelease(DataClassBase):
 
     # other params
     random_data: Optional[bool] = False
+    search_counts: Optional[int] = 1
 
     @property
     def obj_params(self):
@@ -923,11 +927,11 @@ class ConcurrentInputParamsLoadHybridSearchRelease(DataClassBase):
     output_fields: Optional[list] = None
     ignore_growing: Optional[bool] = False
     guarantee_timestamp: Optional[int] = None
-
-    replica_number: Optional[int] = 1
     timeout: Optional[int] = DefaultValue.default_timeout
 
+    replica_number: Optional[int] = 1
     random_data: Optional[bool] = False
+    hybrid_search_counts: Optional[int] = 1
 
 
 @dataclass
@@ -940,7 +944,6 @@ class ConcurrentTaskLoadHybridSearchRelease(DataClassBase):
     output_fields: Optional[list] = None
     ignore_growing: Optional[bool] = False
     guarantee_timestamp: Optional[int] = None
-
     timeout: Optional[int] = DefaultValue.default_timeout
 
     # for load
@@ -948,6 +951,7 @@ class ConcurrentTaskLoadHybridSearchRelease(DataClassBase):
 
     # other params
     random_data: Optional[bool] = False
+    hybrid_search_counts: Optional[int] = 1
 
     def set_random_data(self):
         for r in self.reqs:

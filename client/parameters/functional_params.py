@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Optional, Union, List
+from typing import Optional, Union, List, Dict
 
 from pymilvus.orm import types
 
@@ -8,7 +8,6 @@ from client.common.common_type import DefaultValue
 
 @dataclass
 class FuncParamsBase:
-    timeout: Optional[int] = DefaultValue.default_timeout
 
     @property
     def to_dict(self):
@@ -24,6 +23,8 @@ class FuncParamsDelete(FuncParamsBase):
     expr: Optional[str] = DefaultValue.default_expr
     partition_name: Optional[str] = None
 
+    timeout: Optional[int] = DefaultValue.default_timeout
+
 
 @dataclass
 class FuncParamsQuery(FuncParamsBase):
@@ -31,6 +32,30 @@ class FuncParamsQuery(FuncParamsBase):
     output_fields: Optional[List[str]] = None
     partition_names: Optional[List[str]] = None
     consistency_level: Optional[str] = types.CONSISTENCY_STRONG
+
+    timeout: Optional[int] = DefaultValue.default_timeout
+
+
+@dataclass
+class FuncParamsVectorsIndex(FuncParamsBase):
+    metric_type: str
+    index_type: str
+    index_param: dict
+
+
+@dataclass
+class FuncParamsScalarsIndex(FuncParamsBase):
+    index_type: Optional[str] = ""
+    index_param: Optional[dict] = field(default_factory=lambda: {})
+
+    @property
+    def to_dict(self):
+        index_params = {}
+        if self.index_type:
+            index_params["index_type"] = self.index_type
+        if self.index_param:
+            index_params["params"] = self.index_param
+        return index_params
 
 
 """ Test cases params """
@@ -91,8 +116,15 @@ class ParamsQueryDeleted(ParamsBase):
     result: Optional[int] = 0
 
 
+@dataclass
+class ParamsRebuildPartialIndex(ParamsBase):
+    vectors_index: Optional[Dict[str, FuncParamsVectorsIndex]] = field(default_factory=lambda: {})
+    scalars_index: Optional[Dict[str, FuncParamsScalarsIndex]] = field(default_factory=lambda: {})
+
+
 class GetParamObj:
     scene_functional_query_deleted = ParamsQueryDeleted
+    scene_functional_rebuild_partial_index = ParamsRebuildPartialIndex
 
     def get_obj(self, name):
         return getattr(self, name, ParamsBase)

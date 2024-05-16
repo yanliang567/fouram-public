@@ -167,7 +167,7 @@ class CommonCases(Base):
         vectors_index = self.params_obj.dataset_params.get(pn.vectors_index, {})
         vectors_field = list(vectors_index.keys())
 
-        if len(scalars) + len(vectors_field) == 0:
+        if len(scalars_field) + len(vectors_field) == 0:
             log.info("[CommonCases] No scalar and vector fields need to be indexed.")
             return True
         log.info(f"[CommonCases] Start building other fields index.")
@@ -214,8 +214,9 @@ class CommonCases(Base):
         return self.case_report.to_dict(), True
 
     def prepare_search(self, req_run_counts, **kwargs):
-        search_rt = []
-        for i in range(req_run_counts):
+        search_rt, _counts = [], 0
+        while _counts < req_run_counts:
+            _counts += 1
             res_search = self.search(**kwargs)
             search_rt.append(round(res_search.rt, Precision.SEARCH_PRECISION))
 
@@ -227,16 +228,33 @@ class CommonCases(Base):
             "TP95": round(np.percentile(search_rt, 95), Precision.SEARCH_PRECISION)}})
         return self.case_report.to_dict(), True
 
-    def prepare_search_recall(self, _nq, _top_k, ground_truth_file_name: str = None, **kwargs):
-        res_search = self.search(**kwargs)
+    def prepare_search_recall(self, req_run_counts: int, _nq, _top_k, ground_truth_file_name: str = None, **kwargs):
         true_ids = get_ground_truth_ids(data_size=self.params_obj.dataset_params[pn.dataset_size],
                                         data_type=self.params_obj.dataset_params[pn.dataset_name],
-                                        ground_truth_file_name=ground_truth_file_name)
-        result_ids = get_search_ids(res_search.response)
-        acc_value = get_recall_value(true_ids[:_nq, :_top_k].tolist(), result_ids)
+                                        ground_truth_file_name=ground_truth_file_name)[:_nq, :_top_k].tolist()
 
-        self.case_report.add_attr(**{"search": {"Recall": acc_value,
-                                                "RT": round(res_search.rt, Precision.SEARCH_PRECISION)}})
+        search_acc, search_rt, _counts = [], [], 0
+        while _counts < req_run_counts:
+            _counts += 1
+
+            res_search = self.search(**kwargs)
+            search_rt.append(res_search.rt)
+
+            _recall = get_recall_value(true_ids, get_search_ids(res_search.response))
+            search_acc.append(_recall)
+            log.info(f"[CommonCases] {_counts}. Search recall: {_recall}")
+
+        if len(list(set(search_acc))) != 1:
+            log.error("[CommonCases] Search recall unstable! Different recalls: {0}, All recalls:{1}".format(
+                list(set(search_acc)), search_acc))
+
+        self.case_report.add_attr(**{"search": {
+            "Recall": round(float(np.mean(search_acc)), Precision.SEARCH_PRECISION),
+            "RT": round(float(np.mean(search_rt)), Precision.SEARCH_PRECISION),
+            "MinRT": round(float(np.min(search_rt)), Precision.SEARCH_PRECISION),
+            "MaxRT": round(float(np.max(search_rt)), Precision.SEARCH_PRECISION),
+            "TP99": round(np.percentile(search_rt, 99), Precision.SEARCH_PRECISION),
+            "TP95": round(np.percentile(search_rt, 95), Precision.SEARCH_PRECISION)}})
         return self.case_report.to_dict(), True
 
     def parser_search_params(self):
@@ -859,9 +877,10 @@ class SearchRecall(CommonCases):
                                show_db_user=self.params_obj.dataset_params.get(pn.show_db_user, False))
 
         # search
-        def run(_nq, _top_k, _ground_truth_file_name, run_s_p: dict):
+        def run(req_run_counts, _nq, _top_k, _ground_truth_file_name, run_s_p: dict):
             try:
-                self.prepare_search_recall(_nq, _top_k, ground_truth_file_name=_ground_truth_file_name, **run_s_p)
+                self.prepare_search_recall(req_run_counts, _nq, _top_k, ground_truth_file_name=_ground_truth_file_name,
+                                           **run_s_p)
                 return self.case_report.to_dict(), True
             except Exception as e:
                 log.error("[SearchRecall] Search raise error: {}".format(e))
@@ -882,8 +901,8 @@ class SearchRecall(CommonCases):
             }, other_params)
             p = CaseIterParams(
                 callable_object=run,
-                object_args=[nq, top_k, self.params_obj.dataset_params.get("ground_truth_file_name", None),
-                             search_params],
+                object_args=[self.params_obj.dataset_params.get("req_run_counts", 1), nq, top_k,
+                             self.params_obj.dataset_params.get("ground_truth_file_name", None), search_params],
                 actual_params_used=actual_params_used, case_type=self.__class__.__name__)
             params_list.append(p)
         yield params_list

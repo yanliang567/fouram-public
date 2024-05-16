@@ -803,7 +803,7 @@ class TestPerformanceCases(PerfTemplate):
         """
         case_params = SearchParams().params_scene_search_ivf_flat(
             dataset_size="1m", top_k=[10, 100], nq=10000, search_param={"nprobe": [8, 32, 64]}, other_fields=[],
-            search_expr=None, req_run_counts=None)
+            search_expr=None, req_run_counts=100)
         self.serial_template(input_params=input_params, cpu=dp.default_cpu, mem=dp.default_mem, deploy_mode=deploy_mode,
                              case_callable_obj=SearchRecall().scene_search_recall, default_case_params=case_params)
 
@@ -815,7 +815,7 @@ class TestPerformanceCases(PerfTemplate):
         """
         case_params = SearchParams().params_scene_search_ivf_flat(
             dataset_size="1m", top_k=[10, 100], nq=10000, search_param={"nprobe": [8, 32, 64]}, other_fields=[],
-            search_expr=None, req_run_counts=None)
+            search_expr=None, req_run_counts=100)
         self.serial_template(input_params=input_params, cpu=dp.default_cpu, mem=dp.default_mem, deploy_mode=deploy_mode,
                              case_callable_obj=SearchRecall().scene_search_recall, default_case_params=case_params)
 

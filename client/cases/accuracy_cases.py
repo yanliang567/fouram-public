@@ -241,38 +241,39 @@ class CommonCases(Base):
         }, _params)
         return result, nq, top_k
 
-    def search_recall(self, _search_params, vector_type, metric_type: str):
+    def search_recall(self, _search_params, vector_type, metric_type: str, req_run_counts: int = None):
         _params, nq, top_k = self.search_param_analysis(_search_params, vector_type, metric_type)
-
+        true_ids = self.dataset_neighbors[:nq, :top_k].tolist()
         try:
             log.info("[AccCases] Params of search: {}".format(_params))
-            start_time = time.time()
-            end_time = start_time + 500
 
-            cnt = 0
-            search_rt = []
-            while cnt < 100 and start_time < end_time:
+            search_acc, search_rt, _counts, end_time = [], [], 0, time.time() + 500
+            _condition = "_counts < req_run_counts" if req_run_counts else "_counts < 100 and time.time() < end_time"
+            while eval(_condition):
+                _counts += 1
+
                 res_search = self.search(**_params)
-                search_rt.append(round(res_search.rt, Precision.SEARCH_PRECISION))
-                cnt += 1
-                start_time = time.time()
+                search_rt.append(res_search.rt)
 
-            result = self.search(**_params)
-            rt = result.rt
-            search_rt.append(rt)
+                _recall = get_recall_value(true_ids, get_search_ids(res_search.response))
+                search_acc.append(_recall)
+                log.info(f"[AccCases] {_counts}. Search recall: {_recall}")
 
-            result_ids = get_search_ids(result.response)
-            acc_value = get_recall_value(self.dataset_neighbors[:nq, :top_k].tolist(), result_ids)
+            if len(list(set(search_acc))) != 1:
+                log.error("[AccCases] Search recall unstable! Different recalls: {0}, All recalls:{1}".format(
+                    list(set(search_acc)), search_acc))
 
-            search_res = {"Recall": acc_value,
-                          "RT": round(float(np.mean(search_rt)), Precision.SEARCH_PRECISION),
-                          "LastRT": round(rt, Precision.SEARCH_PRECISION),
-                          "MinRT": round(float(np.min(search_rt)), Precision.SEARCH_PRECISION),
-                          "MaxRT": round(float(np.max(search_rt)), Precision.SEARCH_PRECISION)
-                          }
+            search_res = {
+                "Recall": round(float(np.mean(search_acc)), Precision.SEARCH_PRECISION),
+                "RT": round(float(np.mean(search_rt)), Precision.SEARCH_PRECISION),
+                "LastRT": round(search_rt[-1], Precision.SEARCH_PRECISION),
+                "MinRT": round(float(np.min(search_rt)), Precision.SEARCH_PRECISION),
+                "MaxRT": round(float(np.max(search_rt)), Precision.SEARCH_PRECISION),
+                "TP99": round(np.percentile(search_rt, 99), Precision.SEARCH_PRECISION),
+                "TP95": round(np.percentile(search_rt, 95), Precision.SEARCH_PRECISION)}
             self.case_report.add_attr(**{"search": search_res})
-
             log.info("[AccCases] Search result:{0}".format(search_res))
+
             return self.case_report.to_dict(), True
 
         except Exception as e:
@@ -324,7 +325,9 @@ class AccCases(CommonCases):
         params_list = []
         for s_p in s_params:
             actual_params_used = update_dict_value({pn.search_params: s_p}, input_params.params)
-            p = CaseIterParams(callable_object=self.search_recall, object_args=[s_p, vector_type, metric_type],
+            p = CaseIterParams(callable_object=self.search_recall,
+                               object_args=[s_p, vector_type, metric_type,
+                                            self.params_obj.dataset_params.get("req_run_counts", None)],
                                actual_params_used=actual_params_used, case_type=self.__class__.__name__)
             params_list.append(p)
         yield params_list

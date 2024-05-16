@@ -133,7 +133,9 @@ def get_recall_value(true_ids, result_ids):
     for index, item in enumerate(result_ids):
         log.debug("[get_recall_value] true_ids: {}".format(true_ids[index]))
         log.debug("[get_recall_value] result_ids: {}".format(item))
+
         tmp = set(true_ids[index]).intersection(set(item))
+        log.debug("[get_recall_value] intersection length: {0}, intersection_ids: {1}".format(len(tmp), tmp))
         if len(item) != 0:
             # tmp = set(list(true_ids[index])[:len(item)]).intersection(set(item))
             sum_radio += len(tmp) / len(item)
@@ -1370,7 +1372,9 @@ class GenIterValues:
         return self
 
     def loop_ids(self, step=50000, start_id=0):
-        self.set_ids_step(step)
+        # The first batch value is smaller than the initialized value
+        _step = step if self.ids_step == 0 else self.ids_step
+        self.set_ids_step(_step)
 
         while True:
             ids = [k for k in range(start_id, start_id + int(self.ids_step))]
@@ -1384,7 +1388,9 @@ class GenIterValues:
         return self
 
     def gen_scalar_values(self, scalars_params: dict, insert_length: int):
-        self.set_insert_length(insert_length)
+        # The first batch value is smaller than the initialized value
+        _insert_length = insert_length if self.insert_length == 0 else self.insert_length
+        self.set_insert_length(_insert_length)
 
         _loop_files = {k: loop_gen_scalar_files(
             scalars_params[k]["other_params"].get("dataset"),

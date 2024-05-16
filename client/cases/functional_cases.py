@@ -1,14 +1,20 @@
 import copy
 import dacite
+from typing import Dict
 
 from client.common.common_type import Precision, CaseIterParams
-from client.common.common_func import get_vector_type, get_default_field_name, ParserInputParams
+from client.common.common_func import (
+    get_vector_type, get_default_field_name, ParserInputParams
+)
 from client.util.params_check import functional_check_params
 from client.util.api_request import docstring_decorator
 from client.cases.common_cases import CommonCases
 from client.parameters import params_name as pn
 from client.parameters.params import ParamsFormat, ParamsBase
-from client.parameters.functional_params import GetParamObj
+from client.parameters.functional_params import (
+    GetParamObj,
+    FuncParamsVectorsIndex, FuncParamsScalarsIndex
+)
 
 from utils.util_log import log
 
@@ -130,6 +136,10 @@ class FunctionalCases(CommonCases):
 
     """ Base request """
 
+    def get_collection_fields(self, collection_obj: callable = None):
+        collection_obj = collection_obj or self.collection_wrap
+        return [f.name for f in collection_obj.schema.fields]
+
     def collection_delete(self, report_data: bool = True, **kwargs):
         log.info("[FunctionalCases] Delete params: {0}".format(kwargs))
         res = self.collection_wrap.delete(**kwargs)
@@ -143,6 +153,26 @@ class FunctionalCases(CommonCases):
         if report_data:
             self.set_report_data({"query_RT": round(res.rt, Precision.QUERY_PRECISION)})
         return res
+
+    def build_indexes(self, vectors_index: Dict[str, FuncParamsVectorsIndex] = {},
+                      scalars_index: Dict[str, FuncParamsScalarsIndex] = {}, report_data: bool = True):
+        # build vector index
+        for k, v in vectors_index.items():
+            result = self.build_index(k, **v.to_dict)
+            rt = round(result.rt, Precision.INDEX_PRECISION)
+            # set report data
+            if report_data:
+                self.set_report_data({"index": {k: {"RT": rt}}})
+            log.info("[FunctionalCases] RT of build vector field index `{0}`: {1}s".format(k, rt))
+
+        # build scalar index
+        for k, v in scalars_index.items():
+            result = self.build_scalar_index(field_name=k, index_params=v.to_dict)
+            rt = round(result.rt, Precision.INDEX_PRECISION)
+            # set report data
+            if report_data:
+                self.set_report_data({"index": {k: {"RT": rt}}})
+            log.info("[FunctionalCases] RT of build scalar field index `{0}`: {1}s".format(k, rt))
 
     """ Test steps """
 
@@ -161,6 +191,19 @@ class FunctionalCases(CommonCases):
             1. delete data
             2. query data has been deleted and check result is empty
 
+        input params:
+            delete:
+                expr: str
+                partition_name: str
+                timeout: int
+            query:
+                expr: str
+                output_fields: List[str]
+                partition_names: List[str]
+                consistency_level: str
+                timeout: int
+            result: int
+
         notice:
             Do not choose to use default parameters unless necessary, please pass in from outside!
         """
@@ -170,8 +213,64 @@ class FunctionalCases(CommonCases):
 
         # exec steps
         self.collection_delete(**params.delete.to_dict)
-        res_query = self.collection_query(**params.query.to_dict)
+        res_query = self.collection_query(**params.query.to_dict).response
 
+        query_len = res_query[0]['count(*)'] if params.query.output_fields == ['count(*)'] else len(res_query)
         # check result
-        log.info(f"[FunctionalCases] Check query results after deletion: {len(res_query.response)} == {params.result}")
-        assert len(res_query.response) == params.result
+        log.info(f"[FunctionalCases] Check query results after deletion: {query_len} == {params.result}")
+        assert query_len == params.result
+
+    @docstring_decorator
+    def scene_functional_rebuild_partial_index(self, **kwargs):
+        """
+        steps:
+            1. release collection
+            2. drop indexes
+            3. rebuild indexes
+
+        input params:
+            vectors_index:
+                metric_type: str
+                index_type: str
+                index_param: dict
+            scalars_index:
+                index_type: Optional[str] = ""
+                index_param: Optional[dict] = {}
+
+        notice:
+            Collection would not re-load after rebuilding indexes
+        """
+        # parser input params for test case
+        params = self.parsing_functional_params(data_class=GetParamObj().scene_functional_rebuild_partial_index,
+                                                all_params=kwargs)
+
+        # exec steps
+        scalars_index, vectors_index = params.scalars_index, params.vectors_index
+        scalars_field, vectors_field = list(scalars_index.keys()), list(vectors_index.keys())
+
+        # check rebuild fields
+        if len(scalars_field) + len(vectors_field) == 0:
+            log.info("[FunctionalCases] No scalar and vector fields need to rebuild index.")
+            return True
+
+        other_fields = self.get_collection_fields()
+        for _field in scalars_field + vectors_field:
+            if _field not in other_fields:
+                raise ValueError(f"[FunctionalCases] The field `{_field}` isn't in collection {other_fields}.")
+
+        self.show_index()
+
+        # release collection
+        self.release_collection()
+
+        # drop indexes
+        for field_name in scalars_field + vectors_field:
+            self.drop_specified_field_index(field_name=field_name)
+
+        # rebuild indexes
+        log.info(f"[FunctionalCases] Start rebuilding indexes, scalars: {scalars_field}, vectors: {vectors_field}")
+        self.build_indexes(vectors_index=vectors_index, scalars_index=scalars_index)
+
+        self.show_index()
+
+        log.info(f"[FunctionalCases] Rebuild scalars:{scalars_field} vectors:{vectors_field} indexes done.")

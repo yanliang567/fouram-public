@@ -1,10 +1,13 @@
+from typing import Dict
 from client.common.common_func import dict_recursive_key, parser_data_size, update_dict_value
 from client.common.common_type import DefaultValue
 from client.parameters.input_params.input_params_common import CommonParams
 from client.parameters import params_name as pn
 from client.parameters.functional_params import (
     FuncParamsDelete,
-    FuncParamsQuery
+    FuncParamsQuery,
+    FuncParamsVectorsIndex,
+    FuncParamsScalarsIndex
 )
 
 from utils.util_log import log
@@ -25,6 +28,17 @@ class FunctionalParams(CommonParams):
         result: Optional[int] = 0
         """
         return {"delete": delete.to_dict, "query": query.to_dict, "result": result}
+
+    @staticmethod
+    def params_scene_functional_rebuild_partial_index(
+            vectors_index: Dict[str, FuncParamsVectorsIndex] = {},
+            scalars_index: Dict[str, FuncParamsScalarsIndex] = {}):
+        """
+        vectors_index: Optional[Dict[str, FuncParamsVectorsIndex]] = {}
+        scalars_index: Optional[Dict[str, FuncParamsScalarsIndex]] = {}
+        """
+        return {"vectors_index": {k: v.to_dict for k, v in vectors_index.items()},
+                "scalars_index": {k: v.to_dict for k, v in scalars_index.items()}}
 
     def params_scene_functional(self, functional_params: dict, dataset_name=pn.DatasetsName.SIFT, dim=128,
                                 dataset_size="1m", ni_per=50000,

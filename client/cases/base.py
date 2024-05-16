@@ -508,6 +508,17 @@ class Base:
         log.info("[Base] Clean all index done.")
         return True
 
+    def drop_specified_field_index(self, field_name: str):
+        for _index_obj in self.collection_wrap.indexes:
+            if _index_obj.field_name == field_name:
+                self.collection_wrap.drop_index(index_name=_index_obj.index_name)
+                log.info(f"[Base] Drop index of field:`{field_name}` done.")
+
+        if field_name in [i.field_name for i in self.collection_wrap.indexes]:
+            log.error(f"[Base] Index of collection:{self.collection_wrap.name} field:`{field_name}` can't be dropped.")
+            return False
+        return True
+
     def count_entities(self, collection_obj: callable = None, log_level=LogLevel.INFO):
         collection_obj = collection_obj or self.collection_wrap
         counts = collection_obj.num_entities
@@ -1132,39 +1143,54 @@ class Base:
 
     @func_time_catch()
     def concurrent_load_search_release(self, params: ConcurrentTaskLoadSearchRelease):
+        func_name = "concurrent_load_search_release"
+
         load_res = self.collection_wrap.load(check_task=CheckTasks.assert_result, replica_number=params.replica_number,
-                                             timeout=params.timeout)
+                                             timeout=params.timeout).check_result
 
-        if params.random_data:
-            params.data = gen_vectors(nb=len(params.data), dim=params.dim, field_name=params.anns_field)
-        search_res = self.collection_wrap.search(check_task=CheckTasks.assert_result, **params.obj_params)
+        search_res, _count = [], 0
+        while _count < params.search_counts:
+            _count += 1
+            if params.random_data:
+                params.data = gen_vectors(nb=len(params.data), dim=params.dim, field_name=params.anns_field)
+            search_res.append(
+                self.collection_wrap.search(check_task=CheckTasks.assert_result, **params.obj_params).check_result)
 
-        release_res = self.collection_wrap.release(check_task=CheckTasks.assert_result, timeout=params.timeout)
+        release_res = self.collection_wrap.release(check_task=CheckTasks.assert_result,
+                                                   timeout=params.timeout).check_result
 
-        if not (load_res.check_result and search_res.check_result and release_res.check_result):
-            msg = "[Base] Check concurrent_load_search_release result failed, load:{0}, search:{1}, release:{2}"
-            raise ValueError(msg.format(load_res.check_result, search_res.check_result, release_res.check_result))
+        if not (load_res and sum(search_res) == params.search_counts and release_res):
+            msg = "[Base] Check {0} result failed, load:{1}, search failed:{2}, release:{3}"
+            raise ValueError(
+                msg.format(func_name, load_res, params.search_counts - sum(search_res), release_res))
 
-        return "[Base] concurrent_load_search_release finished."
+        return f"[Base] {func_name} finished."
 
     @func_time_catch()
     def concurrent_load_hybrid_search_release(self, params: ConcurrentTaskLoadHybridSearchRelease):
+        func_name = "concurrent_load_hybrid_search_release"
+
         load_res = self.collection_wrap.load(check_task=CheckTasks.assert_result, replica_number=params.replica_number,
-                                             timeout=params.timeout)
-        if params.random_data:
-            params.set_random_data()
-        log.debug(f"[Base] Params of concurrent_load_hybrid_search_release: {params.get_all_hybrid_search_params}")
-        hybrid_search_res = self.collection_wrap.hybrid_search(check_task=CheckTasks.assert_result,
-                                                               **params.hybrid_search_obj_params)
+                                             timeout=params.timeout).check_result
 
-        release_res = self.collection_wrap.release(check_task=CheckTasks.assert_result, timeout=params.timeout)
+        hybrid_search_res, _count = [], 0
+        while _count < params.hybrid_search_counts:
+            _count += 1
+            if params.random_data:
+                params.set_random_data()
+            log.debug(f"[Base] Params of {func_name}: {params.get_all_hybrid_search_params}")
+            hybrid_search_res.append(self.collection_wrap.hybrid_search(
+                check_task=CheckTasks.assert_result, **params.hybrid_search_obj_params).check_result)
 
-        if not (load_res.check_result and hybrid_search_res.check_result and release_res.check_result):
-            msg = "[Base] Check concurrent_load_hybrid_search_release result failed, load:{0}, hybrid_search:{1}, release:{2}"
+        release_res = self.collection_wrap.release(check_task=CheckTasks.assert_result,
+                                                   timeout=params.timeout).check_result
+
+        if not (load_res and sum(hybrid_search_res) == params.hybrid_search_counts and release_res):
+            msg = "[Base] Check {0} result failed, load:{1}, hybrid_search failed:{2}, release:{3}"
             raise ValueError(
-                msg.format(load_res.check_result, hybrid_search_res.check_result, release_res.check_result))
+                msg.format(func_name, load_res, params.hybrid_search_counts - sum(hybrid_search_res), release_res))
 
-        return "[Base] concurrent_load_hybrid_search_release finished."
+        return f"[Base] {func_name} finished."
 
     @func_time_catch()
     def concurrent_scene_search_test(self, params: ConcurrentTaskSceneSearchTest):
