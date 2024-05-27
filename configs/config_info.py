@@ -1,5 +1,6 @@
 import os
 import json
+import dacite
 
 from dataclasses import dataclass, field
 from typing import Optional
@@ -76,6 +77,8 @@ class VDCENVParams(ParamsBase):
 class DatasetConfig(ParamsBase):
     # for gen dataset file name
     dataset_type: str = pn.NUMPY  # npy, parquet, hdf5
+    # # file data type, for special dtype, e.g. `bfloat16`
+    file_data_type: str = None
     # determine the rules for gen file name
     # scalar: scalar_00000.npy, vector: binary_<dim>d_00000.npy, parquet: binary_<dim>d_00000.parquet
     data_type: str = ""  # vector, scalar
@@ -145,6 +148,9 @@ class DatasetConfigs(ParamsBase):
     def dataset_type(self, name: str):
         return self._get_property(name, "dataset_type")
 
+    def file_data_type(self, name: str):
+        return self._get_property(name, "file_data_type")
+
     def data_type(self, name: str):
         return self._get_property(name, "data_type")
 
@@ -212,18 +218,18 @@ class ConfigInfo:
         if "ENV" in config_dict.keys() and isinstance(config_dict["ENV"], dict):
             for k, v in config_dict["ENV"].items():
                 if isinstance(v, dict):
-                    self.vdc_environments[k] = VDCENVParams(**v).check_params()
+                    self.vdc_environments[k] = dacite.from_dict(data_class=VDCENVParams, data=v).check_params()
 
         if "USERS" in config_dict.keys() and isinstance(config_dict["USERS"], dict):
             for k, v in config_dict["USERS"].items():
                 if isinstance(v, dict):
-                    self.vdc_users[k] = VDCUSERParams(**v).check_params()
+                    self.vdc_users[k] = dacite.from_dict(data_class=VDCUSERParams, data=v).check_params()
 
     def parser_dataset_config(self, config_file):
         config_dict = read_config_file(config_file, out_put=False)
         for k, v in config_dict.items():
             if isinstance(v, dict):
-                self.dataset_config.set_attr(k, DatasetConfig(**v))
+                self.dataset_config.set_attr(k, dacite.from_dict(data_class=DatasetConfig, data=v))
 
     def set_vdc_config(self, vdc_user="default", vdc_env="UAT3") -> (VDCUSERParams, VDCENVParams):
         self.vdc_user = self.vdc_users.get(vdc_user, self.vdc_user)
