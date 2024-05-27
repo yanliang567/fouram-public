@@ -60,3 +60,4 @@ tqdm==4.64.0
 pyarrow==12.0.1
 dacite==1.8.1
 numpy==1.24.3
+ml_dtypes==0.2.0

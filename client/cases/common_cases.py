@@ -19,7 +19,7 @@ from client.common.common_func import (
     get_vector_type, get_default_field_name, get_vectors_from_binary,
     get_ground_truth_ids, get_search_ids, get_recall_value,
     parser_search_params_expr, parser_scalar_index, write_json_file, gen_go_bench_json_file, deal_insert_result,
-    check_vector_index_params, check_params_exist
+    check_vector_index_params, check_params_exist, convert_to_list
 )
 
 from commons.common_params import EnvVariable
@@ -299,7 +299,7 @@ class CommonCases(Base):
                                        dataset_name=self.params_obj.dataset_params[pn.dataset_name],
                                        field_name=vector_field_name)
 
-        query_file = write_json_file(data, json_file_path=gen_go_bench_json_file(
+        query_file = write_json_file(convert_to_list(data), json_file_path=gen_go_bench_json_file(
             f"{EnvVariable.FOURAM_TEMPORARY_DIR}/query_vector"))
 
         result = update_dict_value({

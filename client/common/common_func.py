@@ -4,6 +4,7 @@ import json
 import math
 import copy
 import string
+from ml_dtypes import bfloat16
 import numpy as np
 import pandas as pd
 import h5py
@@ -21,7 +22,7 @@ from client.client_base import ApiCollectionSchemaWrapper, ApiFieldSchemaWrapper
 from client.parameters import params_name as pn
 from client.common.common_type import DefaultValue as dv
 from client.common.common_type import NAS, SimilarityMetrics, AccMetrics, Precision
-from client.common.common_param import GoBenchIndex, SegmentsAnalysis
+from client.common.common_param import GoBenchIndex, SegmentsAnalysis, RNG
 
 from commons.common_params import EnvVariable
 from configs.config_info import config_info
@@ -75,7 +76,7 @@ def gen_field_schema(name: str, dtype=None, description=dv.default_desc, is_prim
 
                 if _field_element in ["STRING", "VARCHAR"]:
                     _kwargs.update({"max_length": kwargs.get("max_length", dv.default_max_length)})
-                elif _field_element in ["BINARY_VECTOR", "FLOAT_VECTOR"]:
+                elif _field_element in ["BINARY_VECTOR", "FLOAT_VECTOR", "FLOAT16_VECTOR", "BFLOAT16_VECTOR"]:
                     _kwargs.update({"dim": kwargs.get("dim", dv.default_dim)})
 
                 _kwargs.update(scalars_params.get(name, {}).get("params", {}))
@@ -179,6 +180,10 @@ def get_default_field_name(data_type=DataType.FLOAT_VECTOR, default_field_name: 
         field_name = dv.default_float_vec_field_name
     elif data_type == DataType.BINARY_VECTOR:
         field_name = dv.default_binary_vector_name
+    elif data_type == DataType.FLOAT16_VECTOR:
+        field_name = dv.default_float16_vector_name
+    elif data_type == DataType.BFLOAT16_VECTOR:
+        field_name = dv.default_bfloat16_vector_name
     elif data_type == DataType.INT64:
         field_name = dv.default_int64_field_name
     elif data_type == DataType.FLOAT:
@@ -282,6 +287,10 @@ def get_file_list(data_size, dim, data_type):
 def gen_vectors(nb, dim, field_name: str = None):
     if field_name and str(field_name).startswith("binary_vector"):
         return gen_binary_vectors(nb, dim)
+    elif field_name and str(field_name).startswith("float16_vector"):
+        return gen_float16_vectors(nb, dim)
+    elif field_name and str(field_name).startswith("bfloat16_vector"):
+        return gen_bfloat16_vectors(nb, dim)
     return gen_float_vectors(nb, dim)
 
 
@@ -292,6 +301,14 @@ def gen_binary_vectors(nb, dim):
 
 def gen_float_vectors(nb, dim):
     return [[random.random() for _ in range(int(dim))] for _ in range(int(nb))]
+
+
+def gen_float16_vectors(nb, dim):
+    return [np.array([random.random() for _ in range(int(dim))], dtype=np.float16) for _ in range(int(nb))]
+
+
+def gen_bfloat16_vectors(nb, dim):
+    return [RNG.uniform(size=dim).astype(bfloat16) for _ in range(int(nb))]
 
 
 def gen_ids(start_id, end_id):
@@ -307,13 +324,20 @@ def gen_values(data_type, vectors, ids, varchar_filled=False, field: dict = {}, 
 
     values = None
     if default_value is not None and isinstance(default_value, list) and len(default_value) != 0:
-        return default_value
+        return handle_special_vector_data_type(data=default_value, vector_data_file=_field_element)
     elif _field_element in [DataType.FLOAT_VECTOR]:
         _dim = field.get("params", {}).get("dim")
         values = vectors if anns_field_bool else gen_float_vectors(nb=len(ids), dim=_dim)
     elif _field_element in [DataType.BINARY_VECTOR]:
         _dim = field.get("params", {}).get("dim")
         values = vectors if anns_field_bool else gen_binary_vectors(nb=len(ids), dim=_dim)
+    elif _field_element in [DataType.FLOAT16_VECTOR]:
+        _dim = field.get("params", {}).get("dim")
+        values = vectors if anns_field_bool else gen_float16_vectors(nb=len(ids), dim=_dim)
+    elif _field_element in [DataType.BFLOAT16_VECTOR]:
+        _dim = field.get("params", {}).get("dim")
+        values = vectors if anns_field_bool else gen_bfloat16_vectors(nb=len(ids), dim=_dim)
+        values = handle_bfloat16_type(data=values)
     elif _field_element in [DataType.INT8]:
         # int8: [-128, 127]
         values = [i % 128 for i in ids]
@@ -359,13 +383,37 @@ def gen_entities(info, vectors=None, ids=None, varchar_filled=False, insert_scal
         return {}
 
     entities = {}
+    check_type = False
     for field in info["fields"]:
         _type = field["type"]
+        if _type in [DataType.FLOAT16_VECTOR, DataType.BFLOAT16_VECTOR]:
+            check_type = True
         if not (field["name"] == "id" and info["auto_id"]):
             entities.update({field["name"]: gen_values(
                 _type, vectors, ids, varchar_filled, field, **insert_scalars_params.get(field["name"], {}),
                 anns_field_bool=(field["name"] == anns_field))})
-    return pd.DataFrame(entities)
+    return list(entities.values()) if check_type else pd.DataFrame(entities)
+
+
+def handle_bfloat16_type(data):
+    if hasattr(data, 'dtype'):
+        data.dtype = 'bfloat16'
+    elif len(data) > 0 and isinstance(data[0], np.ndarray) and not data[0].dtype == 'bfloat16':
+        for d in data:
+            d.dtype = 'bfloat16'
+    return data
+
+
+def handle_special_vector_data_type(data, vector_data_file: str = ""):
+    if vector_data_file == DataType.BFLOAT16_VECTOR:
+        return handle_bfloat16_type(data)
+    return data
+
+
+def handle_special_file_data_type(data, file_data_file):
+    if str(file_data_file) == 'bfloat16':
+        return handle_bfloat16_type(data)
+    return data
 
 
 def normalize_data(metric_type, X):
@@ -481,10 +529,16 @@ def get_vectors_from_binary(nq, dimension, dataset_name, field_name: str = None)
         file_name = config_info.dataset_config.query_file_dir(dataset_name)
 
     if file_name:
-        data = np.load(file_name, allow_pickle=True)
+        data = read_npy_file(file_name, allow_pickle=True)
+
+        # special handling
+        data = handle_special_file_data_type(
+            data=data, file_data_file=config_info.dataset_config.file_data_type(dataset_name))
+
         if nq > len(data):
             raise Exception("[get_vectors_from_binary] nq large than file support({0})".format(len(data)))
-        vectors = data[0:nq].tolist()
+        # vectors = data[0:nq].tolist()
+        vectors = data[0:nq]
         return vectors
     raise Exception("[get_vectors_from_binary] Not support dataset: {0}, please check".format(dataset_name))
 
@@ -601,9 +655,7 @@ def read_parquet_file(file_name: str, column: str):
     file_list = []
     if check_file_exist(file_name):
         try:
-            file_df = pq.read_table(file_name, columns=[column]).to_pandas()
-            file_list = list(file_df[column])
-            del file_df
+            file_list = pq.read_table(file_name, columns=[column]).to_pandas()[column]
         except Exception as e:
             log.error(f"[read_parquet_file] Can not read parquet file: {e}")
         return file_list
@@ -625,7 +677,8 @@ def read_json_file(file_name):
 
 def read_npy_file(file_name, allow_pickle=False):
     if check_file_exist(file_name):
-        file_list = np.load(file_name, allow_pickle=allow_pickle).tolist()
+        # file_list = np.load(file_name, allow_pickle=allow_pickle).tolist()
+        file_list = np.load(file_name, allow_pickle=allow_pickle)
         return file_list
     msg = "[read_npy_file] Can not read npy file, please check."
     log.error(msg)
@@ -1064,6 +1117,15 @@ def check_params_exist(target: dict, keys: list):
     return True
 
 
+def convert_to_list(data):
+    if not isinstance(data, list):
+        if hasattr(data, "tolist"):
+            return data.tolist()
+        else:
+            return list(data)
+    return data
+
+
 def gen_go_bench_json_file(prefix_file_path: str, retry_counts: int = 99999):
     file_path = prefix_file_path
     for i in range(retry_counts):
@@ -1129,7 +1191,7 @@ def go_bench(go_benchmark: str, uri: str, collection_name: str, index_type: str,
         "timeout": search_timeout
     }
     json_file_path = json_file_path or f"{EnvVariable.FOURAM_TEMPORARY_DIR}/query_vector.json"
-    search_vector_file = write_json_file(search_vector, json_file_path=json_file_path)
+    search_vector_file = write_json_file(convert_to_list(search_vector), json_file_path=json_file_path)
 
     go_search_params = [go_benchmark,  # path to the go executable
                         'locust',

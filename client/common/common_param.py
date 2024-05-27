@@ -1,8 +1,14 @@
 import copy
 from dataclasses import dataclass, field
 from typing import Optional, List, Union
+import numpy as np
 
 import client.parameters.params_name as pn
+
+try:
+    RNG = np.random.default_rng(seed=0)
+except ValueError as e:
+    RNG = None
 
 
 MetricsToIndexType = {

@@ -49,6 +49,8 @@ class DefaultValue:
     default_double_field_name = "double"
     default_float_vec_field_name = "float_vector"
     default_binary_vector_name = "binary_vector"
+    default_float16_vector_name = "float16_vector"
+    default_bfloat16_vector_name = "bfloat16_vector"
     default_varchar_field_name = "varchar"
 
     err_code = "err_code"
@@ -76,7 +78,8 @@ class DefaultValue:
     default_query_field = "id"
     default_query_scalar_types = ["int64", "varchar"]
     default_scalar_types = [i for i in dict(DataType.__members__).keys() if
-                            i not in ["NONE", "UNKNOWN", "BINARY_VECTOR", "FLOAT_VECTOR"]]
+                            i not in ["NONE", "UNKNOWN", "BINARY_VECTOR", "FLOAT_VECTOR", "FLOAT16_VECTOR",
+                                      "BFLOAT16_VECTOR", "SPARSE_FLOAT_VECTOR"]]
 
     default_alter_index_params = {'mmap.enabled': True}
 

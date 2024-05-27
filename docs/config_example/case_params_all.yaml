@@ -5,7 +5,7 @@ dataset_params:
   # metric type of index and search
   metric_type: L2 / IP / COSINE / JACCARD / <str>
   # specify the name of the vector column: when creating the collection, or for an existing collection
-  vector_field_name: float_vector / binary_vector / <str>
+  vector_field_name: float_vector / binary_vector / float16_vector / bfloat16_vector / <str>
   # for parquet data sets, specify which column in the parquet data set is used to insert the vector column
   # `float32_vector` is the column_name on laion dataset
   column_name: float32_vector / <str>
@@ -16,7 +16,7 @@ dataset_params:
   # dataset names currently support:
   # random: `local`
   #      1. vector will automatically generate corresponding data based on the `dataset_params.vector_field_name` prefix
-  #      2. if the prefix is not "binary_vector", "float_vector" type data will be generated
+  #      2. if the prefix is not "binary_vector", "float_vector", "float16_vector", "bfloat16_vector" type data will be generated
   # npy: `deep`, `sift`, `text2img`, `laion`, `embed`, `gist`, `glove`, `binary`, `random`
   # parquet: `cohere10m_parquet`, `laion1b_nolang`, `laion2b_multi`
   dataset_name: sift
@@ -26,7 +26,7 @@ dataset_params:
   # `InsertBatch` scenario, `ni_per` is List[int]
   ni_per: 50000 / <int>
 
-  # for `search` and `query`, number of serial execution requests
+  # for `accuracy_cases`, `search`, `search_recall` and `query`, number of serial execution requests
   req_run_counts: 1 / <int>
 
   # support for `SearchRecall`

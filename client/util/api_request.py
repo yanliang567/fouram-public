@@ -73,8 +73,10 @@ def api_request(_list, request_id: str = None, **kwargs):
                 for a in _list[1:]:
                     arg.append(a)
 
+            func_name = func.__qualname__
             log.debug("(api_request)  : [%s] args: %s, kwargs: %s, [requestId: %s]" % (
-                func.__qualname__, truncated_output(arg, info_logout.log_row_length), str(kwargs), request_id))
+                func_name, truncated_output(arg, info_logout.log_row_length, func_name=func_name), str(kwargs),
+                request_id))
 
             return func(*arg, **kwargs)
     return (False, 0), False

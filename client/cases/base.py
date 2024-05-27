@@ -786,7 +786,8 @@ class Base:
         index_param = None
 
         for field in collection_obj.schema.fields:
-            if field.dtype in [DataType.FLOAT_VECTOR, DataType.BINARY_VECTOR]:
+            if field.dtype in [DataType.FLOAT_VECTOR, DataType.BINARY_VECTOR, DataType.FLOAT16_VECTOR,
+                               DataType.BFLOAT16_VECTOR]:
                 field_name = field.name
                 dim = field.params.get("dim")
 

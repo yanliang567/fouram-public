@@ -205,7 +205,13 @@ def execute_funcs(funcs: List[tuple]):
             log.error("[execute_funcs] Parameter error: {0}".format(func))
 
 
-def truncated_output(context, row_length=300):
+def truncated_output(context, row_length=300, func_name: str = ""):
+    # Special handling of output
+    if func_name in ["Collection.insert", "Collection.upsert"]:
+        _data = context[0]
+        if isinstance(_data, list) and _data:
+            return f"<Insert fields: {str(len(_data))}, Insert length: {str(len(_data[0]))}>"
+
     _str = str(context)
     return _str[:row_length] + '......' + _str[-row_length:] if len(_str) > row_length * 2 else _str
 

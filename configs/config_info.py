@@ -77,7 +77,7 @@ class VDCENVParams(ParamsBase):
 class DatasetConfig(ParamsBase):
     # for gen dataset file name
     dataset_type: str = pn.NUMPY  # npy, parquet, hdf5
-    # # file data type, for special dtype, e.g. `bfloat16`
+    # file data type, for special dtype, e.g. `bfloat16`
     file_data_type: str = None
     # determine the rules for gen file name
     # scalar: scalar_00000.npy, vector: binary_<dim>d_00000.npy, parquet: binary_<dim>d_00000.parquet
@@ -140,6 +140,11 @@ class DatasetConfigs(ParamsBase):
                 log.error(f"[DatasetConfigs] Can't get property:{_property} of {name}, error: {e}")
         else:
             log.error(f"[DatasetConfigs] DatasetConfigs has no attribute {name}")
+        return None
+
+    def _get_special_property(self, name: str, _property: str):
+        if hasattr(self, name) and hasattr(getattr(self, name), _property):
+            return hasattr(getattr(self, name), _property)
         return None
 
     def _get_root_dir(self, name):
