@@ -16,9 +16,7 @@ import pyarrow.parquet as pq
 from itertools import product, zip_longest
 from dataclasses import dataclass
 
-from pymilvus import DataType
-
-from client.client_base import ApiCollectionSchemaWrapper, ApiFieldSchemaWrapper, AnnSearchRequest
+from client.client_base import ApiCollectionSchemaWrapper, ApiFieldSchemaWrapper, AnnSearchRequest, DataType
 from client.parameters import params_name as pn
 from client.common.common_type import DefaultValue as dv
 from client.common.common_type import NAS, SimilarityMetrics, AccMetrics, Precision
@@ -41,7 +39,7 @@ def field_type():
     'bool', 'int8', 'int16', 'int32', 'int64', 'float', 'double',
     'string', 'varchar', 'binary_vector', 'float_vector'
     """
-    data_types = dict(DataType.__members__)
+    data_types = DataType.all_members
     _field_types = {}
     for i in data_types.keys():
         if str(i) not in ["NONE", "UNKNOWN"]:

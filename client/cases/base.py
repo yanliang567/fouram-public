@@ -4,7 +4,7 @@ import copy
 from pprint import pformat
 from typing import Union
 
-from pymilvus import DefaultConfig, DataType
+from pymilvus import DefaultConfig
 from pymilvus.client.types import LoadState
 
 from client.client_base import (
@@ -16,7 +16,8 @@ from client.client_base import (
     ApiFieldSchemaWrapper,
     ApiUtilityWrapper,
     ApiRoleWrapper,
-    ApiDBWrapper
+    ApiDBWrapper,
+    DataType
 )
 from client.common.common_func import (
     PrepareInsertParams,

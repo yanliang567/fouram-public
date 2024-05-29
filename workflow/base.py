@@ -157,7 +157,7 @@ class Base:
 
     def deploy_default(self, deploy_tool=Operator, deploy_mode=STANDALONE, cpu=8, mem=16, other_config=None,
                        tag=None, repository=None, node_resources=None, set_dependence=None, input_configs: dict = {},
-                       **kwargs):
+                       upgrade_waiting_time=1800, **kwargs):
         tag = tag or param_info.milvus_tag or AutoGetTag().auto_tag(deploy_tool=deploy_tool)
         repository = repository or param_info.tag_repository
 
@@ -179,8 +179,9 @@ class Base:
 
         # install server and get endpoint
         server_install_params = check_deploy_config(deploy_tool=deploy_tool, configs=self.deploy_config[0])
-        self.deploy_release_name, install_new_config = self.deploy_client.install(server_install_params)
-        self.deploy_client.wait_for_healthy(release_name=self.deploy_release_name)
+        self.deploy_release_name, install_new_config = self.deploy_client.install(server_install_params,
+                                                                                  timeout=upgrade_waiting_time)
+        self.deploy_client.wait_for_healthy(release_name=self.deploy_release_name, timeout=upgrade_waiting_time)
         # endpoint = self.deploy_client.endpoint(release_name=self.deploy_release_name)
 
         # display server values

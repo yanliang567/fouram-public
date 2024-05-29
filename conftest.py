@@ -1,5 +1,6 @@
 import pytest
 
+from client.common.common_func import parser_time
 from deploy.commons.common_params import Helm, Operator, STANDALONE
 
 from utils.util_log import log
@@ -72,7 +73,7 @@ def pytest_addoption(parser):
 
     # upgrade server
     parser.addoption("--upgrade_waiting_time", action="store", default=1800,
-                     help="time to wait for server health, only used for rolling upgrade instance")
+                     help="time to wait for server health, used for installing and rolling upgrade instance")
 
 
 @pytest.fixture
@@ -181,6 +182,7 @@ def input_params(request) -> InputParamsBase:
         "deploy_mode": deploy_mode,
         "deploy_config": request.config.getoption("--deploy_config"),
         "upgrade_config": request.config.getoption("--upgrade_config"),
+        "upgrade_waiting_time": parser_time(request.config.getoption("--upgrade_waiting_time")),
         "case_params": request.config.getoption("--case_params"),
         "case_skip_prepare": request.config.getoption("--case_skip_prepare"),
         "case_skip_prepare_clean": request.config.getoption("--case_skip_prepare_clean"),

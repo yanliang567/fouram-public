@@ -3,9 +3,7 @@ import random
 from dataclasses import dataclass, field
 from typing import Optional, Union, List
 
-from pymilvus import DataType
-
-from client.client_base import RRFRanker, WeightedRanker, AnnSearchRequest
+from client.client_base import RRFRanker, WeightedRanker, AnnSearchRequest, DataType
 from client.common.common_func import (
     ParserFieldsParams,
     gen_combinations, update_dict_value, loop_ids, gen_vectors, get_default_field_name

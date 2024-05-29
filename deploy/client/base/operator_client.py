@@ -68,13 +68,15 @@ class OperatorClient(BaseClient):
             self.dc = DynamicClient(self.kubeconfig, self.namespace, self.api_version, self.kind)
             self.op_conf = OperatorConfig(cluster=self.cluster, api_version=api_version)
 
-    def install(self, body: dict, namespace=None, parser_result=True, return_release_name=False, check_health=False):
+    def install(self, body: dict, namespace=None, parser_result=True, return_release_name=False, check_health=False,
+                timeout=1800, **kwargs):
         """
         :param body: a dict type of configurations that describe the properties of milvus to be deployed
         :param namespace: string
         :param parser_result: bool
         :param return_release_name: bool
         :param check_health: bool
+        :param timeout: int
         :return: dict
         """
         namespace = namespace or self.namespace
@@ -95,7 +97,7 @@ class OperatorClient(BaseClient):
             self.release_name = body["metadata"]["name"]
             if check_health:
                 time.sleep(60)
-                self.wait_for_healthy(release_name=self.release_name)
+                self.wait_for_healthy(release_name=self.release_name, timeout=timeout)
 
         if return_release_name:
             self.release_name = body["metadata"]["name"]

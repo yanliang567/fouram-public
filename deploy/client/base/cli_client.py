@@ -37,8 +37,8 @@ class CliClient(BaseClient):
             self.kubeconfig = " --kubeconfig=%s " % kubeconfig if kubeconfig != "" else ""
             self.ns = self.kubeconfig + self.namespace
 
-    def install(self, set_params="", release_name="", chart="", default_params=" --wait --timeout 30m ", params="",
-                return_release_name=True, **kwargs):
+    def install(self, set_params="", release_name="", chart="", default_params=" --wait ", params="",
+                return_release_name=True, timeout="30m", **kwargs):
         """
         :param set_params: image.all.pullPolicy=IfNotPresent,image.all.tag=v2.0.2
         :param release_name: less than 63 characters
@@ -46,6 +46,7 @@ class CliClient(BaseClient):
         :param default_params: --wait --timeout 30m
         :param params: --set image.all.pullPolicy=IfNotPresent,image.all.tag=v2.0.2
         :param return_release_name: bool
+        :param timeout: waiting time for server deployment
         :return: None
         """
         if release_name != "":
@@ -56,6 +57,7 @@ class CliClient(BaseClient):
 
         chart = chart if chart != "" else self.chart
         set_params = set_params if set_params == "" else " --set %s " % set_params
+        default_params += f" --timeout {timeout}s "
 
         _cmd = " helm %s upgrade --install %s %s %s %s %s " % \
                (self.ns, set_params, default_params, params, self.release_name, chart)

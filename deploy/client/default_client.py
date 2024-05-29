@@ -52,11 +52,12 @@ class DefaultClient:
             prefix += '-vdc'
         return gen_release_name(prefix)
 
-    def install(self, configs, check_health=True):
+    def install(self, configs, check_health=True, timeout=1800):
         """
         return: str, dict
         """
-        self.release_name, _config = self.obj.install(configs, return_release_name=True, check_health=check_health)
+        self.release_name, _config = self.obj.install(
+            configs, return_release_name=True, check_health=check_health, timeout=timeout)
         return self.release_name, _config
 
     def upgrade(self, configs, timeout=1800):

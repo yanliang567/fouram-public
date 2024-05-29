@@ -177,12 +177,13 @@ class VDCClientBase:
         res = self.cloud_rm_api.get_host(instance_id=instance_id)
         return check_multi_keys_exist(res.data, ["instanceId"]), check_multi_keys_exist(res.data, ["userId"])
 
-    def create_server(self, instance_name="", image_tag=None, deploy_mode="", max_create_num: int = 10):
+    def create_server(self, instance_name="", image_tag=None, deploy_mode="", max_create_num: int = 10, timeout=1800):
         """
         :param instance_name: str
         :param image_tag: Equivalent to db_version
         :param deploy_mode: <class_id>, such as class-1 ... class-1-disk ...
         :param max_create_num: Maximum number of rebuilds when creation fails
+        :param timeout: wait for server to be ready
         """
         instance_name = instance_name or self.instance_name
 
@@ -226,17 +227,18 @@ class VDCClientBase:
         self.reset_auto_params(instance_name=instance_name, instance_id=instance_id, set_real_instance_id=False)
 
         # check server is creating
-        assert self.check_server_status()
+        assert self.check_server_status(timeout=timeout)
 
         # setting global params
         self.reset_auto_params(instance_name=instance_name, instance_id=instance_id)
 
         return instance_name, instance_id
 
-    def create_server_less(self, instance_name="", ap_point_host_id=""):
+    def create_server_less(self, instance_name="", ap_point_host_id="", timeout=1800):
         """
         :param instance_name: str
         :param ap_point_host_id: str
+        :param timeout: wait for server to be ready
         """
         instance_name = instance_name or self.instance_name
 
@@ -259,7 +261,7 @@ class VDCClientBase:
         self.reset_auto_params(instance_name=instance_name, instance_id=instance_id, set_real_instance_id=False)
 
         # check server is creating
-        assert self.check_server_status()
+        assert self.check_server_status(timeout=timeout)
 
         # setting global params
         self.reset_auto_params(instance_name=instance_name, instance_id=instance_id)

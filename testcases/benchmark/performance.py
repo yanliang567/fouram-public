@@ -11,7 +11,7 @@ from client.cases import (
     SearchRecall,
     GoBenchCases
 )
-from client.common.common_func import parser_time, parser_data_size  # do not remove
+from client.common.common_func import parser_data_size  # do not remove
 from client.parameters.input_params import (
     AccParams,
     InsertBatchParams,
@@ -66,6 +66,7 @@ class TestServerDeploy(ServerTemplate):
             3. both: do nothing
             4. not both: deploy server and delete the server
             5. deploy_retain_pvc: retain pvc if delete server
+            6. upgrade_waiting_time: time to wait for server health
         """
         # node_resources = [NodeResource(
         #     nodes=[queryNode, indexNode], replicas=2).custom_resource(requests_cpu=1.5, requests_mem=1)]
@@ -90,7 +91,7 @@ class TestServerDeploy(ServerTemplate):
                              deploy_mode=get_default_deploy_mode(input_params.deploy_tool),
                              deploy_skip=True, deploy_uninstall=False)
 
-    def test_server_rolling_upgrade_instance(self, input_params: InputParamsBase, upgrade_waiting_time):
+    def test_server_rolling_upgrade_instance(self, input_params: InputParamsBase):
         """
         :steps:
             1. release_name: instance's release name
@@ -103,8 +104,7 @@ class TestServerDeploy(ServerTemplate):
             6. upgrade_waiting_time: time to wait for server health
         """
         self.upgrade_server_template(input_params=input_params,
-                                     deploy_mode=get_default_deploy_mode(input_params.deploy_tool, deploy_upgrade=True),
-                                     upgrade_waiting_time=parser_time(upgrade_waiting_time))
+                                     deploy_mode=get_default_deploy_mode(input_params.deploy_tool, deploy_upgrade=True))
 
 
 class TestRecallCases(PerfTemplate):

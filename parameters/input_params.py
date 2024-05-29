@@ -116,6 +116,7 @@ class InputParamsBase:
     deploy_mode: Optional[str] = ""
     deploy_config: Union[str, dict] = ""
     upgrade_config: Optional[Union[str, dict]] = ""
+    upgrade_waiting_time: Union[int] = 1800
     case_params: Union[str, dict] = ""
     case_skip_prepare: Optional[bool] = False
     case_skip_prepare_clean: Optional[bool] = False

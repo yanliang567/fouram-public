@@ -1,3 +1,4 @@
+from pymilvus import DataType as DataTypeBase
 
 
 class BaseInitWrapper:
@@ -23,3 +24,26 @@ except ImportError as e:
     RRFRanker = BaseWrapper
     WeightedRanker = BaseWrapper
     AnnSearchRequest = BaseWrapper
+
+
+class DataTypeWrapper(object):
+    all_members = dict(DataTypeBase.__members__)
+
+    def __init__(self):
+        self._set_members()
+
+    def __getattr__(self, name):
+        return -1
+
+    def __getattribute__(self, name):
+        return object.__getattribute__(self, name)
+
+    def __get__(self, instance, owner):
+        return self
+
+    def _set_members(self):
+        for k, v in self.all_members.items():
+            setattr(self, k, v)
+
+
+DataType = DataTypeWrapper()

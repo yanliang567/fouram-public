@@ -30,7 +30,8 @@ class VDCClient(BaseClient):
         log.error(msg)
         raise Exception(msg)
 
-    def install(self, body: dict, release_name="", parser_result=True, return_release_name=False, check_health=False):
+    def install(self, body: dict, release_name="", parser_result=True, return_release_name=False, check_health=False,
+                timeout=1800):
         """
         :param body: a dict type of configurations that describe the properties of milvus to be deployed
             sample:
@@ -43,6 +44,7 @@ class VDCClient(BaseClient):
         :param parser_result: bool
         :param return_release_name: bool
         :param check_health: bool
+        :param timeout: int
         :return: str or tuple, dict
         """
         self.release_name = release_name or self.release_name or gen_release_name("fouram-vdc")
@@ -59,30 +61,30 @@ class VDCClient(BaseClient):
             obj = self._delicate_install
 
         return obj(image_tag=image_tag, server_resource=server_resource, milvus_config=milvus_config,
-                   return_release_name=return_release_name), {"image_tag": image_tag}
+                   return_release_name=return_release_name, timeout=timeout), {"image_tag": image_tag}
 
-    def _delicate_install(self, image_tag, server_resource, milvus_config, return_release_name, **kwargs):
+    def _delicate_install(self, image_tag, server_resource, milvus_config, return_release_name, timeout, **kwargs):
         log.debug(f"[VDCClient] Final config for VDC deployment, release_name: {self.release_name}, " +
                   f"deploy_class_id: {self.deploy_class_id}, image_tag: {image_tag}, " +
                   f"server_resource: {server_resource}, milvus_config: {milvus_config}")
         self.release_name, instance_id = self.client.create_server(
-            instance_name=self.release_name, image_tag=image_tag, deploy_mode=self.deploy_class_id)
+            instance_name=self.release_name, image_tag=image_tag, deploy_mode=self.deploy_class_id, timeout=timeout)
 
         self.upgrade(body={"server_resource": server_resource, "milvus_config": milvus_config},
-                     release_name=self.release_name, check_release_exist=False)
+                     release_name=self.release_name, check_release_exist=False, timeout=timeout)
 
         self.instance_id_maps.update({self.release_name: instance_id})
         return self.release_name if return_release_name else (self.release_name, instance_id)
 
-    def _serverless_install(self, server_resource, milvus_config, return_release_name, **kwargs):
+    def _serverless_install(self, server_resource, milvus_config, return_release_name, timeout, **kwargs):
         log.debug(f"[VDCClient] Final config for VDC deployment, release_name: {self.release_name}, " +
                   f"deploy_class_id: {self.deploy_class_id}, " +
                   f"server_resource: {server_resource}, milvus_config: {milvus_config}")
         self.release_name, instance_id = self.client.create_server_less(
-            instance_name=self.release_name, ap_point_host_id=param_info.vdc_serverless_host)
+            instance_name=self.release_name, ap_point_host_id=param_info.vdc_serverless_host, timeout=timeout)
 
         self.upgrade(body={"server_resource": server_resource, "milvus_config": milvus_config},
-                     release_name=self.release_name, check_release_exist=False)
+                     release_name=self.release_name, check_release_exist=False, timeout=timeout)
 
         self.instance_id_maps.update({self.release_name: instance_id})
         return self.release_name if return_release_name else (self.release_name, instance_id)

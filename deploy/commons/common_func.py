@@ -432,18 +432,22 @@ def parser_op_item(item: dict):
     #         "IP": item["status"]["podIP"],
     #         "NODE": item["spec"]["nodeName"]}
 
-    container_status = check_multi_keys_exist(item, ["status", "containerStatuses"])
-    max_count = 0
-    for c in container_status:
-        if "restartCount" in c:
-            max_count = c["restartCount"] if c["restartCount"] > max_count else max_count
-    _tt = utc_conversion(check_multi_keys_exist(item, ["metadata", "creationTimestamp"]))
-    return {"NAME": check_multi_keys_exist(item, ["metadata", "name"]),
-            "STATUS": check_multi_keys_exist(item, ["status", "phase"]),
-            "RESTARTS": max_count,
-            "AGE": _tt,
-            "IP": check_multi_keys_exist(item, ["status", "podIP"]),
-            "NODE": check_multi_keys_exist(item, ["spec", "nodeName"])}
+    try:
+        container_status = check_multi_keys_exist(item, ["status", "containerStatuses"])
+        max_count = 0
+        for c in container_status:
+            if "restartCount" in c:
+                max_count = c["restartCount"] if c["restartCount"] > max_count else max_count
+        _tt = utc_conversion(check_multi_keys_exist(item, ["metadata", "creationTimestamp"]))
+        return {"NAME": check_multi_keys_exist(item, ["metadata", "name"]),
+                "STATUS": check_multi_keys_exist(item, ["status", "phase"]),
+                "RESTARTS": max_count,
+                "AGE": _tt,
+                "IP": check_multi_keys_exist(item, ["status", "podIP"]),
+                "NODE": check_multi_keys_exist(item, ["spec", "nodeName"])}
+    except Exception as e:
+        log.error(f"[parser_op_item] Get container's status failed: {e}")
+        return {"NAME": "", "STATUS": "", "RESTARTS": "", "AGE": "", "IP": "", "NODE": ""}
 
 
 def hide_value(source, keys):

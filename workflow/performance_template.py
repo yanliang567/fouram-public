@@ -35,7 +35,8 @@ class PerfTemplate(Base):
                                              deploy_mode=input_params.deploy_mode,
                                              other_config=input_params.deploy_config,
                                              cpu=cpu, mem=mem, input_configs=input_configs,
-                                             node_resources=node_resources, set_dependence=set_dependence, **kwargs)
+                                             node_resources=node_resources, set_dependence=set_dependence,
+                                             upgrade_waiting_time=input_params.upgrade_waiting_time, **kwargs)
             # update server metric
             Report_Metric_Object.update_server(deploy_tool=input_params.deploy_tool,
                                                deploy_mode=input_params.deploy_mode,
@@ -96,7 +97,8 @@ class PerfTemplate(Base):
                                              deploy_mode=input_params.deploy_mode,
                                              other_config=input_params.deploy_config,
                                              cpu=cpu, mem=mem, input_configs=input_configs,
-                                             node_resources=node_resources, set_dependence=set_dependence, **kwargs)
+                                             node_resources=node_resources, set_dependence=set_dependence,
+                                             upgrade_waiting_time=input_params.upgrade_waiting_time, **kwargs)
             # update server metric
             Report_Metric_Object.update_server(deploy_tool=input_params.deploy_tool,
                                                deploy_mode=input_params.deploy_mode,
@@ -168,7 +170,8 @@ class PerfTemplate(Base):
                                              deploy_mode=input_params.deploy_mode,
                                              other_config=input_params.deploy_config,
                                              cpu=cpu, mem=mem, input_configs=input_configs,
-                                             node_resources=node_resources, set_dependence=set_dependence, **kwargs)
+                                             node_resources=node_resources, set_dependence=set_dependence,
+                                             upgrade_waiting_time=input_params.upgrade_waiting_time, **kwargs)
             # update server metric
             Report_Metric_Object.update_server(deploy_tool=input_params.deploy_tool,
                                                deploy_mode=input_params.deploy_mode,
@@ -235,7 +238,8 @@ class ServerTemplate(Base):
                                 deploy_mode=input_params.deploy_mode,
                                 other_config=input_params.deploy_config,
                                 cpu=cpu, mem=mem, input_configs=input_configs,
-                                node_resources=node_resources, set_dependence=set_dependence, **kwargs)
+                                node_resources=node_resources, set_dependence=set_dependence,
+                                upgrade_waiting_time=input_params.upgrade_waiting_time, **kwargs)
         else:
             self.init_server_client(deploy_tool=input_params.deploy_tool, deploy_mode=input_params.deploy_mode)
 
@@ -243,7 +247,7 @@ class ServerTemplate(Base):
             self.deploy_delete(deploy_retain_pvc=param_info.deploy_retain_pvc, deploy_uninstall=deploy_uninstall)
 
     def upgrade_server_template(self, input_params: InputParamsBase, release_name=None, deploy_mode=STANDALONE,
-                                upgrade_config: str = "", upgrade_waiting_time: int = 1800):
+                                upgrade_config: str = ""):
         # pop self.deploy_delete from self.teardown_funcs
         self.teardown_funcs.pop(TeardownType.DeployDelete, None)
 
@@ -256,4 +260,4 @@ class ServerTemplate(Base):
 
         self.upgrade_service(release_name=release_name, deploy_tool=input_params.deploy_tool,
                              deploy_mode=input_params.deploy_mode, upgrade_config=upgrade_config,
-                             upgrade_waiting_time=upgrade_waiting_time)
+                             upgrade_waiting_time=input_params.upgrade_waiting_time)
