@@ -49,7 +49,7 @@ class AutoGetTag:
                     if str(t).startswith(self.prefix) and \
                             not str(t).startswith(self.tag_name) and \
                             not str(t).endswith("-gpu") and \
-                            (tag_len == 3 or (tag_len == 4 and str(t).endswith("-amd64"))):
+                            (tag_len == 4 and str(t).endswith("-amd64")):
                         log.info("[AutoGetTag] The image name used is %s" % str(t))
                         return t
             return self.tag_name
