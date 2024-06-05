@@ -9,10 +9,14 @@ from client.parameters import params_name as pn
 from client.parameters.params import ParamsFormat, ParamsBase
 from client.util.params_check import check_params
 from client.common.common_type import Precision, CaseIterParams
+from client.common.common_parser import (
+    ParserInputParams, ExtraPartitionsParams, PrepareInsertParams, ParserFieldsParams
+)
 from client.common.common_func import (
     get_source_file, read_ann_hdf5_file, normalize_data, get_acc_metric_type, gen_combinations, update_dict_value,
-    get_vector_type, get_default_field_name, get_search_ids, get_recall_value, ParserInputParams, ExtraPartitionsParams,
-    PrepareInsertParams, deal_insert_result, check_vector_index_params, parser_scalar_index)
+    get_vector_type, get_default_field_name, get_search_ids, get_recall_value, deal_insert_result,
+    check_vector_index_params, parser_scalar_index
+)
 
 from utils.util_log import log
 
@@ -57,6 +61,8 @@ class CommonCases(Base):
     def prepare_collection(self, metric_type, vector_type, prepare, rebuild_index=False, prepare_clean=True):
         vector_default_field_name = get_default_field_name(
             vector_type, self.params_obj.dataset_params.get(pn.vector_field_name, ""))
+        scalars_params = ParserFieldsParams(self.params_obj.dataset_params, self.params_obj.collection_params,
+                                            main_field_name=vector_default_field_name).get_scalar_other_params
 
         self.clean_all_rbac(reset_rbac=self.params_obj.database_user_params.get(pn.reset_rbac, False))
         self.connect()
@@ -88,8 +94,7 @@ class CommonCases(Base):
                     data_class=ExtraPartitionsParams,
                     data=extra_partitions).combination_params(input_datasize=len(self.dataset_train))
                 insert_obj = PrepareInsertParams(
-                    ni=self.params_obj.dataset_params[pn.ni_per],
-                    scalars_params=self.params_obj.dataset_params.get(pn.scalars_params, {}),
+                    ni=self.params_obj.dataset_params[pn.ni_per], scalars_params=scalars_params,
                     acc_dataset_train=self.dataset_train)
 
                 inert_time = []
@@ -104,17 +109,14 @@ class CommonCases(Base):
                     # insert into the specified partition
                     inert_time.append(self.ann_insert(
                         source_vectors=self.dataset_train, size=p.data_size,
-                        ni=self.params_obj.dataset_params[pn.ni_per],
-                        scalars_params=self.params_obj.dataset_params.get(pn.scalars_params, {}),
+                        ni=self.params_obj.dataset_params[pn.ni_per], scalars_params=scalars_params,
                         input_obj=insert_obj, partition_name=p.partition_name, anns_field=vector_default_field_name))
                 self.case_report.add_attr(**deal_insert_result(inert_time, acc=True))
 
             else:
                 res_insert = self.ann_insert(
-                    source_vectors=self.dataset_train,
-                    ni=self.params_obj.dataset_params[pn.ni_per],
-                    scalars_params=self.params_obj.dataset_params.get(pn.scalars_params, {}),
-                    anns_field=vector_default_field_name)
+                    source_vectors=self.dataset_train, ni=self.params_obj.dataset_params[pn.ni_per],
+                    scalars_params=scalars_params, anns_field=vector_default_field_name)
                 self.case_report.add_attr(**res_insert)
 
             if self.params_obj.flush_params.get(pn.prepare_flush, True):

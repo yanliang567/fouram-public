@@ -210,7 +210,12 @@ def truncated_output(context, row_length=300, func_name: str = ""):
     if func_name in ["Collection.insert", "Collection.upsert"]:
         _data = context[0]
         if isinstance(_data, list) and _data:
-            return f"<Insert fields: {str(len(_data))}, Insert length: {str(len(_data[0]))}>"
+            _fields, _length = len(_data), None
+            if isinstance(_data[0], list):
+                _length = len(_data[0])
+            elif isinstance(getattr(_data[0], "shape", None), list) and getattr(_data[0], "shape", None):
+                _length = getattr(_data[0], "shape", None)[0]
+            return f"<{func_name} fields: {_fields}, {func_name} length: {_length}>, {context[1:]}"
 
     _str = str(context)
     return _str[:row_length] + '......' + _str[-row_length:] if len(_str) > row_length * 2 else _str

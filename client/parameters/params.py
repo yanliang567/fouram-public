@@ -4,9 +4,9 @@ from dataclasses import dataclass, field
 from typing import Optional, Union, List
 
 from client.client_base import RRFRanker, WeightedRanker, AnnSearchRequest, DataType
+from client.common.common_parser import ParserFieldsParams
 from client.common.common_func import (
-    ParserFieldsParams,
-    gen_combinations, update_dict_value, loop_ids, gen_vectors, get_default_field_name
+    gen_combinations, update_dict_value, loop_ids, gen_vectors, get_default_field_name, check_vector_length
 )
 from client.common.common_type import concurrent_global_params, DefaultValue
 from client.parameters.params_name import *
@@ -50,6 +50,7 @@ class ParamsFormat:
             vector_field_name: ([type(str())], OPTION),
             column_name: ([type(str())], OPTION),
             dim: ([type(int())], OPTION),
+            sparse_range: ([type(int()), type(list()), type(None)], OPTION),
             max_length: ([type(int())], OPTION),
             varchar_filled: ([type(bool())], OPTION),
             scalars_index: ([type(list()), type(dict())], OPTION),
@@ -277,6 +278,7 @@ class ConcurrentTaskSearch(DataClassBase):
 
     # other params
     random_data: Optional[bool] = False
+    sparse_range: Optional[List[int]] = field(default_factory=lambda: DefaultValue.default_sparse_range)
 
     # save obj_params
     _obj_params: Optional[dict] = None
@@ -285,7 +287,7 @@ class ConcurrentTaskSearch(DataClassBase):
     def obj_params(self):
         if self._obj_params is None:
             _p = copy.deepcopy(self.to_dict)
-            for i in ["dim", "data", "random_data", "_obj_params"]:
+            for i in ["dim", "data", "random_data", "sparse_range", "_obj_params"]:
                 del _p[i]
 
             for n in ["guarantee_timestamp", "group_by_field", "partition_names"]:
@@ -353,12 +355,13 @@ class ConcurrentTaskHybridSearch(DataClassBase):
             _reqs = copy.deepcopy(self.reqs)
             for r in _reqs:
                 _field_params = self.all_fields_params.get_fields_params(r.anns_field)
-                r._data = gen_vectors(nb=len(r.data), dim=_field_params.dim, field_name=r.anns_field)
+                r._data = gen_vectors(nb=check_vector_length(r.data), dim=_field_params.dim, field_name=r.anns_field,
+                                      sparse_range=_field_params.sparse_range)
         return _reqs, [{"anns_field": r.anns_field,
                         "param": r.param,
                         "limit": r.limit,
                         "expr": r.expr,
-                        "nq": len(r.data)} for r in _reqs]
+                        "nq": check_vector_length(r.data)} for r in _reqs]
 
     @property
     def obj_params(self):
@@ -509,6 +512,8 @@ class ConcurrentInputParamsInsert(DataClassBase):
 @dataclass
 class ConcurrentTaskInsert(DataClassBase):
     dim: int
+    sparse_range: Optional[List[int]] = field(default_factory=lambda: DefaultValue.default_sparse_range)
+    scalars_params: Optional[dict] = field(default_factory=lambda: {})
     nb: Optional[int] = 1
     timeout: Optional[int] = DefaultValue.default_timeout
     anns_field: Optional[str] = None
@@ -526,7 +531,7 @@ class ConcurrentTaskInsert(DataClassBase):
     def set_params(self):
         self._loop_ids = loop_ids(step=self.nb, start_id=self.start_id)
         self.fixed_ids = [k for k in range(self.start_id, self.start_id + self.nb)]
-        self.fixed_vectors = gen_vectors(self.nb, self.dim, field_name=self.anns_field)
+        self.fixed_vectors = gen_vectors(self.nb, self.dim, field_name=self.anns_field, sparse_range=self.sparse_range)
 
     @property
     def get_ids(self):
@@ -541,7 +546,7 @@ class ConcurrentTaskInsert(DataClassBase):
     @property
     def get_vectors(self):
         if self.random_vector:
-            return gen_vectors(self.nb, self.dim, field_name=self.anns_field)
+            return gen_vectors(self.nb, self.dim, field_name=self.anns_field, sparse_range=self.sparse_range)
         return self.fixed_vectors
 
     @property
@@ -590,7 +595,11 @@ class ConcurrentTaskDelete(DataClassBase):
 
 @dataclass
 class ConcurrentInputParamsSceneTest(DataClassBase):
+    dataset: Optional[str] = DefaultValue.default_dataset
+    column_name: Optional[str] = DefaultValue.default_dataset_column_name
+    vector_field_name: Optional[str] = None
     dim: Optional[int] = DefaultValue.default_dim
+    sparse_range: Union[List[int], int, None] = None
     data_size: Optional[int] = 3000
     nb: Optional[int] = 3000
     index_type: Optional[str] = IndexTypeName.IVF_SQ8
@@ -602,10 +611,33 @@ class ConcurrentInputParamsSceneTest(DataClassBase):
     scalars_index: Union[dict, list] = field(default_factory=lambda: {})
     vectors_index: Optional[dict] = field(default_factory=lambda: {})
 
+    @property
+    def anns_field(self):
+        if self.vector_field_name is not None:
+            return self.vector_field_name
+        data_type = getattr(DataType, config_info.dataset_config.vector_type(self.dataset), DataType.FLOAT_VECTOR)
+        return get_default_field_name(data_type=data_type)
+
+    @property
+    def set_all_fields_params_obj(self):
+        return ParserFieldsParams(
+            dataset_params={
+                dim: self.dim,
+                sparse_range: self.sparse_range,
+                dataset_name: self.dataset,
+                column_name: self.column_name,
+                metric_type: self.metric_type,
+                vectors_index: self.vectors_index,
+                scalars_params: self.scalars_params
+            }, collection_params={other_fields: self.other_fields}, main_field_name=self.anns_field)
+
 
 @dataclass
 class ConcurrentTaskSceneTest(DataClassBase):
+    dataset: Optional[str] = DefaultValue.default_dataset
+    column_name: Optional[str] = DefaultValue.default_dataset_column_name
     dim: Optional[int] = DefaultValue.default_dim
+    sparse_range: Optional[List[int]] = field(default_factory=lambda: DefaultValue.default_sparse_range)
     data_size: Optional[int] = 3000
     nb: Optional[int] = 3000
     index_type: Optional[str] = IndexTypeName.IVF_SQ8
@@ -617,6 +649,8 @@ class ConcurrentTaskSceneTest(DataClassBase):
     scalars_params: Optional[dict] = field(default_factory=lambda: {})
     scalars_index: Optional[dict] = field(default_factory=lambda: {})
     vectors_index: Optional[dict] = field(default_factory=lambda: {})
+
+    all_fields_params: ParserFieldsParams = None
 
 
 @dataclass
@@ -635,6 +669,8 @@ class ConcurrentInputParamsSceneInsertDeleteFlush(DataClassBase):
 @dataclass
 class ConcurrentTaskSceneInsertDeleteFlush(DataClassBase):
     dim: Optional[int]
+    sparse_range: Optional[List[int]] = field(default_factory=lambda: DefaultValue.default_sparse_range)
+    scalars_params: Optional[dim] = field(default_factory=lambda: {})
     insert_length: Optional[int] = 1
     delete_length: Optional[int] = 1
     start_id: Optional[int] = 0
@@ -653,7 +689,8 @@ class ConcurrentTaskSceneInsertDeleteFlush(DataClassBase):
     def set_params(self):
         self._loop_ids = loop_ids(step=self.insert_length, start_id=self.start_id)
         self.fixed_ids = [k for k in range(self.start_id, self.start_id + self.insert_length)]
-        self.fixed_vectors = gen_vectors(self.insert_length, self.dim, field_name=self.anns_field)
+        self.fixed_vectors = gen_vectors(self.insert_length, self.dim, field_name=self.anns_field,
+                                         sparse_range=self.sparse_range)
 
     @property
     def get_insert_ids(self):
@@ -669,7 +706,7 @@ class ConcurrentTaskSceneInsertDeleteFlush(DataClassBase):
     @property
     def get_vectors(self):
         if self.random_vector:
-            return gen_vectors(self.insert_length, self.dim, field_name=self.anns_field)
+            return gen_vectors(self.insert_length, self.dim, field_name=self.anns_field, sparse_range=self.sparse_range)
         return self.fixed_vectors
 
     @property
@@ -693,6 +730,8 @@ class ConcurrentInputParamsSceneInsertPartition(DataClassBase):
 @dataclass
 class ConcurrentTaskSceneInsertPartition(DataClassBase):
     dim: int
+    sparse_range: Optional[List[int]] = field(default_factory=lambda: DefaultValue.default_sparse_range)
+    scalars_params: Optional[dict] = field(default_factory=lambda: {})
     anns_field: Optional[str] = None
 
     data_size: Optional[str] = "1m"
@@ -724,6 +763,8 @@ class ConcurrentInputParamsSceneTestPartition(DataClassBase):
 @dataclass
 class ConcurrentTaskSceneTestPartition(DataClassBase):
     dim: int
+    sparse_range: Optional[List[int]] = field(default_factory=lambda: DefaultValue.default_sparse_range)
+    scalars_params: Optional[dict] = field(default_factory=lambda: {})
     anns_field: Optional[str] = None
 
     # collection and insert
@@ -796,6 +837,8 @@ class ConcurrentTaskSceneTestPartitionHybridSearch(DataClassBase):
 
     # save search_obj_params
     _search_obj_params: Optional[dict] = None
+    _scalar_params: Optional[dict] = None
+    _main_sparse_range: Optional[List[int]] = None
 
     def get_random_data(self):
         _reqs = self.reqs
@@ -803,12 +846,13 @@ class ConcurrentTaskSceneTestPartitionHybridSearch(DataClassBase):
             _reqs = copy.deepcopy(self.reqs)
             for r in _reqs:
                 _field_params = self.all_fields_params.get_fields_params(r.anns_field)
-                r._data = gen_vectors(nb=len(r.data), dim=_field_params.dim, field_name=r.anns_field)
+                r._data = gen_vectors(nb=check_vector_length(r.data), dim=_field_params.dim, field_name=r.anns_field,
+                                      sparse_range=_field_params.sparse_range)
         return _reqs, [{"anns_field": r.anns_field,
                         "param": r.param,
                         "limit": r.limit,
                         "expr": r.expr,
-                        "nq": len(r.data)} for r in _reqs]
+                        "nq": check_vector_length(r.data)} for r in _reqs]
 
     @property
     def search_obj_params(self):
@@ -822,6 +866,18 @@ class ConcurrentTaskSceneTestPartitionHybridSearch(DataClassBase):
                 self._search_obj_params["ignore_growing"] = self.ignore_growing
 
         return self._search_obj_params
+
+    @property
+    def scalar_params(self):
+        if self._scalar_params is None:
+            self._scalar_params = self.all_fields_params.get_scalar_other_params
+        return self._scalar_params
+
+    @property
+    def sparse_range(self):
+        if self._main_sparse_range is None:
+            self._main_sparse_range = self.all_fields_params.get_fields_params(self.anns_field).sparse_range
+        return self._main_sparse_range
 
     @property
     def obj_params(self):
@@ -896,6 +952,7 @@ class ConcurrentTaskLoadSearchRelease(DataClassBase):
 
     # for load
     replica_number: Optional[int] = 1
+    sparse_range: Optional[List[int]] = field(default_factory=lambda: DefaultValue.default_sparse_range)
 
     # other params
     random_data: Optional[bool] = False
@@ -906,6 +963,7 @@ class ConcurrentTaskLoadSearchRelease(DataClassBase):
         _p = copy.deepcopy(self.to_dict)
         del _p["dim"]
         del _p["random_data"]
+        del _p["sparse_range"]
         del _p["replica_number"]
 
         if _p["guarantee_timestamp"] is None:
@@ -954,7 +1012,8 @@ class ConcurrentTaskLoadHybridSearchRelease(DataClassBase):
     def set_random_data(self):
         for r in self.reqs:
             _field_params = self.all_fields_params.get_fields_params(r.anns_field)
-            r._data = gen_vectors(nb=len(r.data), dim=_field_params.dim, field_name=r.anns_field)
+            r._data = gen_vectors(nb=check_vector_length(r.data), dim=_field_params.dim, field_name=r.anns_field,
+                                  sparse_range=_field_params.sparse_range)
 
     @property
     def hybrid_search_obj_params(self):
@@ -974,7 +1033,7 @@ class ConcurrentTaskLoadHybridSearchRelease(DataClassBase):
                 "param": r.param,
                 "limit": r.limit,
                 "expr": r.expr,
-                "nq": len(r.data)
+                "nq": check_vector_length(r.data)
             } for r in self.reqs],
             "rerank": self.rerank.dict(),
             "limit": self.limit,
@@ -988,7 +1047,10 @@ class ConcurrentTaskLoadHybridSearchRelease(DataClassBase):
 @dataclass
 class ConcurrentInputParamsSceneSearchTest(DataClassBase):
     dataset: Optional[str] = DefaultValue.default_dataset
+    column_name: Optional[str] = DefaultValue.default_dataset_column_name
+    vector_field_name: Optional[str] = None
     dim: Optional[int] = DefaultValue.default_dim
+    sparse_range: Union[List[int], int, None] = None
     shards_num: Optional[int] = DefaultValue.default_shards_num
     data_size: Optional[int] = 3000
     nb: Optional[int] = 3000
@@ -1021,11 +1083,34 @@ class ConcurrentInputParamsSceneSearchTest(DataClassBase):
     set_properties: Union[dict, list, None] = None
     alter_index: Union[dict, list, None] = None
 
+    @property
+    def anns_field(self):
+        if self.vector_field_name is not None:
+            return self.vector_field_name
+        data_type = getattr(DataType, config_info.dataset_config.vector_type(self.dataset), DataType.FLOAT_VECTOR)
+        return get_default_field_name(data_type=data_type)
+
+    @property
+    def set_all_fields_params_obj(self):
+        return ParserFieldsParams(
+            dataset_params={
+                dim: self.dim,
+                sparse_range: self.sparse_range,
+                dataset_name: self.dataset,
+                column_name: self.column_name,
+                metric_type: self.metric_type,
+                vectors_index: self.vectors_index,
+                scalars_params: self.scalars_params
+            }, collection_params={other_fields: self.other_fields}, main_field_name=self.anns_field)
+
 
 @dataclass
 class ConcurrentTaskSceneSearchTest(DataClassBase):
     dataset: Optional[str] = DefaultValue.default_dataset
+    column_name: Optional[str] = DefaultValue.default_dataset_column_name
+    vector_field_name: Optional[str] = DefaultValue.default_float_vec_field_name
     dim: Optional[int] = DefaultValue.default_dim
+    sparse_range: Optional[List[int]] = field(default_factory=lambda: DefaultValue.default_sparse_range)
     shards_num: Optional[int] = DefaultValue.default_shards_num
     data_size: Optional[int] = 3000
     nb: Optional[int] = 3000
@@ -1058,10 +1143,7 @@ class ConcurrentTaskSceneSearchTest(DataClassBase):
     set_properties: Optional[list] = field(default_factory=lambda: [])
     alter_index: Optional[list] = field(default_factory=lambda: [])
 
-    @property
-    def anns_field(self):
-        data_type = getattr(DataType, config_info.dataset_config.vector_type(self.dataset), DataType.FLOAT_VECTOR)
-        return get_default_field_name(data_type=data_type)
+    all_fields_params: ParserFieldsParams = None
 
 
 @dataclass
@@ -1081,7 +1163,10 @@ class ConcurrentInputParamsSceneHybridSearchTest(DataClassBase):
 
     # collection and insert and index params
     dataset: Optional[str] = DefaultValue.default_dataset
+    column_name: Optional[str] = DefaultValue.default_dataset_column_name
+    vector_field_name: Optional[str] = None
     dim: Optional[int] = DefaultValue.default_dim
+    sparse_range: Union[List[int], int, None] = None
     shards_num: Optional[int] = DefaultValue.default_shards_num
     data_size: Optional[int] = 3000
     nb: Optional[int] = 3000
@@ -1111,6 +1196,8 @@ class ConcurrentInputParamsSceneHybridSearchTest(DataClassBase):
 
     @property
     def anns_field(self):
+        if self.vector_field_name is not None:
+            return self.vector_field_name
         data_type = getattr(DataType, config_info.dataset_config.vector_type(self.dataset), DataType.FLOAT_VECTOR)
         return get_default_field_name(data_type=data_type)
 
@@ -1119,8 +1206,9 @@ class ConcurrentInputParamsSceneHybridSearchTest(DataClassBase):
         return ParserFieldsParams(
             dataset_params={
                 dim: self.dim,
+                sparse_range: self.sparse_range,
                 dataset_name: self.dataset,
-                column_name: None,
+                column_name: self.column_name,
                 metric_type: self.metric_type,
                 vectors_index: self.vectors_index,
                 scalars_params: self.scalars_params
@@ -1143,7 +1231,10 @@ class ConcurrentTaskSceneHybridSearchTest(DataClassBase):
     random_data: Optional[bool] = False
 
     dataset: Optional[str] = DefaultValue.default_dataset
+    column_name: Optional[str] = DefaultValue.default_dataset_column_name
+    vector_field_name: Optional[str] = DefaultValue.default_float_vec_field_name
     dim: Optional[int] = DefaultValue.default_dim
+    sparse_range: Optional[List[int]] = field(default_factory=lambda: DefaultValue.default_sparse_range)
     shards_num: Optional[int] = DefaultValue.default_shards_num
     data_size: Optional[int] = 3000
     nb: Optional[int] = 3000
@@ -1169,7 +1260,6 @@ class ConcurrentTaskSceneHybridSearchTest(DataClassBase):
 
     # for gen hybrid_search data
     all_fields_params: ParserFieldsParams = None
-    anns_field: Optional[str] = None
 
     # common setting
     set_properties: Optional[list] = field(default_factory=lambda: [])
@@ -1178,7 +1268,8 @@ class ConcurrentTaskSceneHybridSearchTest(DataClassBase):
     def set_random_data(self):
         for r in self.reqs:
             _field_params = self.all_fields_params.get_fields_params(r.anns_field)
-            r._data = gen_vectors(nb=len(r.data), dim=_field_params.dim, field_name=r.anns_field)
+            r._data = gen_vectors(nb=check_vector_length(r.data), dim=_field_params.dim, field_name=r.anns_field,
+                                  sparse_range=_field_params.sparse_range)
 
     @property
     def hybrid_search_obj_params(self):
@@ -1208,7 +1299,7 @@ class ConcurrentTaskSceneHybridSearchTest(DataClassBase):
                 "param": r.param,
                 "limit": r.limit,
                 "expr": r.expr,
-                "nq": len(r.data)
+                "nq": check_vector_length(r.data)
             } for r in self.reqs],
             "rerank": self.rerank.dict(),
             "limit": self.limit,

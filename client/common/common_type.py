@@ -37,12 +37,14 @@ class LogLevel:
 
 class DefaultValue:
     default_dataset = "local"
+    default_dataset_column_name = "float32_vector"
     default_dim = 128
     default_shards_num = 2
     default_max_length = 256  # 65535
     default_desc = ""
     default_array_max_capacity = 10
     default_metric_type = "L2"
+    default_sparse_range = [1, 10]
 
     default_int64_field_name = "int64"
     default_float_field_name = "float"
@@ -51,6 +53,7 @@ class DefaultValue:
     default_binary_vector_name = "binary_vector"
     default_float16_vector_name = "float16_vector"
     default_bfloat16_vector_name = "bfloat16_vector"
+    default_sparse_float_vector_name = "sparse_float_vector"
     default_varchar_field_name = "varchar"
 
     err_code = "err_code"

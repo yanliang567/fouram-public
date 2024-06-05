@@ -19,13 +19,16 @@ from client.client_base import (
     ApiDBWrapper,
     DataType
 )
+
+from client.common.common_parser import (
+    PrepareInsertParams, GoSearchParams
+)
 from client.common.common_func import (
-    PrepareInsertParams,
     gen_collection_schema, gen_unique_str, parser_data_size, gen_vectors, gen_entities, gen_random_query_data,
-    go_bench, go_bench_refine, GoSearchParams,
+    go_bench, go_bench_refine,
     remove_list_values, parser_segment_info, update_dict_value, hide_dict_value,
     get_default_search_params, parser_search_params_expr, get_ann_search_request_params, check_vector_index_params,
-    parser_set_properties_params, parser_alter_index_params
+    parser_set_properties_params, parser_alter_index_params, check_vector_length
 )
 from client.common.common_param import TransferNodesParams, TransferReplicasParams
 from client.common.common_type import Precision, CheckTasks
@@ -354,8 +357,7 @@ class Base:
         else:
             collection_schema = collection_schema or self.collection_schema
 
-        v = vectors if isinstance(vectors, list) else vectors.tolist()
-        entities = gen_entities(collection_schema, v, ids, varchar_filled, insert_scalars_params, anns_field)
+        entities = gen_entities(collection_schema, vectors, ids, varchar_filled, insert_scalars_params, anns_field)
 
         log.customize(log_level)(
             "[Base] Start inserting, ids: {0} - {1}, data size: {2}".format(ids[0], ids[-1], data_size))
@@ -366,7 +368,8 @@ class Base:
 
     def insert(self, data_type, dim, size, ni, varchar_filled=False, collection_obj: callable = None, column_name="",
                collection_schema=None, collection_name="", log_level=LogLevel.INFO, scalars_params={},
-               input_obj: PrepareInsertParams = None, anns_field: str = None, **kwargs):
+               input_obj: PrepareInsertParams = None, anns_field: str = None, sparse_range=dv.default_sparse_range,
+               **kwargs):
         data_size = parser_data_size(size)
         data_size_format = str(format(data_size, ',d'))
         ni_cunt = int(data_size / int(ni)) if int(ni) != 0 else 0
@@ -385,14 +388,15 @@ class Base:
         if data_type == "local":
             for i in range(0, ni_cunt):
                 batch_rt += self.insert_batch(
-                    gen_vectors(ni, dim, field_name=anns_field), p_i.loop_ids(ni), data_size_format, varchar_filled,
-                    collection_obj, collection_schema, log_level, p_i.insert_scalars_params(ni), anns_field, **kwargs)
+                    gen_vectors(ni, dim, field_name=anns_field, sparse_range=sparse_range),
+                    p_i.loop_ids(ni), data_size_format, varchar_filled, collection_obj, collection_schema, log_level,
+                    p_i.insert_scalars_params(ni), anns_field, **kwargs)
 
             if last_insert > 0:
                 last_rt = self.insert_batch(
-                    gen_vectors(last_insert, dim, field_name=anns_field), p_i.loop_ids(last_insert), data_size_format,
-                    varchar_filled, collection_obj, collection_schema, log_level,
-                    p_i.insert_scalars_params(last_insert), anns_field, **kwargs)
+                    gen_vectors(last_insert, dim, field_name=anns_field, sparse_range=sparse_range),
+                    p_i.loop_ids(last_insert), data_size_format, varchar_filled, collection_obj, collection_schema,
+                    log_level, p_i.insert_scalars_params(last_insert), anns_field, **kwargs)
 
         else:
             for i in range(0, ni_cunt):
@@ -547,7 +551,7 @@ class Base:
         :return: InterfaceResponse
         """
         msg = '[Base] Params of search nq:{0}, anns_field:{1}, param:{2}, limit:{3}, expr:"{4}", timeout:{5} kwargs:{6}'
-        log.info(msg.format(len(data), anns_field, param, limit, expr, timeout, kwargs))
+        log.info(msg.format(check_vector_length(data), anns_field, param, limit, expr, timeout, kwargs))
         return self.collection_wrap.search(data, anns_field, param, limit, expr=expr, timeout=timeout, **kwargs)
 
     def hybrid_search(self, reqs, rerank, limit, timeout=300, **kwargs):
@@ -846,7 +850,7 @@ class Base:
         """
         partition_obj = partition_obj or self.partition_wrap
         msg = "[Base] Params of search: nq:{0}, anns_field:{1}, param:{2}, limit:{3}, expr:\"{4}\", kwargs:{5}"
-        log.customize(log_level)(msg.format(len(data), anns_field, param, limit, expr, kwargs))
+        log.customize(log_level)(msg.format(check_vector_length(data), anns_field, param, limit, expr, kwargs))
         return partition_obj.search(data, anns_field, param, limit, expr=expr, timeout=timeout, **kwargs)
 
     def hybrid_search_partition(self, reqs, rerank, limit, output_fields=None, partition_obj: callable = None,
@@ -863,8 +867,8 @@ class Base:
         return partition_obj.hybrid_search(reqs, rerank, limit, output_fields=output_fields, timeout=timeout, **kwargs)
 
     def concurrent_search(self, params: ConcurrentTaskSearch):
-        _data = gen_vectors(nb=len(params.data), dim=params.dim,
-                            field_name=params.anns_field) if params.random_data else params.data
+        _data = gen_vectors(nb=check_vector_length(params.data), dim=params.dim, field_name=params.anns_field,
+                            sparse_range=params.sparse_range) if params.random_data else params.data
         return self.collection_wrap.search(data=_data, check_task=CheckTasks.assert_result, **params.obj_params)
 
     def concurrent_hybrid_search(self, params: ConcurrentTaskHybridSearch):
@@ -909,12 +913,12 @@ class Base:
 
     def concurrent_insert(self, params: ConcurrentTaskInsert):
         entities = gen_entities(self.collection_schema, params.get_vectors, params.get_ids, params.varchar_filled,
-                                anns_field=params.anns_field)
+                                anns_field=params.anns_field, insert_scalars_params=params.scalars_params)
         return self.collection_wrap.insert(entities, check_task=CheckTasks.assert_result, **params.obj_params)
 
     def concurrent_upsert(self, params: ConcurrentTaskUpsert):
         entities = gen_entities(self.collection_schema, params.get_vectors, params.get_ids, params.varchar_filled,
-                                anns_field=params.anns_field)
+                                anns_field=params.anns_field, insert_scalars_params=params.scalars_params)
         return self.collection_wrap.upsert(entities, check_task=CheckTasks.assert_result, **params.obj_params)
 
     def concurrent_delete(self, params: ConcurrentTaskDelete):
@@ -935,10 +939,11 @@ class Base:
         time.sleep(1)
 
         # insert vectors
-        self.insert(data_type="local", dim=params.dim, size=params.data_size, ni=params.nb,
-                    collection_obj=collection_obj, collection_name=collection_name,
+        self.insert(data_type=params.dataset, column_name=params.column_name,
+                    dim=params.dim, size=params.data_size, ni=params.nb, sparse_range=params.sparse_range,
+                    collection_obj=collection_obj, collection_name=collection_name, anns_field=params.vector_field_name,
                     collection_schema=collection_obj.schema.to_dict(), log_level=log_level,
-                    anns_field=params.vector_field_name)
+                    scalars_params=params.all_fields_params.get_scalar_other_params)
 
         # flush collection
         self.flush_collection(collection_obj=collection_obj, log_level=log_level)
@@ -974,8 +979,9 @@ class Base:
         log.customize(log_level)("[Base] Start concurrent_scene_insert_delete_flush: {0}".format(self.collection_name))
 
         # insert vectors
-        entities = gen_entities(self.collection_schema, params.get_vectors, params.get_insert_ids,
-                                params.varchar_filled, anns_field=params.anns_field)
+        entities = gen_entities(
+            self.collection_schema, params.get_vectors, params.get_insert_ids, params.varchar_filled,
+            anns_field=params.anns_field, insert_scalars_params=params.scalars_params)
         self.collection_wrap.insert(entities, **params.obj_params)
 
         # delete vectors
@@ -989,7 +995,7 @@ class Base:
     def concurrent_scene_insert_partition(self, params: ConcurrentTaskSceneInsertPartition):
         log_level = LogLevel.DEBUG
         partition_obj = ApiPartitionWrapper()
-        partition_name = gen_unique_str("p")
+        partition_name = gen_unique_str("scene_insert_partition")
 
         # create partition
         self.create_partition(self.collection_wrap.collection, partition_name, partition_obj=partition_obj,
@@ -999,7 +1005,8 @@ class Base:
         self.insert(data_type="local", dim=params.dim, size=params.data_size, ni=params.ni,
                     collection_obj=self.collection_wrap, collection_name=self.collection_wrap.name,
                     collection_schema=self.collection_schema, log_level=log_level, partition_name=partition_name,
-                    anns_field=params.anns_field, **params.obj_params)
+                    anns_field=params.anns_field, sparse_range=params.sparse_range,
+                    scalars_params=params.scalars_params, **params.obj_params)
 
         if params.with_flush:
             self.flush_partition(partition_obj, log_level)
@@ -1015,7 +1022,7 @@ class Base:
     def concurrent_scene_test_partition(self, params: ConcurrentTaskSceneTestPartition):
         log_level = LogLevel.DEBUG
         partition_obj = ApiPartitionWrapper()
-        partition_name = gen_unique_str("sp")
+        partition_name = gen_unique_str("scene_test_partition")
 
         # create partition
         self.create_partition(self.collection_wrap.collection, partition_name, partition_obj=partition_obj,
@@ -1025,7 +1032,8 @@ class Base:
         self.insert(data_type="local", dim=params.dim, size=params.data_size, ni=params.ni,
                     collection_obj=self.collection_wrap, collection_name=self.collection_wrap.name,
                     collection_schema=self.collection_schema, log_level=log_level, partition_name=partition_name,
-                    anns_field=params.anns_field, **params.obj_params)
+                    anns_field=params.anns_field, sparse_range=params.sparse_range,
+                    scalars_params=params.scalars_params, **params.obj_params)
 
         # flush partition
         self.flush_partition(partition_obj, log_level=log_level)
@@ -1043,7 +1051,7 @@ class Base:
         self.load_partition(partition_obj, log_level=log_level)
 
         # search partition
-        data = gen_vectors(nb=params.nq, dim=params.dim, field_name=params.anns_field)
+        data = gen_vectors(nb=params.nq, dim=params.dim, field_name=params.anns_field, sparse_range=params.sparse_range)
         self.search_partition(data=data, anns_field=params.anns_field, param=params.search_param, limit=params.limit,
                               partition_obj=partition_obj, check_task=CheckTasks.assert_result, log_level=log_level,
                               **params.search_obj_params)
@@ -1053,7 +1061,7 @@ class Base:
                                check_task=CheckTasks.assert_result)
         self.search_partition(data=data, anns_field=params.anns_field, param=params.search_param, limit=params.limit,
                               partition_obj=partition_obj, check_task=CheckTasks.err_res,
-                              check_items={dv.err_code: 65535, dv.err_msg: f"partition not loaded"},
+                              check_items={dv.err_code: 65535, dv.err_msg: f"not loaded"},
                               log_level=log_level, **params.search_obj_params)
 
         # drop partition
@@ -1064,7 +1072,7 @@ class Base:
     def concurrent_scene_test_partition_hybrid_search(self, params: ConcurrentTaskSceneTestPartitionHybridSearch):
         log_level = LogLevel.DEBUG
         partition_obj = ApiPartitionWrapper()
-        partition_name = gen_unique_str("hsp")
+        partition_name = gen_unique_str("scene_test_partition_hybrid_search")
 
         # create partition
         self.create_partition(self.collection_wrap.collection, partition_name, partition_obj=partition_obj,
@@ -1074,7 +1082,8 @@ class Base:
         self.insert(data_type="local", dim=params.dim, size=params.data_size, ni=params.ni,
                     collection_obj=self.collection_wrap, collection_name=self.collection_wrap.name,
                     collection_schema=self.collection_schema, log_level=log_level, partition_name=partition_name,
-                    anns_field=params.anns_field, **params.obj_params)
+                    anns_field=params.anns_field, sparse_range=params.sparse_range,
+                    scalars_params=params.scalar_params, **params.obj_params)
 
         # flush partition
         self.flush_partition(partition_obj, log_level=log_level, **params.obj_params)
@@ -1101,7 +1110,7 @@ class Base:
         self.release_partition(partition_obj, log_level=log_level, check_task=CheckTasks.assert_result,
                                **params.obj_params)
         self.hybrid_search_partition(reqs=_reqs, partition_obj=partition_obj, check_task=CheckTasks.err_res,
-                                     check_items={dv.err_code: 65535, dv.err_msg: f"partition not loaded"},
+                                     check_items={dv.err_code: 65535, dv.err_msg: f"not loaded"},
                                      log_level=log_level, **params.search_obj_params)
 
         # drop partition
@@ -1154,7 +1163,8 @@ class Base:
         while _count < params.search_counts:
             _count += 1
             if params.random_data:
-                params.data = gen_vectors(nb=len(params.data), dim=params.dim, field_name=params.anns_field)
+                params.data = gen_vectors(nb=check_vector_length(params.data), dim=params.dim,
+                                          field_name=params.anns_field, sparse_range=params.sparse_range)
             search_res.append(
                 self.collection_wrap.search(check_task=CheckTasks.assert_result, **params.obj_params).check_result)
 
@@ -1212,7 +1222,7 @@ class Base:
 
         # create collection
         self.create_collection(collection_obj=collection_obj, collection_name=collection_name,
-                               shards_num=params.shards_num, vector_field_name=params.anns_field, dim=params.dim,
+                               shards_num=params.shards_num, vector_field_name=params.vector_field_name, dim=params.dim,
                                using=connect_using, other_fields=params.other_fields,
                                scalars_params=params.scalars_params, log_level=log_level)
         time.sleep(1)
@@ -1221,7 +1231,7 @@ class Base:
         # prepare before inserting
         if params.prepare_before_insert:
             # build index
-            self.build_index(field_name=params.anns_field, index_type=params.index_type,
+            self.build_index(field_name=params.vector_field_name, index_type=params.index_type,
                              metric_type=params.metric_type, index_param=params.index_param,
                              collection_obj=collection_obj, log_level=log_level)
 
@@ -1242,10 +1252,11 @@ class Base:
                                  log_level=log_level)
 
         # insert vectors
-        self.insert(data_type=params.dataset, dim=params.dim, size=params.data_size, ni=params.nb,
-                    collection_obj=collection_obj, collection_name=collection_name,
+        self.insert(data_type=params.dataset, column_name=params.column_name,
+                    dim=params.dim, size=params.data_size, ni=params.nb, sparse_range=params.sparse_range,
+                    collection_obj=collection_obj, collection_name=collection_name, anns_field=params.vector_field_name,
                     collection_schema=collection_obj.schema.to_dict(), log_level=log_level,
-                    anns_field=params.anns_field)
+                    scalars_params=params.all_fields_params.get_scalar_other_params)
 
         # flush collection
         self.flush_collection(collection_obj=collection_obj, log_level=log_level)
@@ -1254,7 +1265,7 @@ class Base:
         self.count_entities(collection_obj=collection_obj, log_level=log_level)
 
         # build index
-        self.build_index(field_name=params.anns_field, index_type=params.index_type,
+        self.build_index(field_name=params.vector_field_name, index_type=params.index_type,
                          metric_type=params.metric_type, index_param=params.index_param, collection_obj=collection_obj,
                          log_level=log_level)
 
@@ -1278,7 +1289,9 @@ class Base:
         log.customize(log_level)("[Base] Search collection {}.".format(collection_obj.name))
         for i in range(params.search_counts):
             res = collection_obj.search(
-                gen_vectors(nb=params.nq, dim=params.dim, field_name=params.anns_field), anns_field=params.anns_field,
+                gen_vectors(nb=params.nq, dim=params.dim, field_name=params.vector_field_name,
+                            sparse_range=params.sparse_range),
+                anns_field=params.vector_field_name,
                 param={"metric_type": params.metric_type, "params": params.search_param},
                 limit=params.top_k, check_task=CheckTasks.assert_result)
             search_results.append(res.check_result)
@@ -1318,7 +1331,7 @@ class Base:
 
         # create collection
         self.create_collection(collection_obj=collection_obj, collection_name=collection_name,
-                               shards_num=params.shards_num, vector_field_name=params.anns_field, dim=params.dim,
+                               shards_num=params.shards_num, vector_field_name=params.vector_field_name, dim=params.dim,
                                using=connect_using, other_fields=params.other_fields,
                                scalars_params=params.scalars_params, log_level=log_level)
         time.sleep(1)
@@ -1327,7 +1340,7 @@ class Base:
         # prepare before inserting
         if params.prepare_before_insert:
             # build index
-            self.build_index(field_name=params.anns_field, index_type=params.index_type,
+            self.build_index(field_name=params.vector_field_name, index_type=params.index_type,
                              metric_type=params.metric_type, index_param=params.index_param,
                              collection_obj=collection_obj, log_level=log_level)
 
@@ -1348,10 +1361,11 @@ class Base:
                                  log_level=log_level)
 
         # insert vectors
-        self.insert(data_type=params.dataset, dim=params.dim, size=params.data_size, ni=params.nb,
-                    collection_obj=collection_obj, collection_name=collection_name,
+        self.insert(data_type=params.dataset, column_name=params.column_name,
+                    dim=params.dim, size=params.data_size, ni=params.nb, sparse_range=params.sparse_range,
+                    collection_obj=collection_obj, collection_name=collection_name, anns_field=params.vector_field_name,
                     collection_schema=collection_obj.schema.to_dict(), log_level=log_level,
-                    anns_field=params.anns_field)
+                    scalars_params=params.all_fields_params.get_scalar_other_params)
 
         # flush collection
         self.flush_collection(collection_obj=collection_obj, log_level=log_level)
@@ -1360,7 +1374,7 @@ class Base:
         self.count_entities(collection_obj=collection_obj, log_level=log_level)
 
         # build index
-        self.build_index(field_name=params.anns_field, index_type=params.index_type,
+        self.build_index(field_name=params.vector_field_name, index_type=params.index_type,
                          metric_type=params.metric_type, index_param=params.index_param, collection_obj=collection_obj,
                          log_level=log_level)
 

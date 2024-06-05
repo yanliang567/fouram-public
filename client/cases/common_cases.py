@@ -13,13 +13,15 @@ from client.client_base import AnnSearchRequest
 from client.common.common_param import AnnSearchRequestParams
 from client.common.common_type import Precision, CaseIterParams
 from client.common.common_type import DefaultValue as dv
+from client.common.common_parser import (
+    ParserInputParams, PrepareInsertParams, ParserFieldsParams, ExtraPartitionsParams, ParserSearchFile
+)
 from client.common.common_func import (
-    ParserInputParams, PrepareInsertParams, ParserFieldsParams, ExtraPartitionsParams,
     gen_combinations, update_dict_value,
-    get_vector_type, get_default_field_name, get_vectors_from_binary,
+    get_vector_type, get_default_field_name,
     get_ground_truth_ids, get_search_ids, get_recall_value,
     parser_search_params_expr, parser_scalar_index, write_json_file, gen_go_bench_json_file, deal_insert_result,
-    check_vector_index_params, check_params_exist, convert_to_list
+    check_vector_index_params, check_params_exist, convert_to_list, check_sparse_range
 )
 
 from commons.common_params import EnvVariable
@@ -75,7 +77,8 @@ class CommonCases(Base):
         self.get_collection_schema()
         log.info("[CommonCases] Prepare collection {0} done.".format(self.collection_wrap.name))
 
-    def prepare_insert(self, data_type, dim, size, ni, varchar_filled=False, vector_field_name: str = None):
+    def prepare_insert(self, data_type, dim, size, ni, varchar_filled=False, vector_field_name: str = None,
+                       sparse_range: list = dv.default_sparse_range, scalars_params: dict = {}):
         varchar_filled = self.params_obj.dataset_params.get(pn.varchar_filled, varchar_filled)
 
         # insert to partitions
@@ -84,8 +87,7 @@ class CommonCases(Base):
             param_list = dacite.from_dict(data_class=ExtraPartitionsParams, data=extra_partitions).combination_params(
                 input_datasize=self.params_obj.dataset_params.get(pn.dataset_size, 0))
             insert_obj = PrepareInsertParams(
-                ni=ni, dim=dim, data_type=data_type,
-                scalars_params=self.params_obj.dataset_params.get(pn.scalars_params, {}),
+                ni=ni, dim=dim, data_type=data_type, scalars_params=scalars_params,
                 column_name=self.params_obj.dataset_params.get(pn.column_name, ""))
 
             inert_time = []
@@ -99,16 +101,18 @@ class CommonCases(Base):
                 # insert into the specified partition
                 inert_time.append(self.insert(
                     data_type=data_type, dim=dim, size=p.data_size, ni=ni, varchar_filled=varchar_filled,
-                    scalars_params=self.params_obj.dataset_params.get(pn.scalars_params, {}),
-                    column_name=self.params_obj.dataset_params.get(pn.column_name, ""),
-                    input_obj=insert_obj, partition_name=p.partition_name, anns_field=vector_field_name))
+                    scalars_params=scalars_params, column_name=self.params_obj.dataset_params.get(pn.column_name, ""),
+                    input_obj=insert_obj, partition_name=p.partition_name, anns_field=vector_field_name,
+                    sparse_range=sparse_range
+                ))
             self.case_report.add_attr(**deal_insert_result(inert_time))
 
         else:
             res_insert = self.insert(
                 data_type=data_type, dim=dim, size=size, ni=ni, varchar_filled=varchar_filled,
-                scalars_params=self.params_obj.dataset_params.get(pn.scalars_params, {}),
-                column_name=self.params_obj.dataset_params.get(pn.column_name, ""), anns_field=vector_field_name)
+                scalars_params=scalars_params, column_name=self.params_obj.dataset_params.get(pn.column_name, ""),
+                anns_field=vector_field_name, sparse_range=sparse_range
+            )
             self.case_report.add_attr(**res_insert)
 
     def prepare_load(self, **kwargs):
@@ -269,16 +273,18 @@ class CommonCases(Base):
             search_params_list.append(s)
         return search_params_list
 
-    def search_param_analysis(self, _search_params: dict, default_field_name: str, metric_type: str):
+    def search_param_analysis(self, _search_params: dict, default_field_name: str, metric_type: str,
+                              sparse_range: list = dv.default_sparse_range):
         _params = copy.deepcopy(_search_params)
         nq = _params.pop(pn.nq)
         top_k = _params.pop(pn.top_k)
         search_param = _params.pop(pn.search_param)
         expr = parser_search_params_expr(_params.pop(pn.expr)) if pn.expr in _params else None
 
-        data = get_vectors_from_binary(nq=nq, dimension=self.params_obj.dataset_params[pn.dim],
-                                       dataset_name=self.params_obj.dataset_params[pn.dataset_name],
-                                       field_name=default_field_name)
+        data = ParserSearchFile(
+            dimension=self.params_obj.dataset_params[pn.dim],
+            dataset_name=self.params_obj.dataset_params[pn.dataset_name], field_name=default_field_name,
+            sparse_range=sparse_range).vectors(nq=nq)
         limit = top_k
 
         result = update_dict_value({
@@ -290,14 +296,16 @@ class CommonCases(Base):
         }, _params)
         return result, nq, top_k, expr, _params
 
-    def go_bench_search_param_analysis(self, _search_params: dict, vector_field_name: str = None):
+    def go_bench_search_param_analysis(self, _search_params: dict, vector_field_name: str = None,
+                                       sparse_range: list = dv.default_sparse_range):
         _params = copy.deepcopy(_search_params)
         nq = _params.get(pn.nq)
         expr = parser_search_params_expr(_params.pop(pn.expr)) if pn.expr in _params else None
 
-        data = get_vectors_from_binary(nq=nq, dimension=self.params_obj.dataset_params[pn.dim],
-                                       dataset_name=self.params_obj.dataset_params[pn.dataset_name],
-                                       field_name=vector_field_name)
+        data = ParserSearchFile(
+            dimension=self.params_obj.dataset_params[pn.dim],
+            dataset_name=self.params_obj.dataset_params[pn.dataset_name], field_name=vector_field_name,
+            sparse_range=sparse_range).vectors(nq=nq)
 
         query_file = write_json_file(convert_to_list(data), json_file_path=gen_go_bench_json_file(
             f"{EnvVariable.FOURAM_TEMPORARY_DIR}/query_vector"))
@@ -396,9 +404,9 @@ class CommonCases(Base):
                                                {"metric_type": _fields_params_obj.metric_type})
                 s_obj = dacite.from_dict(data_class=AnnSearchRequestParams, data=r)
 
-                s_obj.data = get_vectors_from_binary(
-                    nq=nq, dimension=_fields_params_obj.dim, dataset_name=_fields_params_obj.dataset,
-                    field_name=s_obj.anns_field)
+                s_obj.data = ParserSearchFile(
+                    dimension=_fields_params_obj.dim, dataset_name=_fields_params_obj.dataset,
+                    field_name=s_obj.anns_field, sparse_range=_fields_params_obj.sparse_range).vectors(nq=nq)
 
                 _reqs.append(AnnSearchRequest(**s_obj.get_params))
                 _require_reqs.append(s_obj.get_require_params)
@@ -456,6 +464,9 @@ class InsertBatch(CommonCases):
         vector_default_field_name = get_default_field_name(
             vector_type, self.params_obj.dataset_params.get(pn.vector_field_name, ""))
         ni_per = self.params_obj.dataset_params[pn.ni_per]
+        sparse_range = check_sparse_range(self.params_obj.dataset_params.get(pn.sparse_range, dv.default_sparse_range))
+        all_fields_params = ParserFieldsParams(self.params_obj.dataset_params, self.params_obj.collection_params,
+                                               main_field_name=vector_default_field_name)
 
         def run(ni):
             try:
@@ -463,7 +474,9 @@ class InsertBatch(CommonCases):
                 self.prepare_insert(data_type=self.params_obj.dataset_params[pn.dataset_name],
                                     dim=self.params_obj.dataset_params[pn.dim],
                                     size=self.params_obj.dataset_params[pn.dataset_size], ni=ni,
-                                    vector_field_name=vector_default_field_name)
+                                    vector_field_name=vector_default_field_name,
+                                    sparse_range=sparse_range, scalars_params=all_fields_params.get_scalar_other_params
+                                    )
                 self.count_entities()
                 return self.case_report.to_dict(), True
             except Exception as e:
@@ -515,6 +528,9 @@ class BuildIndex(CommonCases):
         vector_type = get_vector_type(self.params_obj.dataset_params[pn.dataset_name])
         vector_default_field_name = get_default_field_name(
             vector_type, self.params_obj.dataset_params.get(pn.vector_field_name, ""))
+        sparse_range = check_sparse_range(self.params_obj.dataset_params.get(pn.sparse_range, dv.default_sparse_range))
+        all_fields_params = ParserFieldsParams(self.params_obj.dataset_params, self.params_obj.collection_params,
+                                               main_field_name=vector_default_field_name)
 
         # prepare data
         self.prepare_collection(vector_default_field_name, input_params.prepare, input_params.prepare_clean)
@@ -523,7 +539,9 @@ class BuildIndex(CommonCases):
                                 dim=self.params_obj.dataset_params[pn.dim],
                                 size=self.params_obj.dataset_params[pn.dataset_size],
                                 ni=self.params_obj.dataset_params[pn.ni_per],
-                                vector_field_name=vector_default_field_name)
+                                vector_field_name=vector_default_field_name,
+                                sparse_range=sparse_range, scalars_params=all_fields_params.get_scalar_other_params
+                                )
         self.prepare_flush()
         self.count_entities()
 
@@ -583,6 +601,9 @@ class Load(CommonCases):
         vector_type = get_vector_type(self.params_obj.dataset_params[pn.dataset_name])
         vector_default_field_name = get_default_field_name(
             vector_type, self.params_obj.dataset_params.get(pn.vector_field_name, ""))
+        sparse_range = check_sparse_range(self.params_obj.dataset_params.get(pn.sparse_range, dv.default_sparse_range))
+        all_fields_params = ParserFieldsParams(self.params_obj.dataset_params, self.params_obj.collection_params,
+                                               main_field_name=vector_default_field_name)
 
         # prepare data
         self.prepare_collection(vector_default_field_name, input_params.prepare, input_params.prepare_clean)
@@ -591,7 +612,9 @@ class Load(CommonCases):
                                 dim=self.params_obj.dataset_params[pn.dim],
                                 size=self.params_obj.dataset_params[pn.dataset_size],
                                 ni=self.params_obj.dataset_params[pn.ni_per],
-                                vector_field_name=vector_default_field_name)
+                                vector_field_name=vector_default_field_name,
+                                sparse_range=sparse_range, scalars_params=all_fields_params.get_scalar_other_params
+                                )
 
         self.prepare_flush()
         # if pass in rebuild_index, indexes of collection will be dropped before building index
@@ -654,6 +677,9 @@ class Query(CommonCases):
         vector_type = get_vector_type(self.params_obj.dataset_params[pn.dataset_name])
         vector_default_field_name = get_default_field_name(
             vector_type, self.params_obj.dataset_params.get(pn.vector_field_name, ""))
+        sparse_range = check_sparse_range(self.params_obj.dataset_params.get(pn.sparse_range, dv.default_sparse_range))
+        all_fields_params = ParserFieldsParams(self.params_obj.dataset_params, self.params_obj.collection_params,
+                                               main_field_name=vector_default_field_name)
 
         # prepare data
         self.prepare_collection(vector_default_field_name, input_params.prepare, input_params.prepare_clean)
@@ -662,7 +688,9 @@ class Query(CommonCases):
                                 dim=self.params_obj.dataset_params[pn.dim],
                                 size=self.params_obj.dataset_params[pn.dataset_size],
                                 ni=self.params_obj.dataset_params[pn.ni_per],
-                                vector_field_name=vector_default_field_name)
+                                vector_field_name=vector_default_field_name,
+                                sparse_range=sparse_range, scalars_params=all_fields_params.get_scalar_other_params
+                                )
 
         self.prepare_flush()
         # if pass in rebuild_index, indexes of collection will be dropped before building index
@@ -742,6 +770,9 @@ class Search(CommonCases):
         vector_type = get_vector_type(self.params_obj.dataset_params[pn.dataset_name])
         vector_default_field_name = get_default_field_name(
             vector_type, self.params_obj.dataset_params.get(pn.vector_field_name, ""))
+        sparse_range = check_sparse_range(self.params_obj.dataset_params.get(pn.sparse_range, dv.default_sparse_range))
+        all_fields_params = ParserFieldsParams(self.params_obj.dataset_params, self.params_obj.collection_params,
+                                               main_field_name=vector_default_field_name)
 
         # prepare data
         self.prepare_collection(vector_default_field_name, input_params.prepare, input_params.prepare_clean)
@@ -753,7 +784,9 @@ class Search(CommonCases):
                                 dim=self.params_obj.dataset_params[pn.dim],
                                 size=self.params_obj.dataset_params[pn.dataset_size],
                                 ni=self.params_obj.dataset_params[pn.ni_per],
-                                vector_field_name=vector_default_field_name)
+                                vector_field_name=vector_default_field_name,
+                                sparse_range=sparse_range, scalars_params=all_fields_params.get_scalar_other_params
+                                )
             self.prepare_flush()
             self.prepare_index(vector_field_name=vector_default_field_name,
                                metric_type=self.params_obj.dataset_params[pn.metric_type], extra_setting=False)
@@ -788,7 +821,8 @@ class Search(CommonCases):
         params_list = []
         for s_p in s_params:
             search_params, nq, top_k, expr, other_params = self.search_param_analysis(
-                s_p, vector_default_field_name, self.params_obj.dataset_params[pn.metric_type])
+                s_p, vector_default_field_name, self.params_obj.dataset_params[pn.metric_type],
+                sparse_range=sparse_range)
 
             actual_params_used = copy.deepcopy(input_params.params)
             actual_params_used[pn.search_params] = update_dict_value({
@@ -843,6 +877,9 @@ class SearchRecall(CommonCases):
         vector_type = get_vector_type(self.params_obj.dataset_params[pn.dataset_name])
         vector_default_field_name = get_default_field_name(
             vector_type, self.params_obj.dataset_params.get(pn.vector_field_name, ""))
+        sparse_range = check_sparse_range(self.params_obj.dataset_params.get(pn.sparse_range, dv.default_sparse_range))
+        all_fields_params = ParserFieldsParams(self.params_obj.dataset_params, self.params_obj.collection_params,
+                                               main_field_name=vector_default_field_name)
 
         # prepare data
         self.prepare_collection(vector_default_field_name, input_params.prepare, input_params.prepare_clean)
@@ -854,7 +891,9 @@ class SearchRecall(CommonCases):
                                 dim=self.params_obj.dataset_params[pn.dim],
                                 size=self.params_obj.dataset_params[pn.dataset_size],
                                 ni=self.params_obj.dataset_params[pn.ni_per],
-                                vector_field_name=vector_default_field_name)
+                                vector_field_name=vector_default_field_name,
+                                sparse_range=sparse_range, scalars_params=all_fields_params.get_scalar_other_params
+                                )
             self.prepare_flush()
             self.prepare_index(vector_field_name=vector_default_field_name,
                                metric_type=self.params_obj.dataset_params[pn.metric_type], extra_setting=False)
@@ -890,7 +929,8 @@ class SearchRecall(CommonCases):
         params_list = []
         for s_p in s_params:
             search_params, nq, top_k, expr, other_params = self.search_param_analysis(
-                s_p, vector_default_field_name, self.params_obj.dataset_params[pn.metric_type])
+                s_p, vector_default_field_name, self.params_obj.dataset_params[pn.metric_type],
+                sparse_range=sparse_range)
 
             actual_params_used = copy.deepcopy(input_params.params)
             actual_params_used[pn.search_params] = update_dict_value({
@@ -948,6 +988,9 @@ class HybridSearch(CommonCases):
         vector_type = get_vector_type(self.params_obj.dataset_params[pn.dataset_name])
         vector_default_field_name = get_default_field_name(
             vector_type, self.params_obj.dataset_params.get(pn.vector_field_name, ""))
+        sparse_range = check_sparse_range(self.params_obj.dataset_params.get(pn.sparse_range, dv.default_sparse_range))
+        all_fields_params = ParserFieldsParams(self.params_obj.dataset_params, self.params_obj.collection_params,
+                                               main_field_name=vector_default_field_name)
 
         # prepare data
         self.prepare_collection(vector_default_field_name, input_params.prepare, input_params.prepare_clean)
@@ -959,7 +1002,9 @@ class HybridSearch(CommonCases):
                                 dim=self.params_obj.dataset_params[pn.dim],
                                 size=self.params_obj.dataset_params[pn.dataset_size],
                                 ni=self.params_obj.dataset_params[pn.ni_per],
-                                vector_field_name=vector_default_field_name)
+                                vector_field_name=vector_default_field_name,
+                                sparse_range=sparse_range, scalars_params=all_fields_params.get_scalar_other_params
+                                )
             self.prepare_flush()
             self.prepare_index(vector_field_name=vector_default_field_name,
                                metric_type=self.params_obj.dataset_params[pn.metric_type], extra_setting=False)
@@ -991,8 +1036,6 @@ class HybridSearch(CommonCases):
                 return {}, False
 
         # parser all fields params for search
-        all_fields_params = ParserFieldsParams(self.params_obj.dataset_params, self.params_obj.collection_params,
-                                               main_field_name=vector_default_field_name)
         s_params = self.parser_hybrid_search_params()
         params_list = []
         for s_p in s_params:

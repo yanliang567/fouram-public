@@ -7,7 +7,7 @@ from utils.util_log import log
 
 
 def get_client_obj(name, **kwargs):
-    log.debug("[get_client_obj] Initialize the class object of %s， params: %s" % (name, kwargs))
+    log.debug("[get_client_obj] Initialize the class object of %s, params: %s" % (name, kwargs))
     _object = {
         VDC: VDCClient,
         Helm: CliClient,

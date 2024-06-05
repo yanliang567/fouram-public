@@ -2,11 +2,14 @@ import copy
 import dacite
 
 from client.common.common_type import Precision, CaseIterParams
-from client.common.common_func import (
-    ParserInputParams, GoSearchParams, GoBenchParams, ParserFieldsParams, parser_scalar_index,
-    gen_combinations, get_vector_type, get_default_field_name, parser_time, update_dict_value,
-    parser_set_properties_params, parser_alter_index_params
+from client.common.common_parser import (
+    ParserInputParams, GoSearchParams, GoBenchParams, ParserFieldsParams
 )
+from client.common.common_func import (
+    parser_scalar_index, gen_combinations, get_vector_type, get_default_field_name, parser_time, update_dict_value,
+    parser_set_properties_params, parser_alter_index_params, check_sparse_range
+)
+from client.common.common_type import DefaultValue as dv
 from client.util.params_check import check_params
 from client.util.api_request import info_logout
 from client.cases.common_cases import CommonCases
@@ -73,11 +76,12 @@ class GoBenchCases(CommonCases):
         result_check = True if "response" in res_go and res_go["response"] is True else False
         return self.case_report.to_dict(), result_check
 
-    def parser_go_bench_tasks_params(self, req_type, req_params, vector_field_name: str = None):
+    def parser_go_bench_tasks_params(self, req_type, req_params, vector_field_name: str = None,
+                                     sparse_range: list = dv.default_sparse_range):
         if req_type == pn.search:
             params = ConcurrentInputParamsSearch(**req_params)
             result = self.go_bench_search_param_analysis(
-                _search_params=params.to_dict, vector_field_name=vector_field_name)
+                _search_params=params.to_dict, vector_field_name=vector_field_name, sparse_range=sparse_range)
             return dacite.from_dict(data_class=ConcurrentGoBenchParamsSearch, data=result)
 
         elif req_type == pn.query:
@@ -87,7 +91,8 @@ class GoBenchCases(CommonCases):
 
         return DataClassBase()
 
-    def parser_concurrent_tasks(self, tasks: list, vector_field_name: str = None) -> list:
+    def parser_concurrent_tasks(self, tasks: list, vector_field_name: str = None,
+                                sparse_range: list = dv.default_sparse_range) -> list:
         tasks_dict = {}
         all_support_obj = ConcurrentGoBenchTasksParams().all_obj
         for task in tasks:
@@ -95,7 +100,7 @@ class GoBenchCases(CommonCases):
                 log.error(f"[parser_concurrent_tasks] Task type:{task['type']} is not supported, please check!!!")
             else:
                 task["params"] = self.parser_go_bench_tasks_params(
-                    task["type"], task["params"], vector_field_name=vector_field_name)
+                    task["type"], task["params"], vector_field_name=vector_field_name, sparse_range=sparse_range)
                 tasks_dict.update({task["type"]: ConcurrentObjParams(**task)})
         p = ConcurrentGoBenchTasksParams(**tasks_dict).to_list
         if len(p) == 0:
@@ -123,6 +128,9 @@ class GoBenchCases(CommonCases):
         vector_type = get_vector_type(self.params_obj.dataset_params[pn.dataset_name])
         vector_default_field_name = get_default_field_name(
             vector_type, self.params_obj.dataset_params.get(pn.vector_field_name, ""))
+        sparse_range = check_sparse_range(self.params_obj.dataset_params.get(pn.sparse_range, dv.default_sparse_range))
+        all_fields_params = ParserFieldsParams(self.params_obj.dataset_params, self.params_obj.collection_params,
+                                               main_field_name=vector_default_field_name)
 
         # prepare data
         self.prepare_collection(vector_default_field_name, input_params.prepare, input_params.prepare_clean)
@@ -134,7 +142,9 @@ class GoBenchCases(CommonCases):
                                 dim=self.params_obj.dataset_params[pn.dim],
                                 size=self.params_obj.dataset_params[pn.dataset_size],
                                 ni=self.params_obj.dataset_params[pn.ni_per],
-                                vector_field_name=vector_default_field_name)
+                                vector_field_name=vector_default_field_name,
+                                sparse_range=sparse_range, scalars_params=all_fields_params.get_scalar_other_params
+                                )
             self.prepare_flush()
             self.prepare_index(vector_field_name=vector_default_field_name,
                                metric_type=self.params_obj.dataset_params[pn.metric_type])
@@ -160,8 +170,9 @@ class GoBenchCases(CommonCases):
         for g_p in g_params:
             for s_p in s_params:
                 search_params, nq, top_k, expr, other_params = \
-                    self.search_param_analysis(s_p, vector_default_field_name,
-                                               self.params_obj.dataset_params[pn.metric_type])
+                    self.search_param_analysis(
+                        s_p, vector_default_field_name, self.params_obj.dataset_params[pn.metric_type],
+                        sparse_range=sparse_range)
                 go_search_params = GoSearchParams(dim=self.params_obj.dataset_params[pn.dim], **search_params)
 
                 actual_params_used = copy.deepcopy(input_params.params)
@@ -207,9 +218,12 @@ class GoBenchCases(CommonCases):
         vector_type = get_vector_type(self.params_obj.dataset_params[pn.dataset_name])
         vector_default_field_name = get_default_field_name(
             vector_type, self.params_obj.dataset_params.get(pn.vector_field_name, ""))
+        sparse_range = check_sparse_range(self.params_obj.dataset_params.get(pn.sparse_range, dv.default_sparse_range))
+        all_fields_params = ParserFieldsParams(self.params_obj.dataset_params, self.params_obj.collection_params,
+                                               main_field_name=vector_default_field_name)
 
         input_params.params[pn.concurrent_tasks] = self.parser_concurrent_tasks(
-            self.params_obj.concurrent_tasks, vector_field_name=vector_default_field_name)
+            self.params_obj.concurrent_tasks, vector_field_name=vector_default_field_name, sparse_range=sparse_range)
 
         # load prepare params
         _prepare_load = self.params_obj.load_params.pop("prepare_load", False)
@@ -229,7 +243,9 @@ class GoBenchCases(CommonCases):
                                 dim=self.params_obj.dataset_params[pn.dim],
                                 size=self.params_obj.dataset_params[pn.dataset_size],
                                 ni=self.params_obj.dataset_params[pn.ni_per],
-                                vector_field_name=vector_default_field_name)
+                                vector_field_name=vector_default_field_name,
+                                sparse_range=sparse_range, scalars_params=all_fields_params.get_scalar_other_params
+                                )
             self.prepare_flush()
             self.prepare_index(vector_field_name=vector_default_field_name,
                                metric_type=self.params_obj.dataset_params[pn.metric_type], extra_setting=False)
@@ -309,18 +325,18 @@ class ConcurrentClientBase(CommonCases):
         }, _params)
         return result
 
-    def parser_tasks_params(self, req_type, req_params, vector_field_name: str, metric_type: str):
+    def parser_tasks_params(self, req_type, req_params, vector_field_name: str, metric_type: str,
+                            all_fields_params: ParserFieldsParams, sparse_range: list = dv.default_sparse_range):
         if req_type == pn.search:
             params = ConcurrentInputParamsSearch(**req_params)
             result = self.search_param_analysis(_search_params=params.to_dict, default_field_name=vector_field_name,
-                                                metric_type=metric_type)[0]
-            result.update({"dim": self.params_obj.dataset_params[pn.dim]})
+                                                metric_type=metric_type, sparse_range=sparse_range)[0]
+            result.update({"dim": self.params_obj.dataset_params[pn.dim],
+                           "sparse_range": sparse_range})
             return ConcurrentTaskSearch(**result)
 
         elif req_type == pn.hybrid_search:
             params = ConcurrentInputParamsHybridSearch(**req_params)
-            all_fields_params = ParserFieldsParams(self.params_obj.dataset_params, self.params_obj.collection_params,
-                                                   main_field_name=vector_field_name)
             result = self.hybrid_search_param_analysis(_search_params=params.to_dict,
                                                        all_fields_params=all_fields_params)[0]
             result.update({"all_fields_params": all_fields_params})
@@ -334,6 +350,8 @@ class ConcurrentClientBase(CommonCases):
         elif req_type in [pn.insert, pn.upsert]:
             params = eval("ConcurrentInputParams{0}(**req_params).to_dict".format(req_type.capitalize()))
             params.update({"dim": self.params_obj.dataset_params[pn.dim],
+                           "sparse_range": sparse_range,
+                           "scalars_params": all_fields_params.get_scalar_other_params_no_dataset,
                            "anns_field": vector_field_name})
             _p = eval("ConcurrentTask{0}(**params)".format(req_type.capitalize()))
             _p.set_params()
@@ -342,7 +360,12 @@ class ConcurrentClientBase(CommonCases):
         elif req_type == pn.scene_test:
             _p = ConcurrentInputParamsSceneTest(**req_params)
             _p.scalars_index = parser_scalar_index(_p.scalars_index)
-            return ConcurrentTaskSceneTest(**_p.to_dict)
+            _p.sparse_range = check_sparse_range(_p.sparse_range)
+
+            result = _p.to_dict
+            result.update({"all_fields_params": _p.set_all_fields_params_obj,
+                           "vector_field_name": _p.anns_field})
+            return ConcurrentTaskSceneTest(**result)
 
         elif req_type in [pn.flush, pn.load, pn.release, pn.delete, "debug"]:
             return eval(
@@ -351,6 +374,8 @@ class ConcurrentClientBase(CommonCases):
         elif req_type == pn.scene_insert_delete_flush:
             params = ConcurrentInputParamsSceneInsertDeleteFlush(**req_params).to_dict
             params.update({"dim": self.params_obj.dataset_params[pn.dim],
+                           "sparse_range": sparse_range,
+                           "scalars_params": all_fields_params.get_scalar_other_params_no_dataset,
                            "anns_field": vector_field_name})
             _p = ConcurrentTaskSceneInsertDeleteFlush(**params)
             _p.set_params()
@@ -362,19 +387,21 @@ class ConcurrentClientBase(CommonCases):
         elif req_type == pn.scene_insert_partition:
             params = ConcurrentInputParamsSceneInsertPartition(**req_params).to_dict
             params.update({"dim": self.params_obj.dataset_params[pn.dim],
+                           "sparse_range": sparse_range,
+                           "scalars_params": all_fields_params.get_scalar_other_params_no_dataset,
                            "anns_field": vector_field_name})
             return ConcurrentTaskSceneInsertPartition(**params)
 
         elif req_type == pn.scene_test_partition:
             params = ConcurrentInputParamsSceneTestPartition(**req_params).to_dict
             params.update({"dim": self.params_obj.dataset_params[pn.dim],
+                           "sparse_range": sparse_range,
+                           "scalars_params": all_fields_params.get_scalar_other_params_no_dataset,
                            "anns_field": vector_field_name})
             return ConcurrentTaskSceneTestPartition(**params)
 
         elif req_type == pn.scene_test_partition_hybrid_search:
             params = ConcurrentInputParamsSceneTestPartitionHybridSearch(**req_params)
-            all_fields_params = ParserFieldsParams(self.params_obj.dataset_params, self.params_obj.collection_params,
-                                                   main_field_name=vector_field_name)
             result = self.hybrid_search_param_analysis(_search_params=params.to_dict,
                                                        all_fields_params=all_fields_params)[0]
             result.update({"all_fields_params": all_fields_params,
@@ -391,14 +418,13 @@ class ConcurrentClientBase(CommonCases):
             params = ConcurrentInputParamsLoadSearchRelease(**req_params)
             result, nq, top_k, expr, other_params = \
                 self.search_param_analysis(_search_params=params.to_dict, default_field_name=vector_field_name,
-                                           metric_type=metric_type)
-            result.update({"dim": self.params_obj.dataset_params[pn.dim]})
+                                           metric_type=metric_type, sparse_range=sparse_range)
+            result.update({"dim": self.params_obj.dataset_params[pn.dim],
+                           "sparse_range": sparse_range})
             return ConcurrentTaskLoadSearchRelease(**result)
 
         elif req_type == pn.load_hybrid_search_release:
             params = ConcurrentInputParamsLoadHybridSearchRelease(**req_params)
-            all_fields_params = ParserFieldsParams(self.params_obj.dataset_params, self.params_obj.collection_params,
-                                                   main_field_name=vector_field_name)
             result = self.hybrid_search_param_analysis(_search_params=params.to_dict,
                                                        all_fields_params=all_fields_params)[0]
             result.update({"all_fields_params": all_fields_params})
@@ -409,30 +435,40 @@ class ConcurrentClientBase(CommonCases):
             _p.scalars_index = parser_scalar_index(_p.scalars_index)
             _p.set_properties = parser_set_properties_params(_p.set_properties)
             _p.alter_index = parser_alter_index_params(_p.alter_index)
-            return ConcurrentTaskSceneSearchTest(**_p.to_dict)
+            _p.sparse_range = check_sparse_range(_p.sparse_range)
+
+            result = _p.to_dict
+            result.update({"all_fields_params": _p.set_all_fields_params_obj,
+                           "vector_field_name": _p.anns_field})
+            return ConcurrentTaskSceneSearchTest(**result)
 
         elif req_type == pn.scene_hybrid_search_test:
             params = ConcurrentInputParamsSceneHybridSearchTest(**req_params)
             params.scalars_index = parser_scalar_index(params.scalars_index)
             params.set_properties = parser_set_properties_params(params.set_properties)
             params.alter_index = parser_alter_index_params(params.alter_index)
+            params.sparse_range = check_sparse_range(params.sparse_range)
 
             result = self.hybrid_search_param_analysis(_search_params=params.to_dict,
                                                        all_fields_params=params.set_all_fields_params_obj)[0]
             result.update({"all_fields_params": params.set_all_fields_params_obj,
-                           "anns_field": params.anns_field})
+                           "vector_field_name": params.anns_field})
             return ConcurrentTaskSceneHybridSearchTest(**result)
 
         return DataClassBase()
 
-    def parser_concurrent_tasks(self, tasks: list, vector_field_name: str, metric_type: str) -> ConcurrentTasksParams:
+    def parser_concurrent_tasks(self, tasks: list, vector_field_name: str, metric_type: str,
+                                all_fields_params: ParserFieldsParams,
+                                sparse_range: list = dv.default_sparse_range) -> ConcurrentTasksParams:
         tasks_dict = {}
         all_support_obj = ConcurrentTasksParams().all_obj
         for task in tasks:
             if task["type"] not in all_support_obj:
                 raise Exception(
                     "[parser_concurrent_tasks] Task type:{0} is not supported, please check!!!".format(task["type"]))
-            task["params"] = self.parser_tasks_params(task["type"], task["params"], vector_field_name, metric_type)
+            task["params"] = self.parser_tasks_params(
+                task["type"], task["params"], vector_field_name, metric_type,
+                all_fields_params=all_fields_params, sparse_range=sparse_range)
             tasks_dict.update({task["type"]: ConcurrentObjParams(**task)})
         return ConcurrentTasksParams(**tasks_dict)
 
@@ -464,9 +500,13 @@ class ConcurrentClientBase(CommonCases):
         vector_type = get_vector_type(self.params_obj.dataset_params[pn.dataset_name])
         vector_default_field_name = get_default_field_name(
             vector_type, self.params_obj.dataset_params.get(pn.vector_field_name, ""))
+        sparse_range = check_sparse_range(self.params_obj.dataset_params.get(pn.sparse_range, dv.default_sparse_range))
+        all_fields_params = ParserFieldsParams(self.params_obj.dataset_params, self.params_obj.collection_params,
+                                               main_field_name=vector_default_field_name)
 
         obj_params = self.parser_concurrent_tasks(self.params_obj.concurrent_tasks, vector_default_field_name,
-                                                  self.params_obj.dataset_params[pn.metric_type])
+                                                  self.params_obj.dataset_params[pn.metric_type], all_fields_params,
+                                                  sparse_range=sparse_range)
 
         # load prepare params
         _prepare_load = self.params_obj.load_params.pop(pn.prepare_load, False)
@@ -486,7 +526,9 @@ class ConcurrentClientBase(CommonCases):
                                 dim=self.params_obj.dataset_params[pn.dim],
                                 size=self.params_obj.dataset_params[pn.dataset_size],
                                 ni=self.params_obj.dataset_params[pn.ni_per],
-                                vector_field_name=vector_default_field_name)
+                                vector_field_name=vector_default_field_name,
+                                sparse_range=sparse_range, scalars_params=all_fields_params.get_scalar_other_params
+                                )
             self.prepare_flush()
             self.prepare_index(vector_field_name=vector_default_field_name,
                                metric_type=self.params_obj.dataset_params[pn.metric_type], extra_setting=False)

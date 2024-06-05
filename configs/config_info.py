@@ -76,17 +76,21 @@ class VDCENVParams(ParamsBase):
 @dataclass
 class DatasetConfig(ParamsBase):
     # for gen dataset file name
-    dataset_type: str = pn.NUMPY  # npy, parquet, hdf5
+    dataset_type: str = pn.NUMPY  # npy, parquet, hdf5, scr
     # file data type, for special dtype, e.g. `bfloat16`
     file_data_type: str = None
     # determine the rules for gen file name
-    # scalar: scalar_00000.npy, vector: binary_<dim>d_00000.npy, parquet: binary_<dim>d_00000.parquet
+    #   - scalar: scalar_00000.npy
+    #   - vector:
+    #       - npy: binary_<dim>d_00000.npy
+    #       - parquet: binary_<dim>d_00000.parquet
+    #       - scr: binary_00000.csr
     data_type: str = ""  # vector, scalar
 
     # Default required vector type
     # the data of other vector columns are set in `dataset_params.scalars_params`
     vector_type: str = ""  # FLOAT_VECTOR, BINARY_VECTOR
-    # dim for required vector
+    # dim for dataset, used to generate the dataset file name
     dim: int = 0
 
     # The folder name of the dataset

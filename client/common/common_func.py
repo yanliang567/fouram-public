@@ -14,7 +14,7 @@ from typing import Optional, List, Union
 from sklearn import preprocessing
 import pyarrow.parquet as pq
 from itertools import product, zip_longest
-from dataclasses import dataclass
+from scipy.sparse import csr_matrix, isspmatrix
 
 from client.client_base import ApiCollectionSchemaWrapper, ApiFieldSchemaWrapper, AnnSearchRequest, DataType
 from client.parameters import params_name as pn
@@ -182,6 +182,8 @@ def get_default_field_name(data_type=DataType.FLOAT_VECTOR, default_field_name: 
         field_name = dv.default_float16_vector_name
     elif data_type == DataType.BFLOAT16_VECTOR:
         field_name = dv.default_bfloat16_vector_name
+    elif data_type == DataType.SPARSE_FLOAT_VECTOR:
+        field_name = dv.default_sparse_float_vector_name
     elif data_type == DataType.INT64:
         field_name = dv.default_int64_field_name
     elif data_type == DataType.FLOAT:
@@ -203,8 +205,13 @@ def get_vector_type(data_type):
 
 
 def gen_file_name(file_id, dim, data_type):
-    file_name = "%s_%sd_%05d.%s" % (
-        dv.FILE_PREFIX, str(dim), int(file_id), config_info.dataset_config.dataset_type(data_type))
+    """ Generate the file name of vector dataset """
+    _data_type = config_info.dataset_config.dataset_type(data_type)
+
+    if _data_type == pn.CSR:
+        file_name = "%s_%05d.%s" % (dv.FILE_PREFIX, int(file_id), _data_type)
+    else:
+        file_name = "%s_%sd_%05d.%s" % (dv.FILE_PREFIX, str(dim), int(file_id), _data_type)
 
     if data_type in config_info.dataset_config.vector_to_list:
         return config_info.dataset_config.dir(data_type) + file_name
@@ -213,27 +220,21 @@ def gen_file_name(file_id, dim, data_type):
         return ""
 
 
-def gen_scalar_file_name(file_id, dataset_name: str, dim=dv.default_dim):
-    if config_info.dataset_config.dataset_type(dataset_name) == pn.NUMPY:
-        file_name = "%s_%05d.npy" % (dv.SCALAR_FILE_PREFIX, int(file_id))
-    else:
-        file_name = "%s_%sd_%05d.parquet" % (dv.FILE_PREFIX, int(dim), int(file_id))
-
-    if dataset_name in config_info.dataset_config.scalar_to_list:
-        return config_info.dataset_config.dir(dataset_name) + file_name
-    else:
-        log.error("[gen_scalar_file_name] data type not supported: {}".format(dataset_name))
-        return ""
-
-
 def gen_data_file_name(file_id, dataset_name: str, dim=dv.default_dim):
-    if config_info.dataset_config.dataset_type(dataset_name) == pn.NUMPY:
+    """ Generate the file name of scalar dataset, including multiple column vectors """
+    _dataset_type = config_info.dataset_config.dataset_type(dataset_name)
+
+    if _dataset_type == pn.NUMPY:
         if config_info.dataset_config.data_type(dataset_name) == pn.SCALAR:
-            file_name = "%s_%05d.npy" % (dv.SCALAR_FILE_PREFIX, int(file_id))
+            file_name = "%s_%05d.%s" % (dv.SCALAR_FILE_PREFIX, int(file_id), _dataset_type)
         else:
-            file_name = "%s_%sd_%05d.npy" % (dv.FILE_PREFIX, str(dim), int(file_id))
+            file_name = "%s_%sd_%05d.%s" % (dv.FILE_PREFIX, str(dim), int(file_id), _dataset_type)
+    elif _dataset_type == pn.PARQUET:
+        file_name = "%s_%sd_%05d.%s" % (dv.FILE_PREFIX, str(dim), int(file_id), _dataset_type)
+    elif _dataset_type == pn.CSR:
+        file_name = "%s_%05d.%s" % (dv.FILE_PREFIX, int(file_id), _dataset_type)
     else:
-        file_name = "%s_%sd_%05d.parquet" % (dv.FILE_PREFIX, int(dim), int(file_id))
+        raise ValueError(f"[gen_data_file_name] Dataset not supported: {dataset_name}")
 
     if dataset_name in config_info.dataset_config.to_list:
         return config_info.dataset_config.dir(dataset_name) + file_name
@@ -282,31 +283,56 @@ def get_file_list(data_size, dim, data_type):
     return file_names
 
 
-def gen_vectors(nb, dim, field_name: str = None):
+def gen_vectors(nb, dim, field_name: str = None, sparse_range=dv.default_sparse_range):
     if field_name and str(field_name).startswith("binary_vector"):
         return gen_binary_vectors(nb, dim)
     elif field_name and str(field_name).startswith("float16_vector"):
         return gen_float16_vectors(nb, dim)
     elif field_name and str(field_name).startswith("bfloat16_vector"):
         return gen_bfloat16_vectors(nb, dim)
+    elif field_name and str(field_name).startswith("sparse_float_vector"):
+        return gen_sparse_float_vectors(nb, dim, sparse_range=(sparse_range or dv.default_sparse_range))
     return gen_float_vectors(nb, dim)
 
 
 def gen_binary_vectors(nb, dim):
+    log.debug(f"[gen_binary_vectors] nb: {nb}, dim: {dim}")
     # packs a binary-valued array into bits in a unit8 array, and bytes array_of_ints
     return [bytes(np.packbits([random.randint(0, 1) for _ in range(dim)], axis=-1).tolist()) for _ in range(nb)]
 
 
 def gen_float_vectors(nb, dim):
+    log.debug(f"[gen_float_vectors] nb: {nb}, dim: {dim}")
     return [[random.random() for _ in range(int(dim))] for _ in range(int(nb))]
 
 
 def gen_float16_vectors(nb, dim):
+    log.debug(f"[gen_float16_vectors] nb: {nb}, dim: {dim}")
     return [np.array([random.random() for _ in range(int(dim))], dtype=np.float16) for _ in range(int(nb))]
 
 
 def gen_bfloat16_vectors(nb, dim):
+    log.debug(f"[gen_bfloat16_vectors] nb: {nb}, dim: {dim}")
     return [RNG.uniform(size=dim).astype(bfloat16) for _ in range(int(nb))]
+
+
+def gen_unique_uint32_list(list_length: int, dim: int):
+    _list = []
+    while len(_list) < list_length:
+        _d = random.randint(0, dim)
+        if _d not in _list:
+            _list.append(_d)
+    return _list
+
+
+def gen_sparse_float_vectors(nb: int, dim: int, sparse_range: List[int] = [1, 10]):
+    """ uint32 max length is 10, make sure that dim <= 4294967295 """
+    log.debug(f"[gen_sparse_float_vectors] nb: {nb}, dim: {dim}, sparse_range: {sparse_range}")
+    if len(sparse_range) != 2 or dim < int(sparse_range[1]) - 1:
+        raise ValueError(f"[gen_sparse_float_vectors] Check params failed, dim: {dim}, sparse_range: {sparse_range}")
+
+    _r = list(range(*sparse_range))
+    return [{k: random.random() for k in gen_unique_uint32_list(random.choice(_r), dim)} for _ in range(nb)]
 
 
 def gen_ids(start_id, end_id):
@@ -321,7 +347,8 @@ def gen_values(data_type, vectors, ids, varchar_filled=False, field: dict = {}, 
         _, _field_element = get_array_element_type(field["name"])
 
     values = None
-    if default_value is not None and isinstance(default_value, list) and len(default_value) != 0:
+    if default_value is not None and (
+            (isinstance(default_value, (list, np.ndarray)) and len(default_value) != 0) or isspmatrix(default_value)):
         return handle_special_vector_data_type(data=default_value, vector_data_file=_field_element)
     elif _field_element in [DataType.FLOAT_VECTOR]:
         _dim = field.get("params", {}).get("dim")
@@ -336,6 +363,11 @@ def gen_values(data_type, vectors, ids, varchar_filled=False, field: dict = {}, 
         _dim = field.get("params", {}).get("dim")
         values = vectors if anns_field_bool else gen_bfloat16_vectors(nb=len(ids), dim=_dim)
         values = handle_bfloat16_type(data=values)
+    elif _field_element in [DataType.SPARSE_FLOAT_VECTOR]:
+        _dim = other_params.get("dim", dv.default_dim)
+        _sparse_range = other_params.get("sparse_range", dv.default_sparse_range)
+        values = vectors if anns_field_bool else gen_sparse_float_vectors(
+            nb=len(ids), dim=_dim, sparse_range=_sparse_range)
     elif _field_element in [DataType.INT8]:
         # int8: [-128, 127]
         values = [i % 128 for i in ids]
@@ -380,17 +412,14 @@ def gen_entities(info, vectors=None, ids=None, varchar_filled=False, insert_scal
         log.error("[gen_entities] fields not in info, please check: {}".format(info))
         return {}
 
-    entities = {}
-    check_type = False
+    entities = []
     for field in info["fields"]:
-        _type = field["type"]
-        if _type in [DataType.FLOAT16_VECTOR, DataType.BFLOAT16_VECTOR]:
-            check_type = True
         if not (field["name"] == "id" and info["auto_id"]):
-            entities.update({field["name"]: gen_values(
-                _type, vectors, ids, varchar_filled, field, **insert_scalars_params.get(field["name"], {}),
-                anns_field_bool=(field["name"] == anns_field))})
-    return list(entities.values()) if check_type else pd.DataFrame(entities)
+            entities.append(gen_values(
+                field["type"], vectors, ids, varchar_filled, field, **insert_scalars_params.get(field["name"], {}),
+                anns_field_bool=(field["name"] == anns_field))
+            )
+    return entities
 
 
 def handle_bfloat16_type(data):
@@ -511,34 +540,11 @@ def parser_search_params_expr(expr):
                     _e = compare_expr(field_name, k, v)
                     expression = _e if expression == "" else "{0} && {1}".format(expression, _e)
     else:
-        raise Exception("[parser_search_params_expr] Can't parser search expression: {0}, type:{1}".format(expr,
-                                                                                                           type(expr)))
+        raise Exception(
+            "[parser_search_params_expr] Can't parser search expression: {0}, type:{1}".format(expr, type(expr)))
     if expression == "":
         expression = None
     return expression
-
-
-def get_vectors_from_binary(nq, dimension, dataset_name, field_name: str = None):
-    if dataset_name in ["random"]:
-        file_name = config_info.dataset_config.dir(dataset_name) + "query_%d.npy" % dimension
-    elif dataset_name == "local":
-        return gen_vectors(nq, dimension, field_name=field_name)
-    else:
-        file_name = config_info.dataset_config.query_file_dir(dataset_name)
-
-    if file_name:
-        data = read_npy_file(file_name, allow_pickle=True)
-
-        # special handling
-        data = handle_special_file_data_type(
-            data=data, file_data_file=config_info.dataset_config.file_data_type(dataset_name))
-
-        if nq > len(data):
-            raise Exception("[get_vectors_from_binary] nq large than file support({0})".format(len(data)))
-        # vectors = data[0:nq].tolist()
-        vectors = data[0:nq]
-        return vectors
-    raise Exception("[get_vectors_from_binary] Not support dataset: {0}, please check".format(dataset_name))
 
 
 def gen_insert_scalars_params(scalars_params: dict):
@@ -646,7 +652,39 @@ def read_data_file(file_name: str, column="", allow_pickle=False):
         return read_npy_file(file_name, allow_pickle=allow_pickle)
     elif file_name.endswith(pn.PARQUET):
         return read_parquet_file(file_name, column=column)
+    elif file_name.endswith(pn.CSR):
+        return read_csr_file(file_name)
     raise Exception("[read_data_file] Can not read file: %s" % file_name)
+
+
+def read_csr_file(file_name: str):
+    """
+    Read the fields of a CSR matrix without instantiating it.
+
+    nrow: number of vector rows
+    ncol: number of vector columns
+    nnz: number of non-zero points
+
+    File storage data format:
+        - indptr: [0, <int64>, ...] -> pointer of vector
+        - indices: [<int32> ...] -> vector subscript value
+        - data: [<float32> ...] -> value of the point corresponding to the vector, length is equal to `indices`
+
+    Notice:
+        The file data accuracy has not been verified.
+        Please ensure that the data format and content are correct.
+    """
+    if check_file_exist(file_name):
+        try:
+            with open(file_name, "rb") as f:
+                nrow, ncol, nnz = np.fromfile(f, dtype='int64', count=3)
+                indptr = np.fromfile(f, dtype='int64', count=nrow + 1)
+                indices = np.fromfile(f, dtype='int32', count=nnz)
+                data = np.fromfile(f, dtype='float32', count=nnz)
+                return csr_matrix((data, indices, indptr), shape=(nrow, ncol))
+        except Exception as e:
+            log.error(f"[read_csr_file] Can not read csr file: {e}")
+            return []
 
 
 def read_parquet_file(file_name: str, column: str):
@@ -729,7 +767,6 @@ def loop_gen_files(dim, data_type):
 
 def loop_gen_scalar_files(dataset_name, dim=dv.default_dim):
     for i in range(dv.Max_file_count):
-        # yield gen_scalar_file_name(i, dataset_name, dim)
         yield gen_data_file_name(i, dataset_name, dim)
 
 
@@ -854,6 +891,21 @@ def get_required_params(source, target):
     result = {}
     result = get_params(source, target, result)
     return result
+
+
+def check_vector_length(data):
+    return data.shape[0] if hasattr(data, "shape") else len(data)
+
+
+def check_sparse_range(param):
+    if isinstance(param, list):
+        if len(param) == 2 and all(isinstance(p, int) for p in param) and 1 <= param[0] < param[1]:
+            return param
+    elif isinstance(param, int) and param > 1:
+        return [1, param]
+    elif param is None:
+        return dv.default_sparse_range
+    raise ValueError(f"[check_sparse_range] Param `sparse_range` check failed, please check: {param}")
 
 
 def check_params_type(source: dict, target: dict):
@@ -1038,7 +1090,7 @@ def get_ann_search_request_params(all_obj: List[AnnSearchRequest], print_vectors
     result = []
     for obj in all_obj:
         _dict = {k: getattr(obj, k) for k in check_list if hasattr(obj, k)}
-        _dict.update({"nq": len(obj.data)})
+        _dict.update({"nq": check_vector_length(obj.data)})
         result.append(_dict)
     return result
 
@@ -1121,7 +1173,17 @@ def convert_to_list(data):
             return data.tolist()
         else:
             return list(data)
-    return data
+
+    _data = []
+    for d in data:
+        if not isinstance(d, list):
+            if hasattr(d, "tolist"):
+                _data.append(d.tolist())
+            else:
+                _data.append(list(d))
+        else:
+            _data.append(d)
+    return _data
 
 
 def gen_go_bench_json_file(prefix_file_path: str, retry_counts: int = 99999):
@@ -1283,356 +1345,3 @@ def go_bench_refine(go_benchmark: str, uri: str, case_params: dict, log_path: st
 
     log.error("[go_bench_refine] The `response` field is not included in the result:{0}".format(result))
     return {"response": False}
-
-
-class GoSearchParams:
-    def __init__(self, data, anns_field: str, param: dict, dim: int, limit: int, expr=None,
-                 json_file_path="", **kwargs):
-        self.data = data
-        self.json_file_path = json_file_path or f"{EnvVariable.FOURAM_TEMPORARY_DIR}/query_vector.json"
-        # self.search_vector_file = write_json_file(self.data, json_file_path=json_file_path)
-        if "ef" in param["params"]:
-            sp_value = param["params"]["ef"]
-        elif "nprobe" in param["params"]:
-            sp_value = param["params"]["nprobe"]
-        elif "level" in param["params"]:
-            sp_value = param["params"]["level"]
-        elif "search_list" in param["params"]:
-            sp_value = param["params"]["search_list"]
-        else:
-            raise Exception(
-                "[GoSearchParams] Can not get search params(ef or nprobe or level or search_list): {0}".format(param))
-        params = {"sp_value": sp_value}
-        params.update({"dim": dim})
-
-        self.search_parameters = update_dict_value({
-            "anns_field": anns_field,
-            "metric_type": param["metric_type"],
-            "params": params,
-            "limit": limit,
-            "expression": expr,
-        }, kwargs)
-
-
-class GoBenchParams:
-    def __init__(self, concurrent_tasks: list, concurrent_number: int, during_time: int, interval: int, index_type: str,
-                 collection_name: str, metric_type: str, dim: int, vector_field: str):
-        self.concurrent_tasks = concurrent_tasks
-        self.concurrent_number = concurrent_number
-        self.during_time = during_time
-        self.interval = interval
-        self.index_type = index_type
-        self.collection_name = collection_name
-        self.metric_type = metric_type
-        self.dim = dim
-        self.vector_field = vector_field
-
-    def target_params(self):
-        return {
-            pn.dataset_params: {
-                pn.metric_type: self.metric_type,
-                pn.dim: self.dim,
-                "vector_field": self.vector_field
-            },
-            pn.collection_params: {
-                pn.collection_name: self.collection_name
-            },
-            pn.index_params: {
-                pn.index_type: self.index_type
-            },
-            pn.concurrent_params: {
-                pn.concurrent_number: self.concurrent_number,
-                pn.during_time: parser_time(self.during_time),
-                pn.interval: self.interval
-            },
-            pn.concurrent_tasks: self.concurrent_tasks
-        }
-
-
-""" Parser input params """
-
-
-@dataclass
-class ParserInputParams:
-    params: Optional[dict] = None
-    prepare: Optional[bool] = True
-    prepare_clean: Optional[bool] = True
-    rebuild_index: Optional[bool] = False
-    clean_collection: Optional[bool] = True
-    sub_callable_obj: Optional[callable] = None
-
-
-@dataclass
-class SubPartitionsParams:
-    partition_name: str
-    data_size: int
-    data_repeated: bool
-
-
-@dataclass
-class ExtraPartitionsParams:
-    partitions: Union[int, List[str]] = 1
-    datasizes: Union[str, int, List[Union[str, int]]] = None
-    data_repeated: Optional[bool] = True
-
-    def combination_params(self, input_datasize: int) -> List[SubPartitionsParams]:
-        log.info(f"[ExtraPartitionsParams] Combination extra partition params: {vars(self)}")
-        _input_data_size = parser_data_size(input_datasize)
-
-        # parser partition names
-        partition_names = self.partitions
-        if isinstance(self.partitions, int):
-            if self.partitions < 1:
-                raise ValueError(f"[ExtraPartitionsParams] Partitions can't be less than 1: {self.partitions}")
-            partition_names = [dv.default_partition_name]
-            partition_names.extend([f"{dv.partition_name_prefix}{i}" for i in range(1, self.partitions)])
-
-        # parser data sizes
-        data_sizes = self.datasizes
-        if not isinstance(self.datasizes, list):
-            if self.datasizes:
-                data_sizes = [self.datasizes for i in partition_names]
-            else:
-                d = int(_input_data_size / len(partition_names))
-                data_sizes = [d for i in partition_names]
-                for i in range(int(_input_data_size % len(partition_names))):
-                    data_sizes[i] += 1
-
-        # check params len
-        if len(partition_names) != len(data_sizes):
-            log.error(f"[ExtraPartitionsParams] Partitions:{partition_names}, total datasizes:{input_datasize}")
-            raise ValueError(
-                f"[ExtraPartitionsParams] Len of partitions:{len(partition_names)} != datasizes:{len(data_sizes)}")
-
-        # check total size
-        data_sizes = [parser_data_size(i) for i in data_sizes]
-        if sum(data_sizes) != _input_data_size:
-            log.error(f"[ExtraPartitionsParams] Partitions datasizes:{data_sizes}, total datasizes:{input_datasize}")
-            raise ValueError(
-                f"[ExtraPartitionsParams] Total partitions data sizes:{sum(data_sizes)} != datasizes:{input_datasize}")
-
-        zip_data = self.zip_data([partition_names, data_sizes])
-        partition_number = {i[0]: i[1] for i in zip_data}
-        log.info(f"[ExtraPartitionsParams] The data size for each partition: {partition_number}")
-        # return partition param obj list
-        return [SubPartitionsParams(*i, data_repeated=self.data_repeated) for i in zip_data]
-
-    @staticmethod
-    def zip_data(data: List[list]):
-        return [list(x) for x in zip_longest(*data)]
-
-
-class GenIterValues:
-    def __init__(self):
-        self.insert_length = 0
-        self.ids_step = 0
-
-    def set_ids_step(self, num: int):
-        self.ids_step = num
-        return self
-
-    def loop_ids(self, step=50000, start_id=0):
-        # The first batch value is smaller than the initialized value
-        _step = step if self.ids_step == 0 else self.ids_step
-        self.set_ids_step(_step)
-
-        while True:
-            ids = [k for k in range(start_id, start_id + int(self.ids_step))]
-            start_id = start_id + int(self.ids_step)
-            if start_id + int(self.ids_step) > 2 ** 63 - 1:
-                start_id = 0
-            yield ids
-
-    def set_insert_length(self, num: int):
-        self.insert_length = num
-        return self
-
-    def gen_scalar_values(self, scalars_params: dict, insert_length: int):
-        # The first batch value is smaller than the initialized value
-        _insert_length = insert_length if self.insert_length == 0 else self.insert_length
-        self.set_insert_length(_insert_length)
-
-        _loop_files = {k: loop_gen_scalar_files(
-            scalars_params[k]["other_params"].get("dataset"),
-            dim=scalars_params[k]["other_params"].get("dim", dv.default_dim)) for k in scalars_params.keys() if
-            scalars_params[k].get("other_params", {}).get("dataset", False)}
-        _insert_scalars_params = gen_insert_scalars_params(scalars_params)
-        _loop_dict = copy.deepcopy(_insert_scalars_params)
-
-        for k in _loop_dict.keys():
-            _loop_dict[k]["default_value"] = []
-
-        while True:
-            for k, v in _loop_files.items():
-                while len(_loop_dict[k]["default_value"]) < self.insert_length:
-                    # _loop_dict[k]["default_value"].extend(read_npy_file(next(v), allow_pickle=True))
-                    _loop_dict[k]["default_value"].extend(read_data_file(
-                        next(v), column=_loop_dict[k].get("other_params", {}).get("column_name", ""),
-                        allow_pickle=True))
-
-            for k, v in _loop_dict.items():
-                _insert_scalars_params[k]["default_value"] = _loop_dict[k]["default_value"][:self.insert_length]
-                _loop_dict[k]["default_value"] = _loop_dict[k]["default_value"][self.insert_length:]
-            yield _insert_scalars_params
-
-
-@dataclass
-class PrepareInsertParams:
-    GenScalarValuesObj = GenIterValues()
-    iter_loop_ids = iter([])
-    _loop_ids = []
-    iter_insert_scalars_params = iter([])
-    _insert_scalars_params = []
-    _loop_file = iter([])
-    _vectors = []
-
-    def __init__(self, ni: int, scalars_params: dict, dim: int = dv.default_dim, data_type: str = "",
-                 acc_dataset_train: list = [], column_name: str = "", data_repeated: bool = True):
-        """
-        :param ni: batch of insert
-        :param scalars_params: scalar params
-        :param dim: dim for insert vector
-        :param data_type: data type for vector
-        :param acc_dataset_train: training vectors for recall test
-        :param column_name: column_name for vector file
-        :param data_repeated: repeated vectors when insert into different partitions
-        """
-        self._ni = int(ni)
-        self._scalars_params = scalars_params
-        self._dim = int(dim)
-        self._data_type = data_type
-        self._acc_dataset_train = acc_dataset_train
-        self._column_name = column_name
-        self._data_repeated = data_repeated
-
-        self.vectors_ni = self._ni
-
-        # init data
-        self.refresh_data()
-
-    def refresh_data(self, reset: bool = True):
-        if reset:
-            self.GenScalarValuesObj = GenIterValues()
-
-            self.iter_loop_ids = self.GenScalarValuesObj.loop_ids(int(self._ni))
-            self._loop_ids = []
-
-            self.iter_insert_scalars_params = self.GenScalarValuesObj.gen_scalar_values(self._scalars_params, self._ni)
-            self._insert_scalars_params = []
-
-            if self._data_type:
-                self._loop_file = loop_gen_files(self._dim, self._data_type)
-            self._vectors = []
-
-    def set_data_repeated(self, _flag: bool):
-        self._data_repeated = _flag
-
-    @property
-    def vectors(self):
-        if len(self._vectors) < self.vectors_ni:
-            while True:
-                self._vectors.extend(read_data_file(next(self._loop_file), column=self._column_name))
-                if len(self._vectors) >= self.vectors_ni:
-                    break
-        return self._vectors
-
-    @vectors.setter
-    def vectors(self, data: list):
-        self._vectors = data
-
-    """ iter to get all values """
-
-    def get_acc_vectors(self, ni: int):
-        _v = self._acc_dataset_train[:ni]
-        self._acc_dataset_train = self._acc_dataset_train[ni:]
-        return _v
-
-    def get_vectors(self, ni: int):
-        self.vectors_ni = ni
-        _v = self.vectors[:ni]
-        self.vectors = self.vectors[ni:]
-        return _v
-
-    def loop_ids(self, ni: int):
-        self.GenScalarValuesObj.set_ids_step(ni)
-        return next(self.iter_loop_ids)
-
-    def insert_scalars_params(self, ni: int):
-        self.GenScalarValuesObj.set_insert_length(ni)
-        return next(self.iter_insert_scalars_params)
-
-
-@dataclass
-class FieldsParamsBase:
-    dim: int = dv.default_dim
-    dataset: str = dv.default_dataset
-    column_name: str = None
-    metric_type: str = dv.default_metric_type
-
-    @property
-    def to_dict(self):
-        return vars(self)
-
-
-class ParserFieldsParams:
-    """
-    Mainly to obtain the parameters set by multi-vector
-    """
-
-    def __init__(self, dataset_params: dict, collection_params: dict, main_field_name: str):
-        self._dataset_params = copy.deepcopy(dataset_params)
-        self._collection_params = copy.deepcopy(collection_params)
-        self._main_field_name = main_field_name
-
-        self._parser_params()
-
-    def _set_attr(self, k: str, v: dict):
-        obj = getattr(self, k, None)
-        if obj is None:
-            setattr(self, k, FieldsParamsBase())
-            obj = getattr(self, k)
-        elif not isinstance(obj, FieldsParamsBase):
-            raise ValueError(f"[ParserFieldsParams] Property:{k} already exists, value:{obj}")
-
-        for i, j in v.items():
-            if hasattr(obj, i):
-                setattr(obj, i, j)
-
-    def _parser_params(self):
-        try:
-            # get main `dim`
-            main_dim = self._dataset_params.get(pn.dim)
-
-            # set main vector filed
-            m = FieldsParamsBase(dim=main_dim, dataset=self._dataset_params.get(pn.dataset_name),
-                                 column_name=self._dataset_params.get(pn.column_name),
-                                 metric_type=self._dataset_params.get(pn.metric_type))
-            setattr(self, self._main_field_name, m)
-
-            # set other fields from `collection_params.other_fields`
-            for f in self._collection_params.get(pn.other_fields, []):
-                if isinstance(f, str):
-                    self._set_attr(f, {"dim": main_dim})
-
-            # parser metric type
-            for k1, v1 in self._dataset_params.get(pn.vectors_index, {}).items():
-                if isinstance(v1, dict):
-                    self._set_attr(k1, {pn.metric_type: v1.get(pn.metric_type, dv.default_metric_type)})
-
-            # set other fields from `dataset_params.scalars_params`
-            for k, v in self._dataset_params.get(pn.scalars_params, {}).items():
-                if isinstance(v, dict) and isinstance(v.get("other_params", {}), dict):
-                    _other_params = v.get("other_params", {})
-                    _p = {i: _other_params.get(i) for i in ["dataset", "column_name"] if _other_params.get(i, None)}
-
-                    _params = v.get("params", {})
-                    _p["dim"] = _params.get("dim", main_dim)
-                    self._set_attr(k, _p)
-
-        except Exception as e:
-            raise Exception(f"[ParserFieldsParams] Parser fields params failed: {e}")
-
-        log.debug(f"[ParserFieldsParams] Parser fields params done: {vars(self)}")
-
-    def get_fields_params(self, _field_name: str) -> FieldsParamsBase:
-        return getattr(self, _field_name, eval(f"self.{self._main_field_name}"))

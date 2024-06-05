@@ -180,7 +180,7 @@ class DefaultScalarParams:
         return {
             field: {
                 "params": {"dim": 200},
-                "other_params": {"dataset": "text2img", "dim": 200}
+                "other_params": {"dataset": "text2img"}
             }
         }
 
@@ -192,7 +192,7 @@ class DefaultScalarParams:
         return {
             field: {
                 "params": {"dim": 128},
-                "other_params": {"dataset": "sift", "dim": 128}
+                "other_params": {"dataset": "sift"}
             }
         }
 
@@ -211,7 +211,7 @@ class DefaultScalarParams:
         return {
             field: {
                 "params": {"dim": 512},
-                "other_params": {"dataset": "binary", "dim": 512}
+                "other_params": {"dataset": "binary"}
             }
         }
 

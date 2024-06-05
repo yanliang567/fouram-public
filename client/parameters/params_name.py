@@ -50,6 +50,7 @@ vector_field_name = "vector_field_name"
 dataset_name = "dataset_name"
 column_name = "column_name"
 dim = "dim"
+sparse_range = "sparse_range"
 dataset_size = "dataset_size"
 max_length = "max_length"
 varchar_filled = "varchar_filled"
@@ -142,6 +143,7 @@ distances = "distances"
 # Dataset types, file format
 NUMPY = "npy"
 PARQUET = "parquet"
+CSR = "csr"
 
 # data type name lower
 ARRAY = "array"

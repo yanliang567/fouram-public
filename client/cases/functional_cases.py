@@ -3,9 +3,13 @@ import dacite
 from typing import Dict
 
 from client.common.common_type import Precision, CaseIterParams
-from client.common.common_func import (
-    get_vector_type, get_default_field_name, ParserInputParams
+from client.common.common_parser import (
+    ParserInputParams, ParserFieldsParams
 )
+from client.common.common_func import (
+    get_vector_type, get_default_field_name, check_sparse_range
+)
+from client.common.common_type import DefaultValue as dv
 from client.util.params_check import functional_check_params
 from client.util.api_request import docstring_decorator
 from client.cases.common_cases import CommonCases
@@ -63,6 +67,9 @@ class FunctionalCases(CommonCases):
         vector_type = get_vector_type(self.params_obj.dataset_params[pn.dataset_name])
         vector_default_field_name = get_default_field_name(
             vector_type, self.params_obj.dataset_params.get(pn.vector_field_name, ""))
+        sparse_range = check_sparse_range(self.params_obj.dataset_params.get(pn.sparse_range, dv.default_sparse_range))
+        all_fields_params = ParserFieldsParams(self.params_obj.dataset_params, self.params_obj.collection_params,
+                                               main_field_name=vector_default_field_name)
 
         # load prepare params
         _prepare_load = self.params_obj.load_params.pop("prepare_load", False)
@@ -82,7 +89,9 @@ class FunctionalCases(CommonCases):
                                 dim=self.params_obj.dataset_params[pn.dim],
                                 size=self.params_obj.dataset_params[pn.dataset_size],
                                 ni=self.params_obj.dataset_params[pn.ni_per],
-                                vector_field_name=vector_default_field_name)
+                                vector_field_name=vector_default_field_name,
+                                sparse_range=sparse_range, scalars_params=all_fields_params.get_scalar_other_params
+                                )
             self.prepare_flush()
             self.prepare_index(vector_field_name=vector_default_field_name,
                                metric_type=self.params_obj.dataset_params[pn.metric_type], extra_setting=False)

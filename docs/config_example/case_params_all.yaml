@@ -5,18 +5,28 @@ dataset_params:
   # metric type of index and search
   metric_type: L2 / IP / COSINE / JACCARD / <str>
   # specify the name of the vector column: when creating the collection, or for an existing collection
-  vector_field_name: float_vector / binary_vector / float16_vector / bfloat16_vector / <str>
+  vector_field_name: float_vector / binary_vector / float16_vector / bfloat16_vector / sparse_float_vector / <str>
   # for parquet data sets, specify which column in the parquet data set is used to insert the vector column
-  # `float32_vector` is the column_name on laion dataset
+  # `float32_vector` is the column_name on `laion` dataset
   column_name: float32_vector / <str>
   # vector dimensions for vector field, make sure it is consistent with the dim of the specified dataset
   # `dataset_params.dim` is also a global parameter,
   # `dim` of other vector field will be overwritten by `dataset_params.dim` if `dataset_params.scalars_params.<vector field name>.params.dim` is not set
+  # The dim value of the sparse vector is the maximum subscript value when randomly generating data.
   dim: 128 / <int>
+  # `sparse_range`: the range of non-zero values of a sparse vector, used to generate random sparse vectors
+  #   - List[int, int]: only supports list length of 2, [<min int>, <max int>): <min int> >= 1, <min int> < <max int>
+  #   - int: > 1, and range will be set to [1, <int>)
+  #   - None: will set the default value [1, 10]
+  # `dataset_params.sparse_range` is also a global parameter
+  # Notice:
+  #   - `sparse_range` should not be too large, otherwise data generation will be very slow!!
+  #   - right value of `sparse_range` cannot be greater than dim + 1!!
+  sparse_range: [ 1, 10 ] / <List[int, int]> / <int> / None
   # dataset names currently support:
   # random: `local`
   #      1. vector will automatically generate corresponding data based on the `dataset_params.vector_field_name` prefix
-  #      2. if the prefix is not "binary_vector", "float_vector", "float16_vector", "bfloat16_vector" type data will be generated
+  #      2. if the prefix is not "binary_vector", "float_vector", "float16_vector", "bfloat16_vector", "sparse_float_vector" type data will be generated
   # npy: `deep`, `sift`, `text2img`, `laion`, `embed`, `gist`, `glove`, `binary`, `random`
   # parquet: `cohere10m_parquet`, `laion1b_nolang`, `laion2b_multi`
   dataset_name: sift
@@ -67,13 +77,13 @@ dataset_params:
     # create scalars index params
     varchar_1:
       index_type: INVERTED
-    varchar_2: {}  # for default index, don't pass in params
+    varchar_2: { }  # for default index, don't pass in params
 
   # parameters required to create scalars: {<field_name>: {<params>: {}, <other_params>: {} }}
   scalars_params:
     # `params` for creating collection
     # `other_params` for inserting values
-    # `dim` under `other_params` is used to generate file name `binary_<dim>d_<five digits>.<file type>`
+    # `dim` under `other_params` is used to generate random vector which will be covered by `params.dim`
 
     # default fields: float_vector, id
     # "id" is the default primary key field
@@ -86,7 +96,6 @@ dataset_params:
       other_params:
         dataset: laion2b_multi
         column_name: float32_vector
-        dim: 768
     # After milvus supports multiple vectors, parameters can be passed
     float_vector_1:
       params:
@@ -95,25 +104,37 @@ dataset_params:
         # Parquet data set needs to specify the dataset name and column_name
         dataset: cohere10m_parquet
         column_name: emb
-        dim: 768
     float_vector_2:
       params:
         dim: 128
       other_params:
         # Numpy data set only needs to pass the dataset name
         dataset: sift
-        dim: 128
     binary_vector_1:
       params:
         dim: 512
       other_params:
         dataset: binary
-        dim: 512
+    sparse_float_vector_1:
+      other_params:
+        dataset: sparse_full
+        # sparse_float_vector: please configure `dim` and `sparse_range` under `other_params` to generate random vector, otherwise they will be overwritten by global params
+        dim: 30000
+        # same as `dataset_params.sparse_range`
+        sparse_range: [ 1, 10 ]
+    sparse_float_vector_2:
+      other_params: # random data
+        # `dim` will be covered by the `dataset_params.dim`
+        # same as `dataset_params.sparse_range`
+        sparse_range: [ 1, 20 ]
+    sparse_float_vector_3:
+      other_params: { } # random data
+      # `dim` will be covered by the `dataset_params.dim`
+      # `sparse_range` will be covered by the `dataset_params.sparse_range`
     id:
       other_params:
         dataset: laion2b_multi
         column_name: pk  # for int64 primary key
-        dim: 768
     # Scalar naming rules: `DataType` as prefix
     int64_1:
       other_params:
@@ -140,8 +161,8 @@ dataset_params:
       other_params:
         varchar_filled: false
     array_int64_1:
-       params:
-         max_capacity: 9999
+      params:
+        max_capacity: 9999
 
   # list resource groups after preparing data
   show_resource_groups: False / <bool>
@@ -171,7 +192,7 @@ collection_params:
   auto_id: false / <bool>
   # create scalars: <List[<scalar field name>...]>
   # Notice: scalars are created here so that operations on scalar can take effect.
-  other_fields: ["int64_1", "float_1", "json_1", "varchar_1", "varchar_2", "array_varchar_1", "array_int64_1"]
+  other_fields: [ "int64_1", "float_1", "json_1", "varchar_1", "varchar_2", "array_varchar_1", "array_int64_1" ]
   shards_num: 2 / <int>
   # the default pk is `int64`, you can set `true` to set the primary key column to `varchar` type
   # parameters of the `varchar` pk column can be set in `dataset_params.scalars_params.id`
@@ -216,7 +237,7 @@ search_params:
     nprobe: 64 / <int> / <List[int]>
   expr: "int64_1 > 10" / <str> / <List[str]>
 
-  output_fields: ["int64_1", "float_vector"] / <list>
+  output_fields: [ "int64_1", "float_vector" ] / <list>
   timeout: 300 / <int>
   ignore_growing: <bool>
   guarantee_timestamp: <int>
@@ -252,8 +273,8 @@ hybrid_search_params:
   # rank type: RRFRanker, WeightedRanker -> List[list] or list
   rerank:
     # at least one set of parameters needs to be passed in
-    RRFRanker: [[60], [70], [80]] / [99] / [] / [[], [], [50]]
-    WeightedRanker: [0.9, 0.1] / [[0.9, 0.1], [0.8, 0.2]]
+    RRFRanker: [ [ 60 ], [ 70 ], [ 80 ] ] / [99] / [] / [[], [], [50]]
+    WeightedRanker: [ 0.9, 0.1 ] / [[0.9, 0.1], [0.8, 0.2]]
 
   # search vectors number
   nq: 1 / <int> / <List[int]>
@@ -270,7 +291,7 @@ hybrid_search_params:
 query_params:
   # `ids` will be converted to `expr`: "id in {ids}"
   # ids will overwrite expr after being set
-  ids: [1, 2] / <list>
+  ids: [ 1, 2 ] / <list>
   expr: "int64_1 > 10" / <str>
   output_fields: [ "int64_1", "float_vector" ] / <list>
   ignore_growing: <bool>
@@ -320,7 +341,7 @@ common_params:
 # the parameters of each case are different, please pass them according to actual use.
 # refer to `GetParamObj` in the file `fouram/client/parameters/functional_params.py` to map parameter objects.
 # if there is no parameter mapping in the case, it means that there is no need to pass parameters.
-functional_params: {}
+functional_params: { }
 
 # used with `search` parameters, the old single-search for go bench concurrency parameters
 go_search_params:
@@ -377,12 +398,12 @@ concurrent_tasks:
       # `dim` obtained from `dataset_params.scalars_params.<vector field name>.params.dim`
 
       # search `metric_type` obtained from `dataset_params.vectors_index.<vector field name>.metric_type`
-      reqs:  # List[dict]
+      reqs: # List[dict]
         # `anns_field` and `search_param` must be passed in
         # default value of `expr` is None
         # if `top_k` is not passed in, which will be overwritten by `top_k` above
         - anns_field: float_vector  # str
-          search_param:  # dict
+          search_param: # dict
             nprobe: 64
           top_k: 2  # int
           expr: "id > 0"  # str
@@ -474,7 +495,7 @@ concurrent_tasks:
   - type: upsert
     weight: 1
     params:
-      nb: Optional[int] = 1  # number of batch insert
+      nb: Optional[int] = 1  # number of batch upsert
       timeout: Optional[int] = 60
 
       # random id or vectors
@@ -500,11 +521,15 @@ concurrent_tasks:
     weight: 1
     params:
       # create `dim` collection -> insert `data_size` vectors, batch `nb` -> flush -> count vectors -> index -> drop
+      dataset: Optional[str] = "local"
+      column_name: Optional[str] = "float32_vector" # same as `dataset_params.column_name`
+      vector_field_name: Optional[str] = None # same as `dataset_params.vector_field_name`
       dim: Optional[int] = 128
+      sparse_range: Union[List[int], int, None] = None  # same as `dataset_params.sparse_range`
       data_size: Optional[int] = 3000
       nb: Optional[int] = 3000
       index_type: Optional[str] = "IVF_SQ8"
-      index_param: {"nlist": 2048}  # Optional[dict]
+      index_param: { "nlist": 2048 }  # Optional[dict]
       metric_type: Optional[str] = "L2"
       other_fields: Optional[list] = []  # same as `collection_params.other_fields`
 
@@ -545,7 +570,7 @@ concurrent_tasks:
 
       # search
       nq: Optional[int] = 10
-      search_param: {'nprobe': 16} # Optional[dict]
+      search_param: { 'nprobe': 16 } # Optional[dict]
       limit: Optional[int] = 10
       expr: Optional[str] = None
       output_fields: Optional[list] = None
@@ -559,7 +584,7 @@ concurrent_tasks:
       # same as the params of `- type: hybrid_search`
       reqs: list
       rerank:
-        RRFRanker: []
+        RRFRanker: [ ]
       nq: Optional[int] = 1
       top_k: Optional[int] = 10
       output_fields: Optional[list] = None
@@ -579,7 +604,7 @@ concurrent_tasks:
       # only for checking collections that can be searched
       nq: Optional[int] = 1
       top_k: Optional[int] = 10
-      search_param: {} # Optional[dict]
+      search_param: { } # Optional[dict]
       guarantee_timestamp: Optional[int] = None
       timeout: Optional[int] = 60
 
@@ -628,12 +653,15 @@ concurrent_tasks:
       # build index -> load collection -> serial search `search_counts` times -> drop collection ->
       # delete role and user when new_user=true -> remove new alias connect when new_connect=true
       dataset: Optional[str] = local
+      column_name: Optional[str] = "float32_vector"  # same as `collection_params.column_name`
+      vector_field_name: Optional[str] = None  # same as `collection_params.vector_field_name`
       dim: Optional[int] = 128
+      sparse_range: Union[List[int], int, None] = None  # same as `dataset_params.sparse_range`
       shards_num: Optional[int] = 2
       data_size: Optional[int] = 3000
       nb: Optional[int] = 3000
       index_type: Optional[str] = "IVF_SQ8"
-      index_param: {'nlist': 2048} # Optional[dict]
+      index_param: { 'nlist': 2048 } # Optional[dict]
       metric_type: Optional[str] = "L2"
       other_fields: Optional[list] = []  # same as `collection_params.other_fields`
 
@@ -647,7 +675,7 @@ concurrent_tasks:
       # search
       nq: Optional[int] = 1
       top_k: Optional[int] = 10
-      search_param: {'nprobe': 16} # Optional[dict]
+      search_param: { 'nprobe': 16 } # Optional[dict]
 
       # other
       prepare_before_insert: Optional[bool] = False
@@ -675,7 +703,7 @@ concurrent_tasks:
       top_k: int
       reqs: list
       rerank:
-        RRFRanker: []
+        RRFRanker: [ ]
       output_fields: Optional[list] = None
       ignore_growing: Optional[bool] = False
       guarantee_timestamp: Optional[int] = None
@@ -686,7 +714,10 @@ concurrent_tasks:
 
       # collection and insert and index params
       dataset: Optional[str] = local
+      column_name: Optional[str] = "float32_vector"  # same as `collection_params.column_name`
+      vector_field_name: Optional[str] = None  # same as `collection_params.vector_field_name`
       dim: Optional[int] = 128
+      sparse_range: Union[List[int], int, None] = None  # same as `dataset_params.sparse_range`
       shards_num: Optional[int] = 2
       data_size: Optional[int] = 3000
       nb: Optional[int] = 3000
