@@ -1,7 +1,7 @@
 import scipy.sparse as sp
 
 from client.read_dataset.base.read_base import ReadBase
-from client.common.common_func import read_csr_file
+from client.common.common_func import read_csr_file, check_vector_length
 
 from utils.util_log import log
 
@@ -27,10 +27,11 @@ class ReadCSR(ReadBase):
         while not sp.isspmatrix(self._default_value):
             self._default_value = read_csr_file(self.file_name)
 
-        while not sp.isspmatrix(self._default_value) or self._default_value.shape[0] < data_length:
+        while not sp.isspmatrix(self._default_value) or check_vector_length(self._default_value) < data_length:
             res = read_csr_file(self.file_name)
-            if sp.isspmatrix(res):
-                self._default_value = sp.vstack([self._default_value, res])
+            if sp.isspmatrix(res) and check_vector_length(res) > 0:
+                self._default_value = sp.vstack([self._default_value, res]) if check_vector_length(
+                    self._default_value) > 0 else res
 
         _value = self._default_value[:data_length]
         self._default_value = self._default_value[data_length:]

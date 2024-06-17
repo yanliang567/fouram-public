@@ -30,8 +30,8 @@ class ReadNumpy(ReadBase):
 
         while len(self._default_value) < data_length:
             res = read_npy_file(self.file_name, allow_pickle=self._allow_pickle)
-            if isinstance(res, np.ndarray):
-                self._default_value = np.vstack((self._default_value, res))
+            if isinstance(res, np.ndarray) and len(res) > 0:
+                self._default_value = np.vstack((self._default_value, res)) if len(self._default_value) > 0 else res
 
         _value = self._default_value[:data_length]
         self._default_value = self._default_value[data_length:]
