@@ -54,8 +54,11 @@ class VDCClient(BaseClient):
 
         # check instance type
         if self.deploy_class_id == ClassID.classserverless:
-            self.INSTANCE_TYPE = InstanceType.Serverless
+            self.INSTANCE_TYPE = InstanceType.FreeTier
             obj = self._serverless_install
+        elif self.deploy_class_id == ClassID.classelasticserverless:
+            self.INSTANCE_TYPE = InstanceType.ElasticServerless
+            obj = self._elastic_serverless_install
         else:
             self.INSTANCE_TYPE = InstanceType.Milvus
             obj = self._delicate_install
@@ -80,11 +83,24 @@ class VDCClient(BaseClient):
         log.debug(f"[VDCClient] Final config for VDC deployment, release_name: {self.release_name}, " +
                   f"deploy_class_id: {self.deploy_class_id}, " +
                   f"server_resource: {server_resource}, milvus_config: {milvus_config}")
-        self.release_name, instance_id = self.client.create_server_less(
+        self.release_name, instance_id = self.client.create_free_serverless(
             instance_name=self.release_name, ap_point_host_id=param_info.vdc_serverless_host, timeout=timeout)
 
         self.upgrade(body={"server_resource": server_resource, "milvus_config": milvus_config},
                      release_name=self.release_name, check_release_exist=False, timeout=timeout)
+
+        self.instance_id_maps.update({self.release_name: instance_id})
+        return self.release_name if return_release_name else (self.release_name, instance_id)
+
+    def _elastic_serverless_install(self, server_resource, milvus_config, return_release_name, **kwargs):
+        log.debug(f"[VDCClient] Final config for VDC deployment, release_name: {self.release_name}, " +
+                  f"deploy_class_id: {self.deploy_class_id}, " +
+                  f"server_resource: {server_resource}, milvus_config: {milvus_config}")
+        self.release_name, instance_id = self.client.create_elastic_serverless(
+            instance_name=self.release_name, ap_point_host_id=param_info.vdc_serverless_host)
+
+        self.upgrade(body={"server_resource": server_resource, "milvus_config": milvus_config},
+                     release_name=self.release_name, check_release_exist=False)
 
         self.instance_id_maps.update({self.release_name: instance_id})
         return self.release_name if return_release_name else (self.release_name, instance_id)
@@ -153,8 +169,9 @@ class VDCClient(BaseClient):
         release_name = release_name or self.release_name
         self.check_server_and_set_params(release_name=release_name)
 
-        return self._serverless_endpoint(release_name=release_name) if self.INSTANCE_TYPE == InstanceType.Serverless \
-            else self._delicate_endpoint(release_name=release_name)
+        if self.INSTANCE_TYPE in [InstanceType.FreeTier, InstanceType.ElasticServerless]:
+            return self._serverless_endpoint(release_name=release_name)
+        return self._delicate_endpoint(release_name=release_name)
 
     def _delicate_endpoint(self, release_name: str):
         host, port = self.client.get_endpoint()
@@ -223,6 +240,6 @@ class VDCClient(BaseClient):
         # set endpoint
         if self.INSTANCE_TYPE == InstanceType.Milvus:
             param_info.param_host, param_info.param_port = self.client.get_endpoint()
-        elif self.INSTANCE_TYPE == InstanceType.Serverless:
+        elif self.INSTANCE_TYPE in [InstanceType.FreeTier, InstanceType.ElasticServerless]:
             param_info.param_uri = self.client.get_serverless_endpoint()
             param_info.param_db_name = parse.urlparse(param_info.param_uri).path.strip("/")

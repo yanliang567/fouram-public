@@ -6,6 +6,12 @@ from deploy.commons.common_func import gen_str
 from db_client.client_mysql import ClientMySql
 
 
+def sql_query_instance_id(mysql_client: ClientMySql, ins_name, user_id, is_deleted: int, db="resource.cust_instance"):
+    sql = "SELECT instance_id FROM {0} where ins_name = '{1}' and user_id = '{2}' and is_deleted = {3};"
+    query_sql = sql.format(db, ins_name, user_id, is_deleted)
+    return mysql_client.query(query_sql)
+
+
 def sql_query_instance_class(mysql_client: ClientMySql, class_id, region_id, disk_type: int = None,
                              db="resource.instance_class"):
     sql = "SELECT * FROM {0} where class_id = '{1}' and region_id = '{2}'"

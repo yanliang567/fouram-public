@@ -42,11 +42,18 @@ class OversoldStatus:
 class InstanceType:
     Milvus = 1
     IndexCluster = 2
-    Serverless = 3
+    # Serverless = 3
+    FreeTier = 3
+    ElasticServerless = 5
 
-    get_all_values = [1, 2, 3]
+    get_all_values = [1, 2, 3, 5]
 
 
 class InstanceIndexType:
     BigData = 1  # for instance_class table disk_type, 1 for bigdata, 0 for performance
     HighPerf = 0
+
+
+class RMIsDeletedStatus:
+    NO = 0
+    YES = 1

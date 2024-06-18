@@ -63,7 +63,10 @@ class CloudRMApi:
     def delete(self, instance_id: str, log_level=Log_Level) -> RequestResponseParser:
         url = self.host + "/resource/v1/instance/milvus/delete"
         body = {
+            "backupId": "",
+            "force": True,
             "instanceId": instance_id,
+            "storageDelay": 0
         }
         return self.req.post(url=url, body=body, headers=self.headers, log_level=log_level)
 
@@ -222,8 +225,9 @@ class CloudRMApi:
 
     @request_catch()
     def serverless_create(self, region_id: str, instance_name: str, ap_point_host_id: str = "", collection_name="xxx",
-                          create_collection=False, create_example_collection=False, description="", dim=768,
-                          metric_type="IP", project_id="0", log_level=Log_Level) -> RequestResponseParser:
+                          create_collection=False, create_example_collection=False,
+                          description="fouram benchmark test serverless instance", dim=768,
+                          metric_type="IP", project_id=None, log_level=Log_Level) -> RequestResponseParser:
         url = self.host + "/resource/v1/serverless/create"
         body = {
             "appointHostId": ap_point_host_id,
@@ -234,7 +238,42 @@ class CloudRMApi:
             "dim": dim,
             "instanceName": instance_name,
             "metricType": metric_type,
-            "projectId": project_id,
+            "projectId": project_id or self.project_id,
+            "regionId": region_id
+        }
+        return self.req.post(url=url, body=body, headers=self.headers, log_level=log_level)
+
+    @request_catch()
+    def serverless_create_elastic(self, region_id: str, instance_name: str, ap_point_host_id: str = "",
+                                  real_user_id: str = "", project_id=None,
+                                  log_level=Log_Level) -> RequestResponseParser:
+        url = self.host + "/resource/v1/serverless/create_elastic"
+        body = {
+            "appointHostId": ap_point_host_id,
+            "instanceName": instance_name,
+            "projectId": project_id or self.project_id,
+            "realUserId": real_user_id,
+            "regionId": region_id
+        }
+        return self.req.post(url=url, body=body, headers=self.headers, log_level=log_level)
+
+    @request_catch()
+    def serverless_create_free(self, region_id: str, instance_name: str,
+                               ap_point_host_id: str = "", ap_point_host_user_id: str = "", auto_load: bool = False,
+                               collection_name="xxx", create_collection=False, create_example_collection=False,
+                               description="fouram benchmark test serverless free tire instance", project_id=None,
+                               log_level=Log_Level) -> RequestResponseParser:
+        url = self.host + "/resource/v1/serverless/create_free"
+        body = {
+            "appointHostId": ap_point_host_id,
+            "appointHostUserId": ap_point_host_user_id,
+            "autoLoad": auto_load,
+            "collectionName": collection_name,
+            "createCollection": create_collection,
+            "createExampleCollection": create_example_collection,
+            "description": description,
+            "instanceName": instance_name,
+            "projectId": project_id or self.project_id,
             "regionId": region_id
         }
         return self.req.post(url=url, body=body, headers=self.headers, log_level=log_level)

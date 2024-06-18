@@ -5,13 +5,13 @@ from datetime import datetime
 
 from deploy.client.base.dynamic_client import DynamicClient
 from deploy.vdc_rest_api import CloudRMApi, InfraApi, CloudServiceApi, CloudServiceTestApi
-from deploy.commons.status_code import RMErrorCode, InstanceStatus, InstanceType, InstanceIndexType
+from deploy.commons.status_code import RMErrorCode, InstanceStatus, InstanceType, InstanceIndexType, RMIsDeletedStatus
 from deploy.commons.common_params import ClassID, RMNodeCategory, Pod
 from deploy.commons.common_func import (
     update_dict_value, add_resource, get_child_class_id, parser_modify_params, check_multi_keys_exist, get_api_version,
     get_class_key_name, deal_child_instance_class, compare_cpu_value, compare_mem_value)
 from deploy.commons.sql_statement import (
-    sql_query_instance_class, sql_insert_instance_class,
+    sql_query_instance_id, sql_query_instance_class, sql_insert_instance_class,
     sql_query_cust_instance_node, sql_delete_cust_instance_node, sql_insert_cust_instance_node,
     sql_query_instance_class_oversold, sql_delete_instance_class_oversold, sql_insert_instance_class_oversold,
     sql_query_instance_class_oversold_class_id,
@@ -234,7 +234,7 @@ class VDCClientBase:
 
         return instance_name, instance_id
 
-    def create_server_less(self, instance_name="", ap_point_host_id="", timeout=1800):
+    def create_free_serverless(self, instance_name="", ap_point_host_id="", timeout=1800):
         """
         :param instance_name: str
         :param ap_point_host_id: str
@@ -245,17 +245,55 @@ class VDCClientBase:
         log.info(f"[VDCClientBase] Check instance exists: {self.instance_name}")
         assert not self.check_instance_exist(self.instance_name)
 
-        log.info(
-            f"[VDCClientBase] Start create serverless instance:{instance_name}, ap_point_host_id:{ap_point_host_id}")
-        res = self.cloud_rm_api.serverless_create(
+        log.info("[VDCClientBase] Start creating FreeTire serverless instance: {0}, ap_point_host_id: {1}".format(
+            instance_name, ap_point_host_id))
+        res = self.cloud_rm_api.serverless_create_free(
             region_id=self.region_id, instance_name=instance_name, ap_point_host_id=ap_point_host_id)
 
         if res.code == 0 and "InstanceId" in res.data:
             instance_id = res.data["InstanceId"]
-            log.info(f"[VDCClientBase] The instance: {instance_name} created successfully, instance_id: {instance_id}")
+            log.info("[VDCClientBase] FreeTire serverless instance: {0} created successfully, instance_id: {1}".format(
+                instance_name, instance_id))
         else:
             instance_id = ""
-            self._raise(f"[VDCClientBase] Can't create instance: {instance_name}, response:{res.to_dict}")
+            self._raise("[VDCClientBase] Can't create FreeTire serverless instance: {0}, response: {1}".format(
+                instance_name, res.to_dict))
+
+        # setting global params
+        self.reset_auto_params(instance_name=instance_name, instance_id=instance_id, set_real_instance_id=False)
+
+        # check server is creating
+        assert self.check_server_status(timeout=timeout)
+
+        # setting global params
+        self.reset_auto_params(instance_name=instance_name, instance_id=instance_id)
+
+        return instance_name, instance_id
+
+    def create_elastic_serverless(self, instance_name="", ap_point_host_id="", timeout=1800):
+        """
+        :param instance_name: str
+        :param ap_point_host_id: str
+        :param timeout: wait for server to be ready
+        """
+        instance_name = instance_name or self.instance_name
+
+        log.info(f"[VDCClientBase] Check instance exists: {self.instance_name}")
+        assert not self.check_instance_exist(self.instance_name)
+
+        log.info("[VDCClientBase] Start creating Elastic serverless instance:{0}, ap_point_host_id:{1}".format(
+            instance_name, ap_point_host_id))
+        res = self.cloud_rm_api.serverless_create_elastic(
+            region_id=self.region_id, instance_name=instance_name, ap_point_host_id=ap_point_host_id)
+
+        if res.code == 0 and "InstanceId" in res.data:
+            instance_id = res.data["InstanceId"]
+            log.info("[VDCClientBase] Elastic serverless instance: {0} created successfully, instance_id: {1}".format(
+                instance_name, instance_id))
+        else:
+            instance_id = ""
+            self._raise("[VDCClientBase] Can't create Elastic serverless instance: {0}, response: {1}".format(
+                instance_name, res.to_dict))
 
         # setting global params
         self.reset_auto_params(instance_name=instance_name, instance_id=instance_id, set_real_instance_id=False)
@@ -286,6 +324,11 @@ class VDCClientBase:
         self.cloud_service_api.resume(self.instance_id)
         assert self.check_server_status()
 
+    def rm_delete_server(self):
+        log.info(f"[VDCClientBase] RM API delete instance: {self.instance_id}")
+        self.cloud_rm_api.delete(instance_id=self.instance_id)
+        assert self.rm_check_server_delete()
+
     def rm_stop_server(self, timeout: int = 1800):
         log.info(f"[VDCClientBase] RM API stop instance: {self.instance_id}")
         # stop server and wait stopped
@@ -297,6 +340,12 @@ class VDCClientBase:
         # resume server
         log.info(f"[VDCClientBase] RM API resume instance: {self.instance_id}")
         self.cloud_rm_api.resume(self.instance_id)
+        assert self.check_server_status(timeout=timeout)
+
+    def rm_restart_server(self, timeout: int = 1800):
+        # restart server
+        log.info(f"[VDCClientBase] RM API restart instance: {self.instance_id}")
+        self.cloud_rm_api.restart(self.instance_id)
         assert self.check_server_status(timeout=timeout)
 
     def rm_stop_serverless_host(self, timeout: int = 1800):
@@ -312,11 +361,11 @@ class VDCClientBase:
         self.cloud_rm_api.resume(instance_id=self.real_instance_id, user_id=self.real_user_id)
         assert self.rm_check_server_status(timeout=timeout)
 
-    def rm_restart_server(self, timeout: int = 1800):
-        # resume server
-        log.info(f"[VDCClientBase] RM API restart instance: {self.instance_id}")
-        self.cloud_rm_api.restart(self.instance_id)
-        assert self.check_server_status(timeout=timeout)
+    def rm_restart_serverless_server(self, timeout: int = 1800):
+        # restart server
+        log.info(f"[VDCClientBase] RM API restart serverless instance: {self.real_instance_id}")
+        self.cloud_rm_api.restart(instance_id=self.real_instance_id, user_id=self.real_user_id)
+        assert self.rm_check_server_status(timeout=timeout)
 
     def rm_update_image(self, image_tag: str, timeout: int = 1800):
         """ Update server's image """
@@ -381,7 +430,12 @@ class VDCClientBase:
             if res.code not in [RMErrorCode.INSTANCE_PARAM_NO_NEED_MODIFY, 0]:
                 self._raise(f"[VDCClientBase] Update milvus param {param_name}:{param_value} failed:{res.to_dict}")
 
-        self.rm_restart_server(timeout=timeout)
+        if instance_type == InstanceType.Milvus:
+            self.rm_restart_server(timeout=timeout)
+        elif instance_type in [InstanceType.FreeTier, InstanceType.ElasticServerless]:
+            self.rm_restart_serverless_server(timeout=timeout)
+        else:
+            self._raise(f"[VDCClientBase] Unrecognized instance type {instance_type}")
         log.info(f"[VDCClientBase] Modify instance's: {self.instance_name} parameters completed.")
 
         # if instance_type == InstanceType.Milvus:
@@ -604,6 +658,20 @@ class VDCClientBase:
         self._raise("[VDCClientBase] Instance: %s, instance_id: %s Status is not %s." % (
             self.instance_name, self.real_instance_id, get_class_key_name(InstanceStatus, status)))
 
+    def rm_check_server_delete(self, instance_name: str = None, timeout=1800, interval_time=20):
+        """ Check server deleted """
+        instance_name = instance_name or self.instance_name
+        start_time = time.time()
+        while time.time() < start_time + timeout:
+            time.sleep(interval_time)
+
+            if not self.sql_check_instance_exist(instance_name=instance_name):
+                log.info("[VDCClientBase] Instance: {0} has been deleted.".format(instance_name))
+                return True
+
+        log.info("[VDCClientBase] Instance: {0} has not been deleted.".format(instance_name))
+        return False
+
     def rm_get_instance_type(self, instance_id: str = "", log_level=LogLevel.DEBUG):
         """ Get user instance type """
         instance_id = instance_id or self.instance_id
@@ -645,6 +713,23 @@ class VDCClientBase:
             self.instance_name, self.real_instance_id))
 
     # Others
+    def sql_check_instance_exist(self, instance_name: str = ""):
+        instance_name = instance_name or self.instance_name
+
+        _instance_id = sql_query_instance_id(
+            self.mysql, ins_name=instance_name, user_id=(self.proxy_user_id or self.user_id),
+            is_deleted=RMIsDeletedStatus.NO)
+
+        if len(_instance_id) != 1:
+            self._raise(f"[VDCClientBase] The instance: {instance_name} is not unique in Mysql DB: {_instance_id}")
+        elif len(_instance_id) == 1:
+            # self.instance_id = _instance_id[0]["instance_id"]
+            log.info("[VDCClientBase] Instance exists in Mysql DB: {0}".format(instance_name))
+            return True
+
+        log.info("[VDCClientBase] Instance doesn't exist in Mysql DB: {0}".format(instance_name))
+        return False
+
     def check_instance_resources(self, class_mode: str):
         """
         Check host instance

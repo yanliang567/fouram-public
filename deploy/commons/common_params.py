@@ -58,7 +58,8 @@ ephemeral_storage = "ephemeral-storage"
 
 class ClassIDBase(object):
     classnone = ""  # use for not upgrade instance
-    classserverless = "class-2-disk-serverless"
+    classserverless = "class-2-disk-serverless"  # FreeTire
+    classelasticserverless = "class-elastic-disk-serverless-1"  # Serverless V2
 
 
 class ClassIDMemStandalone(ClassIDBase):
