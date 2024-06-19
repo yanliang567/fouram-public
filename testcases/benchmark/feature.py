@@ -250,7 +250,7 @@ class TestFeatureCases(PerfTemplate):
                 DISKANN: 'float_vector', 'float_vector_1', 'float_vector_2', 'float_vector_3'
                 default_scalar_index: 'int64_1'
                 INVERTED: 'id', 'bool_3'
-            3. insert 100k data
+            3. insert 150w data
             4. flush collection
             5. build indexes again using the same params
             6. load collection
@@ -828,7 +828,7 @@ class TestFeatureCases(PerfTemplate):
                 DISKANN: 'float_vector', 'float_vector_1', 'float_vector_2', 'float_vector_3'
                 default_scalar_index: 'int64_1'
                 INVERTED: 'id', 'bool_3'
-            3. insert 100k data
+            3. insert 150w data
             4. flush collection
             5. build indexes again using the same params
             6. load collection
