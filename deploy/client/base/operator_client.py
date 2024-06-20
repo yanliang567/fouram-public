@@ -9,6 +9,7 @@ from deploy.commons.common_func import (
     update_dict_value, utc_conversion, format_dict_output, get_api_version, parser_op_item, check_multi_keys_exist)
 
 from parameters.input_params import param_info
+from utils.util_cmd import CmdExe
 from utils.util_log import log
 
 
@@ -169,6 +170,28 @@ class OperatorClient(BaseClient):
         log.info("[delete_pvc] Delete pvc:{0}, namespace:{1}".format(list(pvc_names), namespace))
         return results
 
+    def force_delete(self, release_name: str, namespace=None):
+        """
+        Use cli to force delete, ensure that env contains `kubectl`
+
+        `Operator` normally does not need force delete
+        """
+        release_name = release_name or self.release_name
+        namespace = namespace or self.namespace
+
+        # delete server
+        CmdExe("if [ `kubectl get mi {0} -n {1}` ]; then kubectl delete mi {0} -n {1}; fi".format(
+            release_name, namespace)).run_cmd()
+
+        # wait for deleting
+        msg = "{1} -l release={0}-minio; " + \
+              "{1} -l release={0}-pulsar; " + \
+              "{1} -l release={0}-kafka; " + \
+              "{1} -l app.kubernetes.io/instance={0}-etcd; " + \
+              "{1} --field-selector=metadata.name={0}-data"
+        _cmd = msg.format(release_name, f"kubectl delete pvc --wait --timeout=10m -n {namespace}")
+        return CmdExe(_cmd).run_cmd()
+
     def wait_for_healthy(self, release_name: str, namespace=None, timeout=1800):
         release_name = release_name or self.release_name
         namespace = namespace or self.namespace
@@ -245,7 +268,7 @@ class OperatorClient(BaseClient):
         release_name = release_name or self.release_name
         namespace = namespace or self.namespace
 
-        check_list = [release_name + i for i in ["-etcd", "-milvus", "-minio", "-pulsar", "-kafka"]]
+        check_list = [release_name + i for i in ["-etcd", "-milvus", "-data", "-minio", "-pulsar", "-kafka"]]
         result_dict = {}
 
         _configs = self.dc_pvc.result_to_dict(self.dc_pvc.get(namespace=namespace))

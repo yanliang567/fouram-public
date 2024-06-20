@@ -122,6 +122,10 @@ class CliClient(BaseClient):
         _cmd = msg.format(release_name, self.ns)
         return CmdExe(_cmd).run_cmd()
 
+    def force_delete(self, *args, **kwargs):
+        log.info("[CliClient] Does not implement `force_delete` function.")
+        return False
+
     def get_helm_repo(self, repo_name=""):
         _cmd = " helm repo list %s " % self.ns
         if repo_name != "":

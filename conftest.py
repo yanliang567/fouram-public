@@ -62,6 +62,7 @@ def pytest_addoption(parser):
     parser.addoption("--upgrade_config", action="store", default="", help="str or dict")
     parser.addoption('--deploy_retain', action='store_true', default=False, help="retain Milvus instance")
     parser.addoption('--deploy_retain_pvc', action='store_true', default=False, help="retain Milvus's pvc")
+    parser.addoption('--deploy_force_delete', action='store_true', default=False, help="force delete server")
 
     parser.addoption("--case_params", action="store", default="", help="str or dict")
     parser.addoption('--case_skip_prepare', action='store_true', default=False, help="skip prepare collection")
@@ -135,6 +136,7 @@ def initialize_env(request):
         deploy_skip=request.config.getoption("--deploy_skip"),
         deploy_retain=request.config.getoption("--deploy_retain"),
         deploy_retain_pvc=request.config.getoption("--deploy_retain_pvc"),
+        deploy_force_delete=request.config.getoption("--deploy_force_delete"),
         update_helm_file=request.config.getoption("--update_helm_file"),
         # release name
         release_name_prefix=request.config.getoption("--release_name_prefix"),

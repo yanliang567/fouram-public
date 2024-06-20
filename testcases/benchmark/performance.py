@@ -67,6 +67,8 @@ class TestServerDeploy(ServerTemplate):
             4. not both: deploy server and delete the server
             5. deploy_retain_pvc: retain pvc if delete server
             6. upgrade_waiting_time: time to wait for server health
+            7. deploy_force_delete: force delete server when `deploy_retain` and `deploy_retain_pvc` are False
+                                    if the deletion fails, but the force_delete succeeds, no error will raising
         """
         # node_resources = [NodeResource(
         #     nodes=[queryNode, indexNode], replicas=2).custom_resource(requests_cpu=1.5, requests_mem=1)]
@@ -86,6 +88,8 @@ class TestServerDeploy(ServerTemplate):
 
             1. deploy_retain:  do nothing, retain the server and not delete pvc
             2. deploy_retain_pvc: do nothing
+            3. deploy_force_delete: force delete server when `deploy_retain` and `deploy_retain_pvc` are False
+                                    if the deletion fails, but the force_delete succeeds, no error will raising
         """
         self.server_template(input_params=input_params, cpu=dp.default_cpu, mem=dp.default_mem,
                              deploy_mode=get_default_deploy_mode(input_params.deploy_tool),

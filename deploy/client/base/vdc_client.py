@@ -194,6 +194,15 @@ class VDCClient(BaseClient):
         log.info(f"[VDCClient] Delete release's: {release_name} pvc.")
         return True
 
+    def force_delete(self, release_name: str):
+        release_name = release_name or self.release_name
+
+        check_exist, instance_id = self.client.sql_check_instance_exist(instance_name=release_name)
+        if check_exist:
+            self.client.rm_delete_server(instance_id=instance_id, instance_name=release_name)
+            log.info(f"[VDCClient] Force delete release's: {release_name}")
+        return True
+
     def get_all_values(self, release_name: str):
         release_name = release_name or self.release_name
         self.check_server_and_set_params(release_name=release_name)

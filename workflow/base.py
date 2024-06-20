@@ -60,7 +60,8 @@ class Base:
         # Delete the service after the test is over
         if not param_info.deploy_retain and not param_info.deploy_skip:
             self.set_teardown_funcs(
-                TeardownType.DeployDelete, self.deploy_delete, deploy_retain_pvc=param_info.deploy_retain_pvc)
+                TeardownType.DeployDelete, self.deploy_delete_catch, deploy_retain_pvc=param_info.deploy_retain_pvc,
+                deploy_force_delete=param_info.deploy_force_delete)
 
         # Save env params
         if str(EnvVariable.FOURAM_SAVE_CONNECT_PARAMS).lower() == 'true':
@@ -265,6 +266,37 @@ class Base:
             if not deploy_retain_pvc:
                 deploy_client.delete_pvc(release_name=deploy_release_name)
             log.info("[Base] Service deleted successfully: {0}".format(deploy_release_name))
+
+    def deploy_force_delete(self, deploy_client: DefaultClient = None, deploy_release_name=""):
+        deploy_client = deploy_client or self.deploy_client
+        deploy_release_name = deploy_release_name or self.deploy_release_name or param_info.release_name
+
+        res = deploy_client.force_delete(release_name=deploy_release_name)
+        if res:
+            log.info("[Base] Service force delete successfully: {0}".format(deploy_release_name))
+        return res
+
+    def deploy_delete_catch(self, deploy_client=None, deploy_release_name="", deploy_retain_pvc=False,
+                            deploy_uninstall=True, deploy_force_delete=False):
+        if not deploy_retain_pvc and deploy_force_delete:
+            # exec when deploy_retain=False and deploy_retain_pvc=False and deploy_force_delete=True
+            error_msg = None
+            try:
+                self.deploy_delete(deploy_client=deploy_client, deploy_release_name=deploy_release_name,
+                                   deploy_retain_pvc=deploy_retain_pvc, deploy_uninstall=deploy_uninstall)
+            except Exception as e:
+                error_msg = f"Delete server failed: {e}"
+                log.error(f"[Base] {error_msg}")
+            finally:
+                # Only used to force delete instances
+                res = self.deploy_force_delete(deploy_client=deploy_client, deploy_release_name=deploy_release_name)
+                if error_msg and res:
+                    log.error(f"[Base] {error_msg}, but forced deletion succeeded!!")
+                elif error_msg and res is False:
+                    raise Exception(f"[Base] {error_msg}")
+        else:
+            self.deploy_delete(deploy_client=deploy_client, deploy_release_name=deploy_release_name,
+                               deploy_retain_pvc=deploy_retain_pvc, deploy_uninstall=deploy_uninstall)
 
     def run_perf_case(self, callable_obj: callable, default_case_params, case_params, case_prepare, case_prepare_clean,
                       case_rebuild_index, case_clean_collection, sub_callable_obj: callable = None):

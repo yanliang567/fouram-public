@@ -324,10 +324,11 @@ class VDCClientBase:
         self.cloud_service_api.resume(self.instance_id)
         assert self.check_server_status()
 
-    def rm_delete_server(self):
-        log.info(f"[VDCClientBase] RM API delete instance: {self.instance_id}")
-        self.cloud_rm_api.delete(instance_id=self.instance_id)
-        assert self.rm_check_server_delete()
+    def rm_delete_server(self, instance_id: str = None, instance_name: str = None):
+        instance_id, instance_name = instance_id or self.instance_id, instance_name or self.instance_name
+        log.info(f"[VDCClientBase] RM API delete instance: {instance_id}")
+        self.cloud_rm_api.delete(instance_id=instance_id)
+        assert self.rm_check_server_delete(instance_name=instance_name)
 
     def rm_stop_server(self, timeout: int = 1800):
         log.info(f"[VDCClientBase] RM API stop instance: {self.instance_id}")
@@ -619,6 +620,8 @@ class VDCClientBase:
     def check_server_delete(self, timeout=1800, interval_time=20):
         start_time = time.time()
         while time.time() < start_time + timeout:
+            log.info("[VDCClientBase] Waiting for instance: %s to be DELETED using cloud_service_api ..." %
+                     self.instance_name)
             time.sleep(interval_time)
 
             res = self.cloud_service_api.list(search_key="", check_result=False)
@@ -663,9 +666,10 @@ class VDCClientBase:
         instance_name = instance_name or self.instance_name
         start_time = time.time()
         while time.time() < start_time + timeout:
+            log.info("[VDCClientBase] Waiting for instance: %s to be DELETED by checking MYSQL DB ..." % instance_name)
             time.sleep(interval_time)
 
-            if not self.sql_check_instance_exist(instance_name=instance_name):
+            if not self.sql_check_instance_exist(instance_name=instance_name)[0]:
                 log.info("[VDCClientBase] Instance: {0} has been deleted.".format(instance_name))
                 return True
 
@@ -720,15 +724,15 @@ class VDCClientBase:
             self.mysql, ins_name=instance_name, user_id=(self.proxy_user_id or self.user_id),
             is_deleted=RMIsDeletedStatus.NO)
 
-        if len(_instance_id) != 1:
+        if len(_instance_id) > 1:
             self._raise(f"[VDCClientBase] The instance: {instance_name} is not unique in Mysql DB: {_instance_id}")
         elif len(_instance_id) == 1:
             # self.instance_id = _instance_id[0]["instance_id"]
             log.info("[VDCClientBase] Instance exists in Mysql DB: {0}".format(instance_name))
-            return True
+            return True, _instance_id[0]["instance_id"]
 
         log.info("[VDCClientBase] Instance doesn't exist in Mysql DB: {0}".format(instance_name))
-        return False
+        return False, ""
 
     def check_instance_resources(self, class_mode: str):
         """

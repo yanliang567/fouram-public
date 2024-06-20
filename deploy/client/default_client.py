@@ -71,6 +71,10 @@ class DefaultClient:
         release_name = release_name or self.release_name
         return self.obj.delete_pvc(release_name)
 
+    def force_delete(self, release_name=""):
+        release_name = release_name or self.release_name
+        return self.obj.force_delete(release_name)
+
     def endpoint(self, release_name=""):
         release_name = release_name or self.release_name
         return self.obj.endpoint(release_name)

@@ -25,6 +25,10 @@ class BaseClient(metaclass=abc.ABCMeta):
         log.debug("[BaseClient] Delete pvc: {}".format(args, kwargs))
 
     @abc.abstractmethod
+    def force_delete(self, *args, **kwargs):
+        log.debug("[BaseClient] Force Delete: {}".format(args, kwargs))
+
+    @abc.abstractmethod
     def endpoint(self, *args, **kwargs):
         log.debug("[BaseClient] Endpoint: {}".format(args, kwargs))
 
