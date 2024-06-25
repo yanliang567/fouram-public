@@ -39,7 +39,9 @@ def pytest_addoption(parser):
 
     # deploy
     parser.addoption("--milvus_tag", action="store", default=None, help="Milvus container tag")
-    parser.addoption("--milvus_tag_prefix", action="store", default="", help="Milvus container tag prefix")
+    parser.addoption("--milvus_tag_prefix", action="store", default="",
+                     help="Milvus container tag prefix or tag regular expr, prefer prefix matching" +
+                          'e.g.: "master-[0-9a-z]+-[0-9a-z]+", "master.*amd64", "master-[0-9a-z]+-[0-9a-z]+-amd64"')
     parser.addoption("--tag_repository", action="store", default=None, help="tag repository")
     parser.addoption("--update_helm_file", action="store_true", default=False, help="update helm file values.yaml")
     parser.addoption("--release_name_prefix", action="store", default="", help="release name prefix")

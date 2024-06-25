@@ -159,8 +159,9 @@ class Base:
     def deploy_default(self, deploy_tool=Operator, deploy_mode=STANDALONE, cpu=8, mem=16, other_config=None,
                        tag=None, repository=None, node_resources=None, set_dependence=None, input_configs: dict = {},
                        upgrade_waiting_time=1800, **kwargs):
-        tag = tag or param_info.milvus_tag or AutoGetTag().auto_tag(deploy_tool=deploy_tool)
         repository = repository or param_info.tag_repository
+        tag = tag or param_info.milvus_tag or AutoGetTag().auto_tag(deploy_tool=deploy_tool,
+                                                                    idc_hub_repository=repository)
 
         # parser configs
         other_configs = parser_input_config(input_content=other_config)
@@ -201,9 +202,10 @@ class Base:
         release_name = release_name or param_info.release_name
         if not release_name:
             raise Exception(f"[Base] Can not upgrade empty release name:{release_name}, please check.")
-        tag = tag or param_info.milvus_tag or (
-            AutoGetTag().auto_tag(deploy_tool=deploy_tool) if param_info.milvus_tag_prefix else "")
         repository = repository or param_info.tag_repository
+        tag = tag or param_info.milvus_tag or (
+            AutoGetTag().auto_tag(
+                deploy_tool=deploy_tool, idc_hub_repository=repository) if param_info.milvus_tag_prefix else "")
 
         # parser configs and install server
         upgrade_configs = parser_input_config(input_content=upgrade_config)

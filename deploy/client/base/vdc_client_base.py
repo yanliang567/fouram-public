@@ -1,3 +1,4 @@
+import re
 import time
 import json
 import operator
@@ -481,7 +482,7 @@ class VDCClientBase:
 
         resource example as follow:
           imageTag: v2.2.0-20230329-2f52d66-28175ab
-          <name>:  # support mixCoord, dataNode, indexNode, queryNode, proxy, standalone
+          <name>:  # support mixCoord, dataNode, queryNode, proxy, standalone
             replicas: 1
             paused: false
             resources:
@@ -786,6 +787,13 @@ class VDCClientBase:
         return True
 
     # Common functions
+    @staticmethod
+    def _re_full_match_tag(re_str: str, target_str: str):
+        re_obj = re.fullmatch(re_str, target_str)
+        if isinstance(re_obj, re.Match) and re_obj.group() == target_str:
+            return True
+        return False
+
     def get_release_version(self, db_version_prefix: str, current_page: int = 1, page_size: int = 20,
                             max_page: int = 100):
         while max_page > current_page:
@@ -794,6 +802,10 @@ class VDCClientBase:
             for db_version in [i["dbVersion"] for i in check_multi_keys_exist(res.data, ["list"]) if i["insType"] == 1]:
                 if str(db_version).startswith(db_version_prefix):
                     log.info(f"[VDCClientBase] Auto get prefix: {db_version_prefix}, dbVersion: {db_version}")
+                    return db_version
+                elif self._re_full_match_tag(re_str=db_version_prefix, target_str=db_version):
+                    log.info(
+                        f"[VDCClientBase] Match based on regular expr: {db_version_prefix}, dbVersion: {db_version}")
                     return db_version
 
             current_page += 1

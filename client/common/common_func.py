@@ -8,7 +8,6 @@ from ml_dtypes import bfloat16
 import numpy as np
 import pandas as pd
 import h5py
-import tqdm
 import subprocess
 from typing import Optional, List, Union
 from sklearn import preprocessing
@@ -266,6 +265,7 @@ def get_file_list(data_size, dim, data_type):
     data_size = parser_data_size(data_size)
     file_names = []
     _data_size = data_size
+    import tqdm
     with tqdm.tqdm(range(_data_size)) as bar:
         bar.set_description("Get File List Processing")
         for i in range(dv.Max_file_count):

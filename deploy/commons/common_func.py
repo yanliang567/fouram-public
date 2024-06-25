@@ -282,7 +282,7 @@ def get_latest_tag(limit=100, prefix="master", repository="milvusdb/milvus-dev")
 
 
 def get_image_tag():
-    url = "https://harbor.zilliz.cc/api/v2.0/projects/milvus/repositories/milvus/artifacts?page=1&page_size=1&with_" + \
+    url = "https://harbor.milvus.io/api/v2.0/projects/milvus/repositories/milvus/artifacts?page=1&page_size=1&with_" + \
           "tag=true&with_label=false&with_scan_overview=false&with_signature=false&with_immutable_status=false"
     headers = {"accept": "application/json",
                "X-Accept-Vulnerabilities": "application/vnd.scanner.adapter.vuln.report.harbor+json; version=1.0"}
