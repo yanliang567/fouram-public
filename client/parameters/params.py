@@ -107,7 +107,10 @@ class ParamsFormat:
         },
         common_params: {
             set_properties: ([type(dict()), type(list()), type(None)], OPTION),
-            alter_index: ([type(dict()), type(list()), type(None)], OPTION)
+            alter_index: ([type(dict()), type(list()), type(None)], OPTION),
+            custom_api: {
+                prepare_insert_api: ([type(str()), type(None)], OPTION)
+            }
         }
     }
 
@@ -610,6 +613,7 @@ class ConcurrentInputParamsSceneTest(DataClassBase):
     scalars_params: Optional[dict] = field(default_factory=lambda: {})
     scalars_index: Union[dict, list] = field(default_factory=lambda: {})
     vectors_index: Optional[dict] = field(default_factory=lambda: {})
+    custom_insert_api: Optional[str] = insert
 
     @property
     def anns_field(self):
@@ -649,6 +653,7 @@ class ConcurrentTaskSceneTest(DataClassBase):
     scalars_params: Optional[dict] = field(default_factory=lambda: {})
     scalars_index: Optional[dict] = field(default_factory=lambda: {})
     vectors_index: Optional[dict] = field(default_factory=lambda: {})
+    custom_insert_api: Optional[str] = insert
 
     all_fields_params: ParserFieldsParams = None
 
@@ -1082,6 +1087,7 @@ class ConcurrentInputParamsSceneSearchTest(DataClassBase):
     # common setting
     set_properties: Union[dict, list, None] = None
     alter_index: Union[dict, list, None] = None
+    custom_insert_api: Optional[str] = insert
 
     @property
     def anns_field(self):
@@ -1142,6 +1148,7 @@ class ConcurrentTaskSceneSearchTest(DataClassBase):
     # common setting
     set_properties: Optional[list] = field(default_factory=lambda: [])
     alter_index: Optional[list] = field(default_factory=lambda: [])
+    custom_insert_api: Optional[str] = insert
 
     all_fields_params: ParserFieldsParams = None
 
@@ -1193,6 +1200,7 @@ class ConcurrentInputParamsSceneHybridSearchTest(DataClassBase):
     # common setting
     set_properties: Union[dict, list, None] = None
     alter_index: Union[dict, list, None] = None
+    custom_insert_api: Optional[str] = insert
 
     @property
     def anns_field(self):
@@ -1264,6 +1272,7 @@ class ConcurrentTaskSceneHybridSearchTest(DataClassBase):
     # common setting
     set_properties: Optional[list] = field(default_factory=lambda: [])
     alter_index: Optional[list] = field(default_factory=lambda: [])
+    custom_insert_api: Optional[str] = insert
 
     def set_random_data(self):
         for r in self.reqs:

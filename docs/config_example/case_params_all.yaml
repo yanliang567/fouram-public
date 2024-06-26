@@ -6,9 +6,6 @@ dataset_params:
   metric_type: L2 / IP / COSINE / JACCARD / <str>
   # specify the name of the vector column: when creating the collection, or for an existing collection
   vector_field_name: float_vector / binary_vector / float16_vector / bfloat16_vector / sparse_float_vector / <str>
-  # for parquet data sets, specify which column in the parquet data set is used to insert the vector column
-  # `float32_vector` is the column_name on `laion` dataset
-  column_name: float32_vector / <str>
   # vector dimensions for vector field, make sure it is consistent with the dim of the specified dataset
   # `dataset_params.dim` is also a global parameter,
   # `dim` of other vector field will be overwritten by `dataset_params.dim` if `dataset_params.scalars_params.<vector field name>.params.dim` is not set
@@ -30,6 +27,9 @@ dataset_params:
   # npy: `deep`, `sift`, `text2img`, `laion`, `embed`, `gist`, `glove`, `binary`, `random`
   # parquet: `cohere10m_parquet`, `laion1b_nolang`, `laion2b_multi`
   dataset_name: sift
+  # for parquet data sets, specify which column in the parquet data set is used to insert the vector column
+  # `float32_vector` is the column_name on `laion` dataset
+  column_name: float32_vector / <str>
   # The size of the data set to be inserted
   dataset_size: 1b / <str or int>
   # the amount of data for each insert during data preparation
@@ -338,6 +338,11 @@ common_params:
   #              if only <index_name> is set, default value: {"mmap.enabled": True} will be set to extra_params
   alter_index: None / <List[Union[str, dict]]> / <dict>
 
+  custom_api:
+    # customize the interface for writing data during the preparation phase
+    # only support `upsert` and `insert`, default value is `insert`
+    prepare_insert_api: upsert / insert / str / None
+
 # the parameters of each case are different, please pass them according to actual use.
 # refer to `GetParamObj` in the file `fouram/client/parameters/functional_params.py` to map parameter objects.
 # if there is no parameter mapping in the case, it means that there is no need to pass parameters.
@@ -537,6 +542,10 @@ concurrent_tasks:
       scalars_index: Optional[dict, list] = {}  # same as `dataset_params.scalars_index`
       vectors_index: Optional[dict] = {}  # same as `dataset_params.vectors_index`
 
+      # customize the interface for writing data during the preparation phase
+      # only support `upsert` and `insert`, default value is `insert`
+      custom_insert_api: Optional[str] = "insert"
+
   - type: scene_insert_delete_flush
     weight: 1
     params:
@@ -689,6 +698,10 @@ concurrent_tasks:
       set_properties: Union[dict, list, None] = None  # same as `common_params.set_properties`
       alter_index: Union[dict, list, None] = None   # same as `common_params.alter_index`
 
+      # customize the interface for writing data during the preparation phase
+      # only support `upsert` and `insert`, default value is `insert`
+      custom_insert_api: Optional[str] = "insert"
+
   - type: scene_hybrid_search_test
     weight: 1
     params:
@@ -744,3 +757,7 @@ concurrent_tasks:
       # common setting
       set_properties: Union[dict, list, None] = None  # same as `common_params.set_properties`
       alter_index: Union[dict, list, None] = None   # same as `common_params.alter_index`
+
+      # customize the interface for writing data during the preparation phase
+      # only support `upsert` and `insert`, default value is `insert`
+      custom_insert_api: Optional[str] = "insert"

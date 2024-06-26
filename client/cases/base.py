@@ -33,8 +33,7 @@ from client.common.common_func import (
 from client.common.common_param import TransferNodesParams, TransferReplicasParams
 from client.common.common_type import Precision, CheckTasks
 from client.common.common_type import DefaultValue as dv
-from client.parameters.params_name import (
-    reset, groups, max_length, dim, transfer_nodes, transfer_replicas, resource_groups, enable_dynamic_field)
+from client.parameters import params_name as pn
 from client.parameters.params import (
     DataClassBase,
     ConcurrentTaskSearch,
@@ -264,8 +263,8 @@ class Base:
         """ Create a collection with default schema """
         schema = gen_collection_schema(
             vector_field_name=vector_field_name, other_fields=other_fields, varchar_id=varchar_id, auto_id=auto_id,
-            max_length=kwargs.pop(max_length, dv.default_max_length), dim=kwargs.pop(dim, dv.default_dim),
-            scalars_params=scalars_params, enable_dynamic_field=kwargs.pop(enable_dynamic_field, False)) \
+            max_length=kwargs.pop(pn.max_length, dv.default_max_length), dim=kwargs.pop(pn.dim, dv.default_dim),
+            scalars_params=scalars_params, enable_dynamic_field=kwargs.pop(pn.enable_dynamic_field, False)) \
             if schema is None else schema
 
         collection_name = collection_name or gen_unique_str()
@@ -350,7 +349,7 @@ class Base:
 
     def insert_batch(self, vectors, ids, data_size, varchar_filled=False, collection_obj: callable = None,
                      collection_schema=None, log_level=LogLevel.INFO, insert_scalars_params={}, anns_field: str = None,
-                     **kwargs):
+                     custom_api_insert: Union[pn.insert, pn.upsert] = pn.insert, **kwargs):
         if self.collection_schema is None and collection_schema is None:
             self.get_collection_schema()
             collection_schema = self.collection_schema
@@ -360,9 +359,9 @@ class Base:
         entities = gen_entities(collection_schema, vectors, ids, varchar_filled, insert_scalars_params, anns_field)
 
         log.customize(log_level)(
-            "[Base] Start inserting, ids: {0} - {1}, data size: {2}".format(ids[0], ids[-1], data_size))
+            f"[Base] Start {custom_api_insert}ing, ids: {ids[0]} - {ids[-1]}, data size: {data_size}")
         collection_obj = collection_obj or self.collection_wrap
-        res = collection_obj.insert(entities, **kwargs)
+        res = getattr(collection_obj, custom_api_insert, collection_obj.insert)(entities, **kwargs)
         self.count_entities(collection_obj=collection_obj, log_level=log_level)
         return res.rt
 
@@ -660,8 +659,8 @@ class Base:
             "reset": bool
         }
         """
-        _groups = kwargs.get(groups, None)
-        _reset = kwargs.get(reset, False)
+        _groups = kwargs.get(pn.groups, None)
+        _reset = kwargs.get(pn.reset, False)
 
         # reset all resource groups to initial state and all collections will be released
         self.reset_resource_groups(_reset)
@@ -682,8 +681,8 @@ class Base:
             log.info(f"[Base] Transfer all nodes done: {_groups}")
 
         elif isinstance(_groups, dict):
-            _transfer_nodes = _groups.get(transfer_nodes, [])
-            _transfer_replicas = _groups.get(transfer_replicas, [])
+            _transfer_nodes = _groups.get(pn.transfer_nodes, [])
+            _transfer_replicas = _groups.get(pn.transfer_replicas, [])
 
             lrg = self.utility_wrap.list_resource_groups().response
             # transfer nodes
@@ -699,20 +698,20 @@ class Base:
             log.info(f"[Base] Transfer all replicas done: {_transfer_replicas}")
 
     def get_resource_groups(self, **kwargs):
-        _rg = kwargs.pop(resource_groups, None)
+        _rg = kwargs.pop(pn.resource_groups, None)
         if isinstance(_rg, int):
             # get all resource groups
             lrg = self.utility_wrap.list_resource_groups().response
             if len(lrg) == _rg:
-                kwargs.update({resource_groups: lrg})
+                kwargs.update({pn.resource_groups: lrg})
             elif len(lrg) > _rg:
                 rg = random.sample(remove_list_values(lrg, DEFAULT_RESOURCE_GROUP), _rg)
-                kwargs.update({resource_groups: rg})
+                kwargs.update({pn.resource_groups: rg})
             else:
                 raise Exception(f"[Base] The current resource groups{lrg}:{len(lrg)} < required:{_rg}")
 
         elif isinstance(_rg, list):
-            kwargs.update({resource_groups: _rg})
+            kwargs.update({pn.resource_groups: _rg})
         return kwargs
 
     def get_collection_properties(self, collection_obj: callable = None, log_level=LogLevel.DEBUG):
@@ -943,7 +942,8 @@ class Base:
                     dim=params.dim, size=params.data_size, ni=params.nb, sparse_range=params.sparse_range,
                     collection_obj=collection_obj, collection_name=collection_name, anns_field=params.vector_field_name,
                     collection_schema=collection_obj.schema.to_dict(), log_level=log_level,
-                    scalars_params=params.all_fields_params.get_scalar_other_params)
+                    scalars_params=params.all_fields_params.get_scalar_other_params,
+                    custom_api_insert=params.custom_insert_api)
 
         # flush collection
         self.flush_collection(collection_obj=collection_obj, log_level=log_level)
@@ -1256,7 +1256,8 @@ class Base:
                     dim=params.dim, size=params.data_size, ni=params.nb, sparse_range=params.sparse_range,
                     collection_obj=collection_obj, collection_name=collection_name, anns_field=params.vector_field_name,
                     collection_schema=collection_obj.schema.to_dict(), log_level=log_level,
-                    scalars_params=params.all_fields_params.get_scalar_other_params)
+                    scalars_params=params.all_fields_params.get_scalar_other_params,
+                    custom_api_insert=params.custom_insert_api)
 
         # flush collection
         self.flush_collection(collection_obj=collection_obj, log_level=log_level)
@@ -1365,7 +1366,8 @@ class Base:
                     dim=params.dim, size=params.data_size, ni=params.nb, sparse_range=params.sparse_range,
                     collection_obj=collection_obj, collection_name=collection_name, anns_field=params.vector_field_name,
                     collection_schema=collection_obj.schema.to_dict(), log_level=log_level,
-                    scalars_params=params.all_fields_params.get_scalar_other_params)
+                    scalars_params=params.all_fields_params.get_scalar_other_params,
+                    custom_api_insert=params.custom_insert_api)
 
         # flush collection
         self.flush_collection(collection_obj=collection_obj, log_level=log_level)

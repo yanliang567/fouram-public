@@ -8,6 +8,7 @@ from client.cases.case_report import CasesReport
 from client.parameters import params_name as pn
 from client.parameters.params import ParamsFormat, ParamsBase
 from client.util.params_check import check_params
+from client.common.common_param import CustomAPIInsert
 from client.common.common_type import Precision, CaseIterParams
 from client.common.common_parser import (
     ParserInputParams, ExtraPartitionsParams, PrepareInsertParams, ParserFieldsParams
@@ -87,6 +88,8 @@ class CommonCases(Base):
             self.get_collection_schema()
 
             # insert vectors
+            custom_api_insert = dacite.from_dict(
+                data_class=CustomAPIInsert, data=self.params_obj.common_params.get(pn.custom_api, {})).api
             extra_partitions = self.params_obj.dataset_params.get(pn.extra_partitions, None)
             # insert to partitions
             if extra_partitions:
@@ -110,13 +113,15 @@ class CommonCases(Base):
                     inert_time.append(self.ann_insert(
                         source_vectors=self.dataset_train, size=p.data_size,
                         ni=self.params_obj.dataset_params[pn.ni_per], scalars_params=scalars_params,
-                        input_obj=insert_obj, partition_name=p.partition_name, anns_field=vector_default_field_name))
+                        input_obj=insert_obj, partition_name=p.partition_name, anns_field=vector_default_field_name,
+                        custom_api_insert=custom_api_insert))
                 self.case_report.add_attr(**deal_insert_result(inert_time, acc=True))
 
             else:
                 res_insert = self.ann_insert(
                     source_vectors=self.dataset_train, ni=self.params_obj.dataset_params[pn.ni_per],
-                    scalars_params=scalars_params, anns_field=vector_default_field_name)
+                    scalars_params=scalars_params, anns_field=vector_default_field_name,
+                    custom_api_insert=custom_api_insert)
                 self.case_report.add_attr(**res_insert)
 
             if self.params_obj.flush_params.get(pn.prepare_flush, True):

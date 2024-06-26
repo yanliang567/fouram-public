@@ -102,3 +102,16 @@ class SegmentsAnalysis:
     @property
     def to_dict(self):
         return vars(self)
+
+
+@dataclass
+class CustomAPIInsert:
+    prepare_insert_api: str = pn.insert
+
+    _api = None
+
+    @property
+    def api(self) -> str:
+        if self._api is None:
+            self._api = self.prepare_insert_api if self.prepare_insert_api in [pn.insert, pn.upsert] else pn.insert
+        return self._api

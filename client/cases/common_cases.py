@@ -10,7 +10,7 @@ from client.parameters.params import ParamsFormat, ParamsBase
 from client.parameters import params_name as pn
 from client.util.params_check import check_params
 from client.client_base import AnnSearchRequest
-from client.common.common_param import AnnSearchRequestParams
+from client.common.common_param import AnnSearchRequestParams, CustomAPIInsert
 from client.common.common_type import Precision, CaseIterParams
 from client.common.common_type import DefaultValue as dv
 from client.common.common_parser import (
@@ -80,6 +80,8 @@ class CommonCases(Base):
     def prepare_insert(self, data_type, dim, size, ni, varchar_filled=False, vector_field_name: str = None,
                        sparse_range: list = dv.default_sparse_range, scalars_params: dict = {}):
         varchar_filled = self.params_obj.dataset_params.get(pn.varchar_filled, varchar_filled)
+        custom_api_insert = dacite.from_dict(
+            data_class=CustomAPIInsert, data=self.params_obj.common_params.get(pn.custom_api, {})).api
 
         # insert to partitions
         extra_partitions = self.params_obj.dataset_params.get(pn.extra_partitions, None)
@@ -103,7 +105,7 @@ class CommonCases(Base):
                     data_type=data_type, dim=dim, size=p.data_size, ni=ni, varchar_filled=varchar_filled,
                     scalars_params=scalars_params, column_name=self.params_obj.dataset_params.get(pn.column_name, ""),
                     input_obj=insert_obj, partition_name=p.partition_name, anns_field=vector_field_name,
-                    sparse_range=sparse_range
+                    sparse_range=sparse_range, custom_api_insert=custom_api_insert
                 ))
             self.case_report.add_attr(**deal_insert_result(inert_time))
 
@@ -111,7 +113,7 @@ class CommonCases(Base):
             res_insert = self.insert(
                 data_type=data_type, dim=dim, size=size, ni=ni, varchar_filled=varchar_filled,
                 scalars_params=scalars_params, column_name=self.params_obj.dataset_params.get(pn.column_name, ""),
-                anns_field=vector_field_name, sparse_range=sparse_range
+                anns_field=vector_field_name, sparse_range=sparse_range, custom_api_insert=custom_api_insert
             )
             self.case_report.add_attr(**res_insert)
 
