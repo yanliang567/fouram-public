@@ -800,13 +800,14 @@ class VDCClientBase:
             res = self.cloud_rm_api.release_version(current_page=current_page, page_size=page_size)
 
             for db_version in [i["dbVersion"] for i in check_multi_keys_exist(res.data, ["list"]) if i["insType"] == 1]:
-                if str(db_version).startswith(db_version_prefix):
-                    log.info(f"[VDCClientBase] Auto get prefix: {db_version_prefix}, dbVersion: {db_version}")
-                    return db_version
-                elif self._re_full_match_tag(re_str=db_version_prefix, target_str=db_version):
-                    log.info(
-                        f"[VDCClientBase] Match based on regular expr: {db_version_prefix}, dbVersion: {db_version}")
-                    return db_version
+                if isinstance(db_version, str) and db_version:
+                    if str(db_version).startswith(db_version_prefix):
+                        log.info(f"[VDCClientBase] Auto get prefix: {db_version_prefix}, dbVersion: {db_version}")
+                        return db_version
+                    elif self._re_full_match_tag(re_str=db_version_prefix, target_str=db_version):
+                        log.info(
+                            f"[VDCClientBase] Match based on regular expr: {db_version_prefix}, dbVersion: {db_version}")
+                        return db_version
 
             current_page += 1
 
