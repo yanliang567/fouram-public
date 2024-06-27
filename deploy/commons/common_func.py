@@ -588,38 +588,43 @@ def parser_class_id_name(m_value: str, l_value: str, default_len: int = 30):
 def gen_db_resource(source: dict, instance_id: str, class_id: list, db_raw: list, oversold: list, child_classes: list):
     for k, v in source.items():
         if isinstance(v, dict) and hasattr(RMNodeCategory, k):
-            if "replicas" in v and str(v["replicas"]).isdigit() and int(v["replicas"]) != 0 and \
-                    "resources" in v and "limits" in v["resources"] and "requests" in v["resources"]:
-                r_l = v["resources"]["limits"]
-                r_r = v["resources"]["requests"]
+            if "replicas" in v:
+                replicas = v["replicas"]
+                if str(replicas).startswith("-") and str(replicas).lstrip("-").isdigit() and int(replicas) == -1:
+                    replicas = 1
 
-                if "cpu" in r_l and "memory" in r_l:
-                    l_cpu = parser_cpu_resources(r_l["cpu"])
-                    l_memory = parser_mem_resources(r_l["memory"])
+                if str(replicas).isdigit() and int(replicas) != 0 and \
+                        "resources" in v and "limits" in v["resources"] and "requests" in v["resources"]:
+                    r_l = v["resources"]["limits"]
+                    r_r = v["resources"]["requests"]
 
-                    # set class id name
-                    # fouram_id = "fouram-{0}c{1}g-{2}-{3}".format(
-                    #     l_cpu, is_number(l_memory / 1024.0), eval(f"RMNodeCategory.{k}"), instance_id[-8:])
-                    name_mem = is_number(l_memory / 1024.0)
-                    name_node_category = eval(f"RMNodeCategory.{k}")
-                    fouram_id = parser_class_id_name(m_value=f"{l_cpu}c{name_mem}g-{name_node_category}",
-                                                     l_value=instance_id)
+                    if "cpu" in r_l and "memory" in r_l:
+                        l_cpu = parser_cpu_resources(r_l["cpu"])
+                        l_memory = parser_mem_resources(r_l["memory"])
 
-                    class_id.append((fouram_id, l_cpu, l_memory))
-                    db_raw.append((k, int(v["replicas"]), fouram_id, l_cpu, l_memory))
-                    if "cpu" in r_r and "memory" in r_r:
-                        r_cpu = parser_cpu_resources(r_r["cpu"])
-                        r_memory = parser_mem_resources(r_r["memory"])
-                        extend_field = {
-                            "requests.cpu": str('%.3f' % r_cpu),
-                            "requests.memory": str('%.1f' % r_memory) + "Mi",
-                            "limits.cpu": str('%.3f' % l_cpu),
-                            "limits.memory": str('%.1f' % l_memory) + "Mi"
-                        }
-                        oversold.append((k, fouram_id, extend_field))
-                    child_classes.append((k, fouram_id, json.dumps(v)))
-            else:
-                gen_db_resource(v, instance_id, class_id, db_raw, oversold, child_classes)
+                        # set class id name
+                        # fouram_id = "fouram-{0}c{1}g-{2}-{3}".format(
+                        #     l_cpu, is_number(l_memory / 1024.0), eval(f"RMNodeCategory.{k}"), instance_id[-8:])
+                        name_mem = is_number(l_memory / 1024.0)
+                        name_node_category = eval(f"RMNodeCategory.{k}")
+                        fouram_id = parser_class_id_name(m_value=f"{l_cpu}c{name_mem}g-{name_node_category}",
+                                                         l_value=instance_id)
+
+                        class_id.append((fouram_id, l_cpu, l_memory))
+                        db_raw.append((k, int(replicas), fouram_id, l_cpu, l_memory))
+                        if "cpu" in r_r and "memory" in r_r:
+                            r_cpu = parser_cpu_resources(r_r["cpu"])
+                            r_memory = parser_mem_resources(r_r["memory"])
+                            extend_field = {
+                                "requests.cpu": str('%.3f' % r_cpu),
+                                "requests.memory": str('%.1f' % r_memory) + "Mi",
+                                "limits.cpu": str('%.3f' % l_cpu),
+                                "limits.memory": str('%.1f' % l_memory) + "Mi"
+                            }
+                            oversold.append((k, fouram_id, extend_field))
+                        child_classes.append((k, fouram_id, json.dumps(v)))
+                else:
+                    gen_db_resource(v, instance_id, class_id, db_raw, oversold, child_classes)
     return class_id, db_raw, oversold, child_classes
 
 
