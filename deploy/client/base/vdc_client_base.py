@@ -178,11 +178,13 @@ class VDCClientBase:
         res = self.cloud_rm_api.get_host(instance_id=instance_id)
         return check_multi_keys_exist(res.data, ["instanceId"]), check_multi_keys_exist(res.data, ["userId"])
 
-    def create_server(self, instance_name="", image_tag=None, deploy_mode="", max_create_num: int = 10, timeout=1800):
+    def create_server(self, instance_name="", image_tag=None, deploy_mode="", processor_architecture: int = 1,
+                      max_create_num: int = 10, timeout=1800):
         """
         :param instance_name: str
         :param image_tag: Equivalent to db_version
         :param deploy_mode: <class_id>, such as class-1 ... class-1-disk ...
+        :param processor_architecture: `processorArchitecture` int, 1 -> X86 or 2 -> ARM
         :param max_create_num: Maximum number of rebuilds when creation fails
         :param timeout: wait for server to be ready
         """
@@ -191,10 +193,11 @@ class VDCClientBase:
         log.info(f"[VDCClientBase] Check instance exists: {self.instance_name}")
         assert not self.check_instance_exist(self.instance_name)
 
-        log.info("[VDCClientBase] Start create instance: %s, image_tag: %s deploy_mode: %s" % (
-            instance_name, image_tag, get_class_key_name(ClassID, deploy_mode)))
+        log.info(
+            "[VDCClientBase] Start create instance: %s, image_tag: %s, deploy_mode: %s, processorArchitecture: %s" % (
+                instance_name, image_tag, get_class_key_name(ClassID, deploy_mode), processor_architecture))
         res = self.cloud_rm_api.create(class_id=deploy_mode, db_version=image_tag, instance_name=instance_name,
-                                       check_result=False)
+                                       processor_architecture=processor_architecture, check_result=False)
 
         # recreate instance when create failed
         count = 1

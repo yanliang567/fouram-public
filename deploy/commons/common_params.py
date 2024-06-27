@@ -47,10 +47,8 @@ Operator = "operator"
 OP = "op"
 VDC = "vdc"
 
-
 # default params
 default_namespace = "qa-milvus"
-
 
 # default key's name
 ephemeral_storage = "ephemeral-storage"
@@ -144,3 +142,20 @@ class ComponentsLabel(enum.Enum):
     querynode = 7
     standalone = 9
     mixcoord = 10
+
+
+class ProcessorArchitecture:
+    X86 = 1
+    ARM = 2
+
+    all_values = [1, 2]
+
+
+class ParserExtraConfig:
+    def __init__(self, **kwargs):
+        self.all_configs = kwargs
+
+    @property
+    def processor_architecture(self):
+        res = self.all_configs.get("processorArchitecture", ProcessorArchitecture.X86)
+        return res if res in ProcessorArchitecture.all_values else ProcessorArchitecture.X86

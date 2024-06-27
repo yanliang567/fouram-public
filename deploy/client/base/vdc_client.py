@@ -3,7 +3,7 @@ from urllib import parse
 from deploy.client.base.base_client import BaseClient
 from deploy.client.base.vdc_client_base import VDCClientBase
 from deploy.commons.status_code import InstanceType
-from deploy.commons.common_params import ClassID
+from deploy.commons.common_params import ClassID, ParserExtraConfig
 from deploy.commons.common_func import gen_release_name, get_class_key_name
 
 from parameters.input_params import param_info
@@ -40,6 +40,7 @@ class VDCClient(BaseClient):
                 milvus_tag_prefix: <db_version_prefix>, if not passed image_tag, will used prefix to get a image_tag
                 server_resource: {} # pod resource, such as Milvus's pods, config for upgrade pod resources by infra API
                 milvus_config: {}  # milvus.yaml config content
+                extra_config: {} # special creation params, e.g.: "processorArchitecture": <only support 1 or 2>
         :param release_name: str
         :param parser_result: bool
         :param return_release_name: bool
@@ -50,7 +51,9 @@ class VDCClient(BaseClient):
         self.release_name = release_name or self.release_name or gen_release_name("fouram-vdc")
         self.deploy_class_id = eval(f'ClassID.{body.get("deploy_mode")}') or self.deploy_class_id
         image_tag = body.get("image_tag", "") or self.client.get_release_version(body.get("milvus_tag_prefix", ""))
-        server_resource, milvus_config = [body.get(i, {}) for i in ["server_resource", "milvus_config"]]
+        server_resource, milvus_config, extra_config = [body.get(i, {}) for i in
+                                                        ["server_resource", "milvus_config", "extra_config"]]
+        extra_config_obj = ParserExtraConfig(**extra_config)
 
         # check instance type
         if self.deploy_class_id == ClassID.classserverless:
@@ -64,14 +67,17 @@ class VDCClient(BaseClient):
             obj = self._delicate_install
 
         return obj(image_tag=image_tag, server_resource=server_resource, milvus_config=milvus_config,
-                   return_release_name=return_release_name, timeout=timeout), {"image_tag": image_tag}
+                   return_release_name=return_release_name, extra_config_obj=extra_config_obj,
+                   timeout=timeout), {"image_tag": image_tag}
 
-    def _delicate_install(self, image_tag, server_resource, milvus_config, return_release_name, timeout, **kwargs):
+    def _delicate_install(self, image_tag, server_resource, milvus_config, return_release_name, timeout,
+                          extra_config_obj: ParserExtraConfig = ParserExtraConfig(), **kwargs):
         log.debug(f"[VDCClient] Final config for VDC deployment, release_name: {self.release_name}, " +
                   f"deploy_class_id: {self.deploy_class_id}, image_tag: {image_tag}, " +
                   f"server_resource: {server_resource}, milvus_config: {milvus_config}")
         self.release_name, instance_id = self.client.create_server(
-            instance_name=self.release_name, image_tag=image_tag, deploy_mode=self.deploy_class_id, timeout=timeout)
+            instance_name=self.release_name, image_tag=image_tag, deploy_mode=self.deploy_class_id,
+            processor_architecture=extra_config_obj.processor_architecture, timeout=timeout)
 
         self.upgrade(body={"server_resource": server_resource, "milvus_config": milvus_config},
                      release_name=self.release_name, check_release_exist=False, timeout=timeout)
@@ -92,12 +98,12 @@ class VDCClient(BaseClient):
         self.instance_id_maps.update({self.release_name: instance_id})
         return self.release_name if return_release_name else (self.release_name, instance_id)
 
-    def _elastic_serverless_install(self, server_resource, milvus_config, return_release_name, **kwargs):
+    def _elastic_serverless_install(self, server_resource, milvus_config, return_release_name, timeout, **kwargs):
         log.debug(f"[VDCClient] Final config for VDC deployment, release_name: {self.release_name}, " +
                   f"deploy_class_id: {self.deploy_class_id}, " +
                   f"server_resource: {server_resource}, milvus_config: {milvus_config}")
         self.release_name, instance_id = self.client.create_elastic_serverless(
-            instance_name=self.release_name, ap_point_host_id=param_info.vdc_serverless_host)
+            instance_name=self.release_name, ap_point_host_id=param_info.vdc_serverless_host, timeout=timeout)
 
         self.upgrade(body={"server_resource": server_resource, "milvus_config": milvus_config},
                      release_name=self.release_name, check_release_exist=False)

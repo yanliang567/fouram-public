@@ -542,7 +542,7 @@ concurrent_tasks:
       scalars_index: Optional[dict, list] = {}  # same as `dataset_params.scalars_index`
       vectors_index: Optional[dict] = {}  # same as `dataset_params.vectors_index`
 
-      # customize the interface for writing data during the preparation phase
+      # customize the interface for writing data
       # only support `upsert` and `insert`, default value is `insert`
       custom_insert_api: Optional[str] = "insert"
 
@@ -698,7 +698,7 @@ concurrent_tasks:
       set_properties: Union[dict, list, None] = None  # same as `common_params.set_properties`
       alter_index: Union[dict, list, None] = None   # same as `common_params.alter_index`
 
-      # customize the interface for writing data during the preparation phase
+      # customize the interface for writing data
       # only support `upsert` and `insert`, default value is `insert`
       custom_insert_api: Optional[str] = "insert"
 
@@ -758,6 +758,6 @@ concurrent_tasks:
       set_properties: Union[dict, list, None] = None  # same as `common_params.set_properties`
       alter_index: Union[dict, list, None] = None   # same as `common_params.alter_index`
 
-      # customize the interface for writing data during the preparation phase
+      # customize the interface for writing data
       # only support `upsert` and `insert`, default value is `insert`
       custom_insert_api: Optional[str] = "insert"
