@@ -134,7 +134,7 @@ class TestFunctionalCases(PerfTemplate):
             default_case_params=default_case_params)
 
     @pytest.mark.parametrize("deploy_mode", [STANDALONE])
-    def test_functional_scene_delete_query(self, input_params: InputParamsBase, deploy_mode):
+    def test_functional_scene_delete_query_common(self, input_params: InputParamsBase, deploy_mode):
         """
         :test steps:
             1. Prepare data

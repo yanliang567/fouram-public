@@ -2,7 +2,7 @@ import copy
 import dacite
 from typing import Dict
 from pymilvus import DataType
-from pymilvus.orm import types
+from pymilvus.orm.types import CONSISTENCY_STRONG
 
 from client.common.common_type import Precision, CaseIterParams, DefaultValue
 from client.common.common_parser import (
@@ -45,7 +45,6 @@ class FunctionalCases(CommonCases):
             return self.case_report.to_dict(), True
         except Exception as e:
             log.error("[FunctionalCases] Run {0} raise error: {1}".format(func_obj.__name__, e))
-            log.error(str(e))
             return {}, False
 
     @functional_check_params(ParamsFormat.common_functional)
@@ -69,7 +68,8 @@ class FunctionalCases(CommonCases):
         vector_type = get_vector_type(self.params_obj.dataset_params[pn.dataset_name])
         vector_default_field_name = get_default_field_name(
             vector_type, self.params_obj.dataset_params.get(pn.vector_field_name, ""))
-        sparse_range = check_sparse_range(self.params_obj.dataset_params.get(pn.sparse_range, DefaultValue.default_sparse_range))
+        sparse_range = check_sparse_range(
+            self.params_obj.dataset_params.get(pn.sparse_range, DefaultValue.default_sparse_range))
         all_fields_params = ParserFieldsParams(self.params_obj.dataset_params, self.params_obj.collection_params,
                                                main_field_name=vector_default_field_name)
 
@@ -251,85 +251,87 @@ class FunctionalCases(CommonCases):
             Do not choose to use default parameters unless necessary, please pass in from outside!
         """
         # parser input params for test case
-        params = self.parsing_functional_params(data_class=GetParamObj().scene_functional_query_all_deleted,
-                                                all_params=kwargs)
-        log.info(f"[scene_functional_query_all_deleted] functional params: {params}")
-        deleted_exprs = []
-        deleted_count = 0
-        actual_partition_names = [p.name for p in self.collection_wrap.partitions]
+        functional_params = self.parsing_functional_params(data_class=GetParamObj().scene_functional_query_all_deleted,
+                                                           all_params=kwargs)
+        log.info(f"[scene_functional_query_all_deleted] functional params: {functional_params}")
 
         # get extra partitions and parser datasize
+        actual_partition_names = [p.name for p in self.collection_wrap.partitions]
         extra_partitions = self.params_obj.dataset_params.get(pn.extra_partitions, None)
         if extra_partitions:
-            ep = dacite.from_dict(data_class=ExtraPartitionsParams, data=extra_partitions)
-            data_sizes = ep.parser_datasize(parser_data_size(self.params_obj.dataset_params.get(pn.dataset_size, 0)))
+            sub_partitions_params_list = (
+                dacite.from_dict(data_class=ExtraPartitionsParams, data=extra_partitions).combination_params(
+                    input_datasize=self.params_obj.dataset_params.get(pn.dataset_size, 0)))
 
-            # check all data_size of partition is same
+            # check all data_size of each partition is same, for check query result from non-delete partitions
             partition_same_size = True
-            for d in range(1, len(data_sizes)):
-                if data_sizes[d] != data_sizes[d - 1]:
+            for i in range(1, len(sub_partitions_params_list)):
+                if sub_partitions_params_list[i].data_size != sub_partitions_params_list[i - 1].data_size:
                     partition_same_size = False
 
-        def delete_query_empty(_expr, partition_name=params.partition_name):
+        # inner func: delete expr -> flush or not -> check some result of query
+        def _inner_delete_query_empty(_expr: str, partition_name: str):
             # delete
+            if _expr == "":
+                raise Exception("[scene_functional_query_all_deleted] cannot be empty")
             res_delete = self.collection_delete(expr=_expr, partition_name=partition_name)
             assert res_delete.res_result
-            deleted_exprs.append(_expr)
+            deleted_expr_list.append(_expr)
 
-            if params.with_flush:
+            # flush or not
+            if functional_params.with_flush:
                 self.collection_flush()
 
-            # query all deleted expr
-            for deleted_expr in deleted_exprs:
+            # query all deleted expr -> expected empty result
+            for deleted_expr in deleted_expr_list:
                 res_query = self.collection_query(expr=deleted_expr, partition_names=[partition_name],
-                                                  consistency_level=types.CONSISTENCY_STRONG)
-                if len(res_query.response) != 0:
-                    raise Exception(f"[scene_functional_query_all_deleted] Query partitions {[partition_name]} "
-                                    f"with the deldted expr: {deleted_expr} should return empty result.")
-
-            # verify query result with deleted expr from other partitions
-            other_partitions = [p for p in actual_partition_names if p != partition_name]
-
-            if len(other_partitions) > 0:
-                res_query = self.collection_query(expr=_expr, partition_names=other_partitions,
-                                                  consistency_level=types.CONSISTENCY_STRONG)
+                                                  consistency_level=CONSISTENCY_STRONG)
+                assert (len(res_query.response) == 0,
+                        f"[scene_functional_query_all_deleted] Query partitions {[partition_name]} "
+                        f"with the deleted expr: {deleted_expr} should return empty result.")
 
                 # Only check deleted data can be queried in the non-delete partition
                 # when the data of extra partitions is repeated and the data size of each partition is same
-                if ep.data_repeated and partition_same_size:
-                    if len(res_query.response) <= 0:
-                        raise Exception(
-                            f"[scene_functional_query_all_deleted] Query partitions {other_partitions} "
-                            f"with expr: {deleted_expr} shouldn't return empty.")
+                # In other cases, it may be correct whether the query result is empty or not
+                other_partitions = [p for p in actual_partition_names if p != partition_name]
+                if len(other_partitions) > 0:
+                    res_query_other_par = self.collection_query(expr=_expr, partition_names=other_partitions,
+                                                                consistency_level=CONSISTENCY_STRONG)
+                    assert res_query_other_par.res_result, "query from other partitions failed!"
+                    if sub_partitions_params_list[0].data_repeated and partition_same_size:
+                        assert (len(res_query_other_par.response) > 0,
+                                f"[scene_functional_query_all_deleted] Query partitions {other_partitions} "
+                                f"with expr: {_expr} shouldn't return empty.")
 
             return res_delete.response.delete_count
 
         # query before delete
-        count_before = self.collection_query(expr="", consistency_level=types.CONSISTENCY_STRONG,
-                                             output_fields=["count(*)"])
+        count_before = self.collection_query(expr="", consistency_level=CONSISTENCY_STRONG, output_fields=["count(*)"])
         log.info(f"[scene_functional_query_all_deleted] Before delete, query count* is {count_before}")
 
         # expr_list mode
-        if len(params.delete_expr_list) > 0:
-            for expr in params.delete_expr_list:
-                del_count = delete_query_empty(expr, partition_name=params.partition_name)
+        deleted_expr_list = []
+        deleted_count = 0
+        if len(functional_params.delete_expr_list) > 0:
+            for expr in functional_params.delete_expr_list:
+                del_count = _inner_delete_query_empty(expr, partition_name=functional_params.partition_name)
                 deleted_count += del_count
 
         # range_batch mode
         else:
-            if len(params.delete_range) < 2 or params.delete_batch <= 0:
+            if len(functional_params.delete_range) < 2 or functional_params.delete_batch <= 0:
                 raise Exception("[scene_functional_query_all_deleted] "
                                 "You must choose one of the two modes expr_list and range_batch. "
                                 "If expr_list is selected, parameter delete_expr_list cannot be empty; "
                                 "if range_batch is selected, parameter delete_range must specify the deletion range, "
                                 "such as [0, 100], and parameter delete_batch is greater than 0.")
             else:
-                delete_len = params.delete_range[1] - params.delete_range[0]
-                ni_count = int(delete_len / params.delete_batch)
-                last_delete = delete_len % params.delete_batch
+                delete_len = functional_params.delete_range[1] - functional_params.delete_range[0]
+                ni_count = int(delete_len / functional_params.delete_batch)
+                last_delete = delete_len % functional_params.delete_batch
                 log.info(
                     f"[scene_functional_query_all_deleted] delete_len={delete_len}, ni_count={ni_count}, last_delete={last_delete}")
-                delete_pks = loop_ids(params.delete_batch, start_id=params.delete_range[0])
+                delete_pks = loop_ids(functional_params.delete_batch, start_id=functional_params.delete_range[0])
 
                 # get pk field name
                 if self.collection_wrap.schema.primary_field.dtype != DataType.INT64:
@@ -337,16 +339,17 @@ class FunctionalCases(CommonCases):
                 pk = self.collection_wrap.schema.primary_field.name
 
                 for i in range(0, ni_count):
-                    del_count = delete_query_empty(f"{pk} in {next(delete_pks)}", partition_name=params.partition_name)
+                    del_count = _inner_delete_query_empty(f"{pk} in {next(delete_pks)}",
+                                                          partition_name=functional_params.partition_name)
                     deleted_count += del_count
 
                 if last_delete > 0:
-                    del_count = delete_query_empty(f"{pk} in {next(delete_pks)[:last_delete]}",
-                                                   partition_name=params.partition_name)
+                    del_count = _inner_delete_query_empty(f"{pk} in {next(delete_pks)[:last_delete]}",
+                                                          partition_name=functional_params.partition_name)
                     deleted_count += del_count
 
         log.info(f"[scene_functional_query_all_deleted] Total delete count is {deleted_count}")
-        count_after = self.collection_query(expr="", consistency_level=types.CONSISTENCY_STRONG,
+        count_after = self.collection_query(expr="", consistency_level=CONSISTENCY_STRONG,
                                             output_fields=["count(*)"])
         log.info(f"[scene_functional_query_all_deleted] After delete, query count* is {count_after}")
 
