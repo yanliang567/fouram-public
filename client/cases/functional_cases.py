@@ -1,7 +1,7 @@
 import copy
 import dacite
 from typing import Dict
-from pymilvus import DataType
+from client.client_base import DataType
 from pymilvus.orm.types import CONSISTENCY_STRONG
 
 from client.common.common_type import Precision, CaseIterParams, DefaultValue
