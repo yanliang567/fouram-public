@@ -16,7 +16,7 @@ class ReadNumpy(ReadBase):
         self._allow_pickle = allow_pickle
         self._dataset_name = dataset_name
 
-        self._default_value = None
+        self._default_value = []
 
     @property
     def file_name(self):
@@ -25,13 +25,8 @@ class ReadNumpy(ReadBase):
     def get_data(self, data_length: int):
         log.debug(f"[ReadNumpy] Get data from dataset `{self._dataset_name}`, length: {data_length}")
 
-        while not isinstance(self._default_value, np.ndarray):
-            self._default_value = read_npy_file(self.file_name, allow_pickle=self._allow_pickle)
-
         while len(self._default_value) < data_length:
-            res = read_npy_file(self.file_name, allow_pickle=self._allow_pickle)
-            if isinstance(res, np.ndarray) and len(res) > 0:
-                self._default_value = np.vstack((self._default_value, res)) if len(self._default_value) > 0 else res
+            self._default_value.extend(read_npy_file(self.file_name, allow_pickle=self._allow_pickle))
 
         _value = self._default_value[:data_length]
         self._default_value = self._default_value[data_length:]
