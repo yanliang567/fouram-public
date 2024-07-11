@@ -217,8 +217,8 @@ def truncated_output(context, row_length=300, func_name: str = ""):
                 _length = getattr(_data[0], "shape", None)[0]
 
             for i in _data:
-                content += f"[ {str(i[0]):.24s} ... ], "
-            return f"<{func_name} fields: {_fields}, length: {_length}, content: [ {content}]>, {context[1:]}"
+                content += f"[ `type{type(i[0])}, dtype<{getattr(i[0], 'dtype', '')}>` {str(i[0]):.24s} ... ], "
+            return f"<{func_name} fields: {_fields}, length: {_length}, content: [ {content[:-2]} ]>, {context[1:]}"
 
     _str = str(context)
     return _str[:row_length] + '......' + _str[-row_length:] if len(_str) > row_length * 2 else _str
