@@ -382,7 +382,7 @@ class Base:
             "[Base] Start inserting {0} vectors to collection {1}".format(data_size, collection_name))
 
         p_i = input_obj or PrepareInsertParams(ni=ni, scalars_params=scalars_params, dim=dim, data_type=data_type,
-                                               column_name=column_name)
+                                               column_name=column_name, dataset_size=data_size)
 
         if data_type == "local":
             for i in range(0, ni_cunt):
@@ -435,7 +435,8 @@ class Base:
         last_rt = 0
 
         log.info("[Base] Start inserting {} vectors".format(size))
-        p_i = input_obj or PrepareInsertParams(ni=ni, scalars_params=scalars_params, acc_dataset_train=source_vectors)
+        p_i = input_obj or PrepareInsertParams(ni=ni, scalars_params=scalars_params, acc_dataset_train=source_vectors,
+                                               dataset_size=size)
 
         for i in range(ni_cunt):
             batch_rt += self.insert_batch(

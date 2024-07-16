@@ -105,6 +105,7 @@ class DatasetConfig(ParamsBase):
 @dataclass
 class DatasetConfigs(ParamsBase):
     local = DatasetConfig(vector_type="FLOAT_VECTOR")
+    random_algorithm = DatasetConfig(dataset_type=pn.RandomAlgorithm)
 
     def set_attr(self, attr_name: str, attr_value: DatasetConfig):
         try:

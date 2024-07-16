@@ -146,6 +146,14 @@ distances = "distances"
 NUMPY = "npy"
 PARQUET = "parquet"
 CSR = "csr"
+RandomAlgorithm = "random_algorithm"
+
+# random_algorithm func names
+specify_scope = "specify_scope"
+random_range = "random_range"
+fixed_value_range = "fixed_value_range"
+specify_scope_custom_size = "specify_scope_custom_size"
+random_range_custom_size = "random_range_custom_size"
 
 # data type name lower
 ARRAY = "array"

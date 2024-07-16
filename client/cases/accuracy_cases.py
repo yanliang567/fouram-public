@@ -98,7 +98,7 @@ class CommonCases(Base):
                     data=extra_partitions).combination_params(input_datasize=len(self.dataset_train))
                 insert_obj = PrepareInsertParams(
                     ni=self.params_obj.dataset_params[pn.ni_per], scalars_params=scalars_params,
-                    acc_dataset_train=self.dataset_train)
+                    dataset_size=len(self.dataset_train), acc_dataset_train=self.dataset_train)
 
                 inert_time = []
                 for p in param_list:

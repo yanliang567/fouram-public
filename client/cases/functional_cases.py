@@ -1,9 +1,10 @@
 import copy
 import dacite
 from typing import Dict
-from client.client_base import DataType
+
 from pymilvus.orm.types import CONSISTENCY_STRONG
 
+from client.client_base import DataType
 from client.common.common_type import Precision, CaseIterParams, DefaultValue
 from client.common.common_parser import (
     ParserInputParams, ParserFieldsParams, ExtraPartitionsParams

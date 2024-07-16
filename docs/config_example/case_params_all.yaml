@@ -24,8 +24,9 @@ dataset_params:
   # random: `local`
   #      1. vector will automatically generate corresponding data based on the `dataset_params.vector_field_name` prefix
   #      2. if the prefix is not "binary_vector", "float_vector", "float16_vector", "bfloat16_vector", "sparse_float_vector" type data will be generated
-  # npy: `deep`, `sift`, `text2img`, `laion`, `embed`, `gist`, `glove`, `binary`, `random`
+  # npy: `deep`, `sift`, `text2img`, `laion`, `embed`, `gist`, `glove`, `binary`, `random`, `laion1b_float16`, `laion1b_bfloat16`
   # parquet: `cohere10m_parquet`, `laion1b_nolang`, `laion2b_multi`
+  # csr: `sparse_full`
   dataset_name: sift
   # for parquet data sets, specify which column in the parquet data set is used to insert the vector column
   # `float32_vector` is the column_name on `laion` dataset
@@ -139,6 +140,160 @@ dataset_params:
     int64_1:
       other_params:
         dataset: laion2b_int64
+    int64_2:
+      other_params:
+        dataset: random_algorithm
+        algorithm_params:
+          #  Algorithm name: specify_scope
+          #
+          #  Support data type: INT8, INT16, INT32, INT64, DOUBLE, FLOAT, VARCHAR, ARRAY
+          #
+          #  Params:
+          #      specify_range: List<int>, e.g.: [ 1, 100 ] => 1 ~ 99
+          #      max_capacity: <int> <- for ARRAY
+          #
+          #  Introduce:
+          #      Read the scalar values in `specify_range` sequentially,
+          #      process the scalar values according to the scalar data type.
+          #
+          #      e.g.:
+          #          specify_range: [0, 3]
+          #          max_capacity: 2
+          #      -> handling scalar value types: [0, 1, 2] or [[0, 0], [1, 1], [2, 2]]
+          #      -> scalar_values
+          #          int: [0, 1, 2, 0, 1, 2, ... <repeated>]
+          #          str: ["0", "1", "2", "0", "1", "2", ... <repeated>]
+          #          array<int>: [[0, 0], [1, 1], [2, 2], [0, 0], [1, 1], [2, 2], ... <repeated>]
+          #          ...
+          #      -> get the specified length: scalar_values[:<insert batch size>]
+          algorithm_name: specify_scope
+          specify_range: [ -100, 100 ]
+    int64_3:
+      other_params:
+        dataset: random_algorithm
+        algorithm_params:
+          #  Algorithm name: random_range
+          #
+          #  Support data type: INT8, INT16, INT32, INT64, DOUBLE, FLOAT, VARCHAR, ARRAY
+          #
+          #  Params:
+          #      specify_range: List<int>, e.g.: [ 1, 100 ] => 1 ~ 99
+          #      max_capacity: <int> <- for ARRAY
+          #
+          #  Introduce:
+          #      Read the scalar values in `specify_range` sequentially,
+          #      process the scalar values according to the scalar data type.
+          #
+          #      e.g.:
+          #          specify_range: [0, 3]
+          #      -> handling scalar value types: [0, 1, 2]
+          #      -> scalar_values
+          #          int: [0, 1, 2, 0, 1, 2, ... <repeated>]
+          #          str: ["0", "1", "2", "0", "1", "2", ... <repeated>]
+          #          ...
+          #      -> get the specified length and break the sequence: random.shuffle(scalar_values[:<insert batch size>])
+          algorithm_name: random_range
+          specify_range: [ -123, 100 ]
+    int64_4:
+      other_params:
+        dataset: random_algorithm
+        algorithm_params:
+          #  Algorithm name: fixed_value_range
+          #
+          #  Support data type: INT8, INT16, INT32, INT64, DOUBLE, FLOAT, VARCHAR, ARRAY
+          #
+          #  Params:
+          #      specify_range: List<int>, e.g.: [ 1, 100 ] => 1 ~ 99
+          #      batch: <int>, > 0 <- the number of times the same value is repeated
+          #      max_capacity: <int> <- for ARRAY
+          #
+          #  Introduce:
+          #      Read the scalar values in `specify_range` sequentially,
+          #      process the scalar values according to the scalar data type.
+          #
+          #      e.g.:
+          #          specify_range: [0, 3]
+          #          batch: 2
+          #      -> handling scalar value types: [0, 0, 1, 1, 2, 2]
+          #      -> scalar_values
+          #          int: [0, 0, 1, 1, 2, 2, 0, 0, 1, 1, 2, 2, ... <repeated>]
+          #          str: ["0", "0", "1", "1", "2", "2", "0", "0", "1", "1", "2", "2", ... <repeated>]
+          #          ...
+          #      -> get the specified length: scalar_values[:<insert batch size>]
+          algorithm_name: fixed_value_range
+          specify_range: [ 0, 100 ]
+          batch: 50
+    int64_5:
+      other_params:
+        dataset: random_algorithm
+        algorithm_params:
+          #  Algorithm name: specify_scope_custom_size
+          #
+          #  Support data type: INT8, INT16, INT32, INT64, DOUBLE, FLOAT, VARCHAR, ARRAY
+          #
+          #  Params:
+          #      specify_range: List<int>, e.g.: [ 0, 100 ] => 0 ~ 99
+          #      max_capacity: <int> <- for ARRAY
+          #      base_size: Union[int, str] <- the number of each value
+          #      custom_size: dict<str: Union[int, list]>, this value will overrides `base_size`
+          #                   - key: the number of value, e.g.: "100", "10k"
+          #                   - value: scalar value, must be within the `specified_range`, e.g.: 1, [10, 51]
+          #
+          #  Introduce:
+          #      Read the scalar values in `specify_range` sequentially,
+          #      process the scalar values according to the scalar data type.
+          #
+          #      e.g.:
+          #          specify_range: [0, 4]
+          #          base_size: 2
+          #          custom_size: {"4": 1, "1": [2, 3]}
+          #      -> scalar_values = [0, 1, 2, 3, 0, 1, 1, 1]
+          #      -> get the specified length: scalar_values[:<insert batch size>]
+          #      -> handling scalar value types
+          #
+          #  Notice:
+          #      The total number of scalars set cannot be less than the total number that needs to be inserted,
+          #      otherwise an error will be reported after the custom values are inserted done!!
+          algorithm_name: specify_scope_custom_size
+          specify_range: [ -101, 100 ]
+          base_size: "6w"
+          custom_size: { "10w": 10, "1w": [ 1, 2, 99 ] }
+    int64_6:
+      other_params:
+        dataset: random_algorithm
+        algorithm_params:
+          #  Algorithm name: random_range_custom_size
+          #
+          #  Support data type: INT8, INT16, INT32, INT64, DOUBLE, FLOAT, VARCHAR, ARRAY
+          #
+          #  Params:
+          #    specify_range: List<int>, e.g.: [ 0, 100 ] => 0 ~ 99
+          #    max_capacity: <int> <- for ARRAY
+          #    base_size: Union[int, str] <- the number of each value
+          #    custom_size: dict<str: Union[int, list]>, this value will overrides `base_size`
+          #                            - key: the number of value, e.g.: "100", "10k"
+          #                            - value: scalar value, must be within the `specified_range`, e.g.: 1, [10, 51]
+          #
+          #  Introduce:
+          #    Read the scalar values in `specify_range` sequentially,
+          #    disrupt the order of the scalars,
+          #    process the scalar values according to the scalar data type.
+          #
+          #    e.g.:
+          #      specify_range: [ 0, 3 ]
+          #      base_size: 2
+          #      custom_size: { "4": 1, "1": 2 }
+          #    -> scalar_values = [0, 1, 2, 0, 1, 1, 1]
+          #    -> get the specified length and break the sequence: random.shuffle(scalar_values[:<insert batch size>])
+          #    -> handling scalar value types
+          #
+          #  Notice:
+          #    The total number of scalars set cannot be less than the total number that needs to be inserted,
+          #    otherwise an error will be reported after the custom values are inserted done!!
+          algorithm_name: random_range_custom_size
+          specify_range: [ 1, 100 ]
+          base_size: "6w"
+          custom_size: { "10w": 10, "1w": [ 1, 2, 99 ] }
     json_1:
       other_params:
         dataset: laion2b_json
@@ -160,9 +315,31 @@ dataset_params:
         max_capacity: 5
       other_params:
         varchar_filled: false
+    array_varchar_2:
+      params:
+        max_length: 2
+        max_capacity: 5
+      other_params:
+        # `varchar_filled` will not be used
+        varchar_filled: false
+        # the generated <int> data will be converted into <str>
+        dataset: random_algorithm
+          algorithm_params:
+            algorithm_name: specify_scope
+            specify_range: [ 1, 100 ]
     array_int64_1:
       params:
         max_capacity: 9999
+    array_int64_2:
+      params:
+        max_capacity: 100
+      other_params:
+        dataset: random_algorithm
+        algorithm_params:
+          algorithm_name: fixed_value_range
+          max_capacity: 50 # must be <= `dataset_params.scalars_params.array_int64_2.params.max_capacity`
+          specify_range: [ 1, 100 ]
+          batch: 25
 
   # list resource groups after preparing data
   show_resource_groups: False / <bool>

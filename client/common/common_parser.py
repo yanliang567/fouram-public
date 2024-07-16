@@ -1,7 +1,7 @@
 import copy
 from typing import Optional, List, Union
 from itertools import zip_longest
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from client.read_dataset.read_entry import ReadEntry
 from client.parameters import params_name as pn
@@ -179,7 +179,7 @@ class GenIterValues:
         self.insert_length = num
         return self
 
-    def gen_scalar_values(self, scalars_params: dict, insert_length: int):
+    def gen_scalar_values(self, scalars_params: dict, insert_length: int, dataset_size=0):
         # The first batch value is smaller than the initialized value
         _insert_length = insert_length if self.insert_length == 0 else self.insert_length
         self.set_insert_length(_insert_length)
@@ -187,10 +187,11 @@ class GenIterValues:
         _loop_files = {
             k: ReadEntry(
                 dataset_type=config_info.dataset_config.dataset_type(v["other_params"]["dataset"]),
-                dataset_name=v["other_params"]["dataset"],
+                dataset_name=v["other_params"]["dataset"], dataset_size=dataset_size,
                 iter_file=loop_gen_scalar_files(v["other_params"]["dataset"],
                                                 dim=config_info.dataset_config.dim(v["other_params"]["dataset"])),
-                column_name=v["other_params"].get("column_name", ""), allow_pickle=True
+                column_name=v["other_params"].get("column_name", ""), allow_pickle=True,
+                field_name=k, algorithm_params=v["other_params"].get("algorithm_params", {})
             )
             for k, v in scalars_params.items() if
             v.get("other_params", {}).get("dataset", False) not in [dv.default_dataset, False]
@@ -218,7 +219,7 @@ class PrepareInsertParams:
     _main_vector_client = None
 
     def __init__(self, ni: int, scalars_params: dict, dim: int = dv.default_dim, data_type: str = "",
-                 acc_dataset_train: list = [], column_name: str = "", data_repeated: bool = True):
+                 acc_dataset_train: list = [], column_name: str = "", data_repeated: bool = True, dataset_size=0):
         """
         :param ni: batch of insert
         :param scalars_params: scalar params
@@ -227,6 +228,7 @@ class PrepareInsertParams:
         :param acc_dataset_train: training vectors for recall test
         :param column_name: column_name for vector file
         :param data_repeated: repeated vectors when insert into different partitions
+        :param dataset_size: total data size
         """
         self._ni = int(ni)
         self._scalars_params = scalars_params
@@ -235,6 +237,7 @@ class PrepareInsertParams:
         self._acc_dataset_train = acc_dataset_train
         self._column_name = column_name
         self._data_repeated = data_repeated
+        self._dataset_size = parser_data_size(dataset_size)
 
         self.vectors_ni = self._ni
 
@@ -246,7 +249,7 @@ class PrepareInsertParams:
         if self._main_vector_client is None:
             self._main_vector_client = ReadEntry(
                 dataset_type=config_info.dataset_config.dataset_type(self._data_type),
-                dataset_name=self._data_type,
+                dataset_name=self._data_type, dataset_size=self._dataset_size,
                 iter_file=loop_gen_files(config_info.dataset_config.dim(self._data_type), self._data_type),
                 column_name=self._column_name, allow_pickle=True
             )
@@ -260,12 +263,13 @@ class PrepareInsertParams:
         if reset:
             self.GenScalarValuesObj = GenIterValues()
             self.iter_loop_ids = self.GenScalarValuesObj.loop_ids(int(self._ni))
-            self.iter_insert_scalars_params = self.GenScalarValuesObj.gen_scalar_values(self._scalars_params, self._ni)
+            self.iter_insert_scalars_params = self.GenScalarValuesObj.gen_scalar_values(
+                self._scalars_params, self._ni, dataset_size=self._dataset_size)
 
             if self._data_type in config_info.dataset_config.vector_to_list:
                 self.main_vector_client = ReadEntry(
                     dataset_type=config_info.dataset_config.dataset_type(self._data_type),
-                    dataset_name=self._data_type,
+                    dataset_name=self._data_type, dataset_size=self._dataset_size,
                     iter_file=loop_gen_files(config_info.dataset_config.dim(self._data_type), self._data_type),
                     column_name=self._column_name, allow_pickle=True
                 )
@@ -300,6 +304,7 @@ class FieldsParamsBase:
     metric_type: str = ""
     sparse_range: List[int] = None
     varchar_filled: Optional[bool] = None
+    algorithm_params: Optional[dict] = field(default_factory=lambda: {})
 
     @property
     def to_dict(self):
@@ -398,7 +403,7 @@ class ParserFieldsParams:
                 if isinstance(v, dict) and isinstance(v.get("other_params", {}), dict):
                     _other_params = v.get("other_params", {})
                     _p = {i: _other_params.get(i) for i in
-                          ["dataset", "column_name", "varchar_filled", "dim", "sparse_range"] if
+                          ["dataset", "column_name", "varchar_filled", "dim", "sparse_range", "algorithm_params"] if
                           _other_params.get(i, None)}
 
                     # set dim, `other_params.dim` > `params.dim` > `dataset_params.dim`

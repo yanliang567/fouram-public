@@ -82,14 +82,15 @@ class CommonCases(Base):
         varchar_filled = self.params_obj.dataset_params.get(pn.varchar_filled, varchar_filled)
         custom_api_insert = dacite.from_dict(
             data_class=CustomAPIInsert, data=self.params_obj.common_params.get(pn.custom_api, {})).api
+        data_size = self.params_obj.dataset_params.get(pn.dataset_size, 0)
 
         # insert to partitions
         extra_partitions = self.params_obj.dataset_params.get(pn.extra_partitions, None)
         if extra_partitions:
             param_list = dacite.from_dict(data_class=ExtraPartitionsParams, data=extra_partitions).combination_params(
-                input_datasize=self.params_obj.dataset_params.get(pn.dataset_size, 0))
+                input_datasize=data_size)
             insert_obj = PrepareInsertParams(
-                ni=ni, dim=dim, data_type=data_type, scalars_params=scalars_params,
+                ni=ni, dim=dim, data_type=data_type, scalars_params=scalars_params, dataset_size=data_size,
                 column_name=self.params_obj.dataset_params.get(pn.column_name, ""))
 
             inert_time = []

@@ -33,7 +33,7 @@ def gen_unique_str(str_value=None):
     return "fouram_" + prefix if str_value is None else str_value + "_" + prefix
 
 
-def field_type():
+def field_type() -> dict:
     """
     'bool', 'int8', 'int16', 'int32', 'int64', 'float', 'double',
     'string', 'varchar', 'binary_vector', 'float_vector'
@@ -46,6 +46,13 @@ def field_type():
     data_types = dict(sorted(data_types.items(), key=lambda item: item[0], reverse=True))
     log.debug("[field_type] Currently supported data types include: {}".format(data_types))
     return data_types
+
+
+def get_field_dtype(field_name: str):
+    for _field, _dtype in field_type().items():
+        if str(field_name).startswith(_field.lower()):
+            return _dtype, None if _dtype != getattr(DataType, "ARRAY", -1) else get_array_element_type(field_name)[1]
+    raise ValueError(f"[get_field_dtype] Can't parser field's data type: {field_name}")
 
 
 def get_array_element_type(data_type: str):
