@@ -567,6 +567,11 @@ concurrent_tasks:
       # true: randomly generate search vectors every time
       random_data: Optional[bool] = False
 
+      # check request result
+      # supports: `check_response`, `check_error_response`, `check_ignore_expected_errors`
+      check_task: Optional[str] = "check_response"
+      check_items: Union[dict, list] = {}
+
   - type: hybrid_search
     weight: 1
     params:
@@ -611,6 +616,11 @@ concurrent_tasks:
       # true: randomly generate search vectors every time
       random_data: Optional[bool] = False
 
+      # check request result
+      # supports: `check_response`, `check_error_response`, `check_ignore_expected_errors`
+      check_task: Optional[str] = "check_response"
+      check_items: Union[dict, list] = {}
+
   - type: query
     weight: 1
     params:
@@ -637,10 +647,20 @@ concurrent_tasks:
       # `field_type` only support "int64" and "varchar"
       field_type: Optional[str] = int64
 
+      # check request result
+      # supports: `check_response`, `check_error_response`, `check_ignore_expected_errors`
+      check_task: Optional[str] = "check_response"
+      check_items: Union[dict, list] = {}
+
   - type: flush
     weight: 1
     params:
       timeout: Optional[int] = 60
+
+      # check request result
+      # supports: `check_response`, `check_error_response`, `check_ignore_rate_limit`, `check_ignore_expected_errors`
+      check_task: Optional[str] = "check_response"
+      check_items: Union[dict, list] = {}
 
   - type: load
     weight: 1
@@ -648,10 +668,20 @@ concurrent_tasks:
       replica_number: Optional[int] = 1
       timeout: Optional[int] = 60
 
+      # check request result
+      # supports: `check_response`, `check_error_response`, `check_ignore_expected_errors`
+      check_task: Optional[str] = "check_response"
+      check_items: Union[dict, list] = {}
+
   - type: release
     weight: 1
     params:
       timeout: Optional[int] = 60
+
+      # check request result
+      # supports: `check_response`, `check_error_response`, `check_ignore_expected_errors`
+      check_task: Optional[str] = "check_response"
+      check_items: Union[dict, list] = {}
 
   # load and release collection, you can only set concurrent_number=1
   - type: load_release
@@ -659,6 +689,15 @@ concurrent_tasks:
     params:
       replica_number: Optional[int] = 1
       timeout: Optional[int] = 60
+
+      # check request result
+      # e.g.: {<load or release>: {"check_task": <request check task>, "check_items": <items for task>} ... }
+#      check_tasks:
+#        load:
+#          check_task: check_response
+#        release:
+#          check_task: check_response
+      check_tasks: Optional[dict] = {}
 
   - type: insert
     weight: 1
@@ -674,6 +713,11 @@ concurrent_tasks:
       varchar_filled: Optional[bool] = False
       start_id: Optional[int] = 0 # number of start id
 
+      # check request result
+      # supports: `check_response`, `check_error_response`, `check_ignore_expected_errors`
+      check_task: Optional[str] = "check_response"
+      check_items: Union[dict, list] = {}
+
   - type: upsert
     weight: 1
     params:
@@ -688,6 +732,11 @@ concurrent_tasks:
       varchar_filled: Optional[bool] = False
       start_id: Optional[int] = 0 # number of start id
 
+      # check request result
+      # supports: `check_response`, `check_error_response`, `check_ignore_expected_errors`
+      check_task: Optional[str] = "check_response"
+      check_items: Union[dict, list] = {}
+
   - type: delete
     weight: 1
     params:
@@ -698,6 +747,11 @@ concurrent_tasks:
       # it will be filled in from 0 when the data is insufficient
       delete_length: Optional[int] = 1
       timeout: Optional[int] = 60
+
+      # check request result
+      # supports: `check_response`, `check_error_response`, `check_ignore_expected_errors`
+      check_task: Optional[str] = "check_response"
+      check_items: Union[dict, list] = {}
 
   - type: scene_test
     weight: 1
@@ -737,6 +791,10 @@ concurrent_tasks:
       random_vector: Optional[bool] = False
       varchar_filled: Optional[bool] = False
       timeout: Optional[int] = None # timeout for insert, delete and flush
+
+      # check request result
+      # e.g.: {<insert or delete or flush>: {"check_task": <request check task>, "check_items": <items for task>} ... }
+      check_tasks: Optional[dict] = {}
 
   - type: scene_insert_partition
     weight: 1
@@ -805,6 +863,7 @@ concurrent_tasks:
       top_k: int
       search_param: dict
       expr: Optional[str] = None
+      partition_names: Optional[list] = None
       guarantee_timestamp: Optional[int] = None
       output_fields: Optional[list] = None
       group_by_field: Optional[str] = None
@@ -814,6 +873,10 @@ concurrent_tasks:
       random_data: Optional[bool] = False
       search_counts: Optional[int] = 1  # Number of serial search
 
+      # check request result
+      # e.g.: {<load or search or release>: {"check_task": <request check task>, "check_items": <items for task>} ... }
+      check_tasks: Optional[dict] = {}
+
   - type: load_hybrid_search_release
     weight: 1
     params:
@@ -822,6 +885,7 @@ concurrent_tasks:
       top_k: int
       reqs: list
       rerank: dict
+      partition_names: Optional[list] = None
       output_fields: Optional[list] = None
       ignore_growing: Optional[bool] = False
       guarantee_timestamp: Optional[int] = None
@@ -830,6 +894,10 @@ concurrent_tasks:
       replica_number: Optional[int] = 1
       random_data: Optional[bool] = False
       hybrid_search_counts: Optional[int] = 1  # Number of serial hybrid_search
+
+      # check request result
+      # e.g.: {<load or hybrid_search or release>: {"check_task": <request check task>, "check_items": <items for task>} ... }
+      check_tasks: Optional[dict] = {}
 
   - type: scene_search_test
     weight: 1

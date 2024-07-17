@@ -17,9 +17,9 @@ from scipy.sparse import csr_matrix, isspmatrix
 
 from client.client_base import ApiCollectionSchemaWrapper, ApiFieldSchemaWrapper, AnnSearchRequest, DataType
 from client.parameters import params_name as pn
-from client.common.common_type import DefaultValue as dv
-from client.common.common_type import NAS, SimilarityMetrics, AccMetrics, Precision
+from client.common.common_type import NAS, SimilarityMetrics, AccMetrics, Precision, DefaultValue as dv
 from client.common.common_param import GoBenchIndex, SegmentsAnalysis, RNG
+from client.check.func_check import InterfaceCheckTasks
 
 from commons.common_params import EnvVariable
 from configs.config_info import config_info
@@ -1005,6 +1005,26 @@ def parser_alter_index_params(params: Union[dict, list, None]) -> List[dict]:
 
     log.debug(f"[parser_alter_index_params] Parser alter index params done: {_params}")
     return _params
+
+
+def parser_check_tasks(check_tasks: dict, requests: List[str]) -> dict:
+    if check_tasks is None:
+        return {}
+    elif isinstance(check_tasks, dict):
+        res = {}
+        for k, v in check_tasks.items():
+            if k in requests and isinstance(v, dict):
+                res[k] = {}
+
+                _check_task, _check_items = v.get("check_task", None), v.get("check_items", None)
+                if _check_task in getattr(InterfaceCheckTasks, k, []):
+                    res[k]["check_task"] = _check_task
+                    if isinstance(_check_items, (dict, list)):
+                        res[k]["check_items"] = _check_items
+        log.debug(f"[parser_check_tasks] Parsing completed: {res}, source: {check_tasks}")
+        return res
+    else:
+        raise ValueError(f"[parser_check_tasks] Parsing failed, type: {type(check_tasks)}, value: {check_tasks}")
 
 
 def get_spawn_rate(total_num: int, default_max_step: int = 5, default_max_spawn_rate: int = 100):

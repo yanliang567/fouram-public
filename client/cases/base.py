@@ -31,8 +31,7 @@ from client.common.common_func import (
     parser_set_properties_params, parser_alter_index_params, check_vector_length
 )
 from client.common.common_param import TransferNodesParams, TransferReplicasParams
-from client.common.common_type import Precision, CheckTasks
-from client.common.common_type import DefaultValue as dv
+from client.common.common_type import Precision, CheckTasks, DefaultValue as dv
 from client.parameters import params_name as pn
 from client.parameters.params import (
     DataClassBase,
@@ -806,7 +805,7 @@ class Base:
         return field_name, dim, metric_type, index_type, index_param
 
     def check_collection_load(self, collection_name: str):
-        res = self.utility_wrap.loading_progress(collection_name, check_task=CheckTasks.ignore_check)
+        res = self.utility_wrap.loading_progress(collection_name, check_task=CheckTasks.checkIgnore)
         result = res.response.get("loading_progress", "") if res.res_result else ""
         return True if result == "100%" else False
 
@@ -869,7 +868,7 @@ class Base:
     def concurrent_search(self, params: ConcurrentTaskSearch):
         _data = gen_vectors(nb=check_vector_length(params.data), dim=params.dim, field_name=params.anns_field,
                             sparse_range=params.sparse_range) if params.random_data else params.data
-        return self.collection_wrap.search(data=_data, check_task=CheckTasks.assert_result, **params.obj_params)
+        return self.collection_wrap.search(data=_data, **params.obj_params)
 
     def concurrent_hybrid_search(self, params: ConcurrentTaskHybridSearch):
         log_level = LogLevel.DEBUG
@@ -877,7 +876,7 @@ class Base:
         _reqs, _reqs_params = params.get_random_data()
         log.customize(log_level)(
             f"[Base] Params of concurrent_hybrid_search reqs: {_reqs_params}, {params.get_all_params}")
-        return self.collection_wrap.hybrid_search(reqs=_reqs, check_task=CheckTasks.assert_result, **params.obj_params)
+        return self.collection_wrap.hybrid_search(reqs=_reqs, **params.obj_params)
 
     def concurrent_query(self, params: ConcurrentTaskQuery):
         _extra_expr = ""
@@ -889,41 +888,41 @@ class Base:
             _extra_expr += _symbol + gen_random_query_data(
                 random_count=params.random_count, random_range=params.random_range,
                 query_field_name=params.field_name, query_field_type=params.field_type)
-        return self.collection_wrap.query(expr=params.expr + _extra_expr, check_task=CheckTasks.assert_result,
-                                          **params.obj_params)
+        return self.collection_wrap.query(expr=params.expr + _extra_expr, **params.obj_params)
 
     def concurrent_flush(self, params: ConcurrentTaskFlush):
-        return self.collection_wrap.flush(check_task=CheckTasks.assert_result, **params.obj_params)
+        return self.collection_wrap.flush(**params.obj_params)
 
     def concurrent_load(self, params: ConcurrentTaskLoad):
-        return self.collection_wrap.load(check_task=CheckTasks.assert_result, **params.obj_params)
+        return self.collection_wrap.load(**params.obj_params)
 
     def concurrent_release(self, params: ConcurrentTaskRelease):
-        return self.collection_wrap.release(check_task=CheckTasks.assert_result, **params.obj_params)
+        return self.collection_wrap.release(**params.obj_params)
 
     @func_time_catch()
     def concurrent_load_release(self, params: ConcurrentTaskLoadRelease):
-        load_res = self.collection_wrap.load(check_task=CheckTasks.assert_result, replica_number=params.replica_number,
-                                             timeout=params.timeout)
-        release_res = self.collection_wrap.release(check_task=CheckTasks.assert_result, timeout=params.timeout)
+        func_name = "concurrent_load_release"
+
+        load_res = self.collection_wrap.load(replica_number=params.replica_number, **params.load_obj_params)
+        release_res = self.collection_wrap.release(**params.release_obj_params)
+
         if not (load_res.check_result and release_res.check_result):
-            raise ValueError("[Base] Check concurrent_load_release result failed, load: {0}, release: {1}".format(
-                load_res.check_result, release_res.check_result))
-        return "[Base] concurrent_load_release finished."
+            raise ValueError("[Base] Check {0} result failed, load: {1}, release: {2}".format(
+                func_name, load_res.check_result, release_res.check_result))
+        return f"[Base] {func_name} finished."
 
     def concurrent_insert(self, params: ConcurrentTaskInsert):
         entities = gen_entities(self.collection_schema, params.get_vectors, params.get_ids, params.varchar_filled,
                                 anns_field=params.anns_field, insert_scalars_params=params.scalars_params)
-        return self.collection_wrap.insert(entities, check_task=CheckTasks.assert_result, **params.obj_params)
+        return self.collection_wrap.insert(entities, **params.obj_params)
 
     def concurrent_upsert(self, params: ConcurrentTaskUpsert):
         entities = gen_entities(self.collection_schema, params.get_vectors, params.get_ids, params.varchar_filled,
                                 anns_field=params.anns_field, insert_scalars_params=params.scalars_params)
-        return self.collection_wrap.upsert(entities, check_task=CheckTasks.assert_result, **params.obj_params)
+        return self.collection_wrap.upsert(entities, **params.obj_params)
 
     def concurrent_delete(self, params: ConcurrentTaskDelete):
-        return self.collection_wrap.delete(expr=params.get_expr, check_task=CheckTasks.assert_result,
-                                           **params.obj_params)
+        return self.collection_wrap.delete(expr=params.get_expr, **params.obj_params)
 
     @func_time_catch()
     def concurrent_scene_test(self, params: ConcurrentTaskSceneTest):
@@ -976,21 +975,25 @@ class Base:
 
     @func_time_catch()
     def concurrent_scene_insert_delete_flush(self, params: ConcurrentTaskSceneInsertDeleteFlush):
-        log_level = LogLevel.DEBUG
-        log.customize(log_level)("[Base] Start concurrent_scene_insert_delete_flush: {0}".format(self.collection_name))
+        log_level, func_name = LogLevel.DEBUG, "concurrent_scene_insert_delete_flush"
+        log.customize(log_level)("[Base] Start {0}: {1}".format(func_name, self.collection_name))
 
         # insert vectors
         entities = gen_entities(
             self.collection_schema, params.get_vectors, params.get_insert_ids, params.varchar_filled,
             anns_field=params.anns_field, insert_scalars_params=params.scalars_params)
-        self.collection_wrap.insert(entities, **params.obj_params)
+        insert_res = self.collection_wrap.insert(entities, **params.insert_obj_params)
 
         # delete vectors
-        self.collection_wrap.delete(expr="id in {}".format(params.get_delete_ids), **params.obj_params)
+        delete_res = self.collection_wrap.delete(expr=f"id in {params.get_delete_ids}", **params.delete_obj_params)
 
         # flush collection
-        self.collection_wrap.flush(**params.obj_params)
-        return "[Base] concurrent_scene_insert_delete_flush finished."
+        flush_res = self.collection_wrap.flush(**params.flush_obj_params)
+
+        if not (insert_res.check_result and delete_res.check_result and flush_res.check_result):
+            raise ValueError("[Base] Check {0} result failed, insert: {1}, delete: {2}, flush: {3}".format(
+                func_name, insert_res.check_result, delete_res.check_result, flush_res.check_result))
+        return f"[Base] {func_name} finished."
 
     @func_time_catch()
     def concurrent_scene_insert_partition(self, params: ConcurrentTaskSceneInsertPartition):
@@ -1014,7 +1017,7 @@ class Base:
 
         # release before dropping
         self.release_partition(partition_obj, log_level=log_level, timeout=params.timeout,
-                               check_task=CheckTasks.assert_result)
+                               check_task=CheckTasks.checkResponse)
         # drop partition
         self.drop_partition(partition_obj, log_level)
         return "[Base] concurrent_scene_insert_partition finished."
@@ -1054,15 +1057,15 @@ class Base:
         # search partition
         data = gen_vectors(nb=params.nq, dim=params.dim, field_name=params.anns_field, sparse_range=params.sparse_range)
         self.search_partition(data=data, anns_field=params.anns_field, param=params.search_param, limit=params.limit,
-                              partition_obj=partition_obj, check_task=CheckTasks.assert_result, log_level=log_level,
+                              partition_obj=partition_obj, check_task=CheckTasks.checkResponse, log_level=log_level,
                               **params.search_obj_params)
 
         # release partition and search failed
         self.release_partition(partition_obj, log_level=log_level, timeout=params.timeout,
-                               check_task=CheckTasks.assert_result)
+                               check_task=CheckTasks.checkResponse)
         self.search_partition(data=data, anns_field=params.anns_field, param=params.search_param, limit=params.limit,
-                              partition_obj=partition_obj, check_task=CheckTasks.err_res,
-                              check_items={dv.err_code: 65535, dv.err_msg: f"not loaded"},
+                              partition_obj=partition_obj, check_task=CheckTasks.checkErrorResponse,
+                              check_items={dv.code: 65535, dv.message: f"not loaded"},
                               log_level=log_level, **params.search_obj_params)
 
         # drop partition
@@ -1104,14 +1107,14 @@ class Base:
 
         # hybrid_search partition
         _reqs, _ = params.get_random_data()
-        self.hybrid_search_partition(reqs=_reqs, partition_obj=partition_obj, check_task=CheckTasks.assert_result,
+        self.hybrid_search_partition(reqs=_reqs, partition_obj=partition_obj, check_task=CheckTasks.checkResponse,
                                      log_level=log_level, **params.search_obj_params)
 
         # release partition and hybrid_search failed
-        self.release_partition(partition_obj, log_level=log_level, check_task=CheckTasks.assert_result,
+        self.release_partition(partition_obj, log_level=log_level, check_task=CheckTasks.checkResponse,
                                **params.obj_params)
-        self.hybrid_search_partition(reqs=_reqs, partition_obj=partition_obj, check_task=CheckTasks.err_res,
-                                     check_items={dv.err_code: 65535, dv.err_msg: f"not loaded"},
+        self.hybrid_search_partition(reqs=_reqs, partition_obj=partition_obj, check_task=CheckTasks.checkErrorResponse,
+                                     check_items={dv.code: 65535, dv.message: f"not loaded"},
                                      log_level=log_level, **params.search_obj_params)
 
         # drop partition
@@ -1148,7 +1151,7 @@ class Base:
                                                      {"metric_type": metric_type,
                                                       "params": get_default_search_params(index_type=index_type)})
 
-                    c.search(check_task=CheckTasks.assert_result, **params.obj_params)
+                    c.search(check_task=CheckTasks.checkResponse, **params.obj_params)
                 else:
                     log.warning(f"[Base] Can't get collection: {i} params, please check.")
         return "[Base] concurrent_iterate_search finished."
@@ -1157,20 +1160,21 @@ class Base:
     def concurrent_load_search_release(self, params: ConcurrentTaskLoadSearchRelease):
         func_name = "concurrent_load_search_release"
 
-        load_res = self.collection_wrap.load(check_task=CheckTasks.assert_result, replica_number=params.replica_number,
-                                             timeout=params.timeout).check_result
+        # load
+        load_res = self.collection_wrap.load(replica_number=params.replica_number,
+                                             **params.load_obj_params).check_result
 
+        # search
         search_res, _count = [], 0
         while _count < params.search_counts:
             _count += 1
             if params.random_data:
                 params.data = gen_vectors(nb=check_vector_length(params.data), dim=params.dim,
                                           field_name=params.anns_field, sparse_range=params.sparse_range)
-            search_res.append(
-                self.collection_wrap.search(check_task=CheckTasks.assert_result, **params.obj_params).check_result)
+            search_res.append(self.collection_wrap.search(data=params.data, **params.search_obj_params).check_result)
 
-        release_res = self.collection_wrap.release(check_task=CheckTasks.assert_result,
-                                                   timeout=params.timeout).check_result
+        # release
+        release_res = self.collection_wrap.release(**params.release_obj_params).check_result
 
         if not (load_res and sum(search_res) == params.search_counts and release_res):
             msg = "[Base] Check {0} result failed, load:{1}, search failed:{2}, release:{3}"
@@ -1183,9 +1187,11 @@ class Base:
     def concurrent_load_hybrid_search_release(self, params: ConcurrentTaskLoadHybridSearchRelease):
         func_name = "concurrent_load_hybrid_search_release"
 
-        load_res = self.collection_wrap.load(check_task=CheckTasks.assert_result, replica_number=params.replica_number,
-                                             timeout=params.timeout).check_result
+        # load
+        load_res = self.collection_wrap.load(replica_number=params.replica_number,
+                                             **params.load_obj_params).check_result
 
+        # hybrid_search
         hybrid_search_res, _count = [], 0
         while _count < params.hybrid_search_counts:
             _count += 1
@@ -1193,10 +1199,10 @@ class Base:
                 params.set_random_data()
             log.debug(f"[Base] Params of {func_name}: {params.get_all_hybrid_search_params}")
             hybrid_search_res.append(self.collection_wrap.hybrid_search(
-                check_task=CheckTasks.assert_result, **params.hybrid_search_obj_params).check_result)
+                reqs=params.reqs, **params.hybrid_search_obj_params).check_result)
 
-        release_res = self.collection_wrap.release(check_task=CheckTasks.assert_result,
-                                                   timeout=params.timeout).check_result
+        # release
+        release_res = self.collection_wrap.release(**params.release_obj_params).check_result
 
         if not (load_res and sum(hybrid_search_res) == params.hybrid_search_counts and release_res):
             msg = "[Base] Check {0} result failed, load:{1}, hybrid_search failed:{2}, release:{3}"
@@ -1295,7 +1301,7 @@ class Base:
                             sparse_range=params.sparse_range),
                 anns_field=params.vector_field_name,
                 param={"metric_type": params.metric_type, "params": params.search_param},
-                limit=params.top_k, check_task=CheckTasks.assert_result)
+                limit=params.top_k, check_task=CheckTasks.checkResponse)
             search_results.append(res.check_result)
 
         # drop collection
@@ -1403,7 +1409,7 @@ class Base:
         for i in range(params.hybrid_search_counts):
             if params.random_data:
                 params.set_random_data()
-            res = collection_obj.hybrid_search(check_task=CheckTasks.assert_result, **params.hybrid_search_obj_params)
+            res = collection_obj.hybrid_search(check_task=CheckTasks.checkResponse, **params.hybrid_search_obj_params)
             hybrid_search_results.append(res.check_result)
 
         # drop collection

@@ -11,8 +11,7 @@ from client.parameters import params_name as pn
 from client.util.params_check import check_params
 from client.client_base import AnnSearchRequest
 from client.common.common_param import AnnSearchRequestParams, CustomAPIInsert
-from client.common.common_type import Precision, CaseIterParams
-from client.common.common_type import DefaultValue as dv
+from client.common.common_type import Precision, CaseIterParams, DefaultValue as dv
 from client.common.common_parser import (
     ParserInputParams, PrepareInsertParams, ParserFieldsParams, ExtraPartitionsParams, ParserSearchFile
 )

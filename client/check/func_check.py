@@ -1,10 +1,42 @@
+from typing import Union, List
+
 from pymilvus.exceptions import MilvusException
 
-from client.common.common_type import DefaultValue as dv
-from client.common.common_type import Error, CheckTasks
+from client.common.common_type import Error, CheckTasks, DefaultValue as dv
 import client.check.param_check as pc
+from client.check.exception_message import ServerExceptionsMessage
 
 from utils.util_log import log
+
+
+class InterfaceCheckTasks:
+    search = CheckTasks.base_check(CheckTasks.checkIgnoreExpectedErrors)
+    hybrid_search = CheckTasks.base_check(CheckTasks.checkIgnoreExpectedErrors)
+    query = CheckTasks.base_check(CheckTasks.checkIgnoreExpectedErrors)
+    flush = CheckTasks.base_check(CheckTasks.checkIgnoreRateLimit, CheckTasks.checkIgnoreExpectedErrors)
+    load = CheckTasks.base_check(CheckTasks.checkIgnoreExpectedErrors)
+    release = CheckTasks.base_check(CheckTasks.checkIgnoreExpectedErrors)
+    insert = CheckTasks.base_check(CheckTasks.checkIgnoreExpectedErrors)
+    upsert = CheckTasks.base_check(CheckTasks.checkIgnoreExpectedErrors)
+    delete = CheckTasks.base_check(CheckTasks.checkIgnoreExpectedErrors)
+
+
+def parser_check_items(check_items) -> List[Error]:
+    if not isinstance(check_items, (dict, list)):
+        raise ValueError(
+            f"[parser_check_items] Type of `check_items` is not a dict ot list:{type(check_items)}, {check_items}")
+
+    if isinstance(check_items, dict):
+        return [Error(check_items)]
+
+    res = []
+    for check_item in check_items:
+        if not isinstance(check_item, dict):
+            raise ValueError(
+                f"[parser_check_items] Item type in `check_items` list is not a dict:{type(check_item)}, {check_item}")
+        res.append(Error(check_item))
+
+    return res
 
 
 class ResponseChecker:
@@ -20,50 +52,67 @@ class ResponseChecker:
         """
         Method: start response checking for milvus API call
         """
-        result = True
         if self.check_task is None:
             # Interface normal return check
-            result = self.assert_succ(self.succ, True)
+            result = self.assert_success(self.succ, True)
 
-        elif self.check_task is CheckTasks.assert_result:
-            result = self.assert_result(self.succ, True)
+        elif self.check_task == CheckTasks.checkResponse:
+            # Verify that the request is successful
+            result = self.check_response(self.succ, True)
 
-        elif self.check_task == CheckTasks.err_res:
+        elif self.check_task == CheckTasks.checkErrorResponse:
             # Interface return error code and error message check
-            result = self.assert_exception(self.response, self.succ, self.check_items)
+            result = self.check_error_response(self.response, self.succ, self.check_items)
 
-        elif self.check_task == CheckTasks.ccr:
+        elif self.check_task == CheckTasks.checkConnectionResponse:
             # Connection interface response check
             result = self.check_value_equal(self.response, self.func_name, self.check_items)
 
-        elif self.check_task == CheckTasks.ignore_check:
+        elif self.check_task == CheckTasks.checkIgnore:
+            # Don't verify the result, return the `success` or `failure` of the request
             result = self.succ
+
+        elif self.check_task == CheckTasks.checkIgnoreRateLimit:
+            result = self.ignore_rate_limit(self.response, self.succ)
+
+        elif self.check_task == CheckTasks.checkIgnoreExpectedErrors:
+            result = self.ignore_expected_errors(self.response, self.succ, self.check_items)
+
+        else:
+            log.warning(
+                f"[CheckFunc] Check task does not exist:{self.check_task}, roll back to check response.")
+            result = self.assert_success(self.succ, True)
 
         # Add check_items here if something new need verify
 
         return result
 
-    def assert_result(self, actual, expect):
+    def check_response(self, actual, expect):
         if actual is not expect:
             log.error("[CheckFunc] {0} request check failed, response:{1}".format(self.func_name, self.response))
         return actual is expect
 
-    # @staticmethod
-    def assert_succ(self, actual, expect):
+    def assert_success(self, actual, expect):
         if actual is not expect:
             log.error("[CheckFunc] {0} request check failed, response:{1}".format(self.func_name, self.response))
         assert actual is expect
         return actual is expect
 
-    @staticmethod
-    def assert_exception(res, actual=True, error_dict=None):
-        assert actual is False
-        assert len(error_dict) > 0
+    def check_error_response(self, res, actual=True, check_items: Error = Error({})):
+        if not (actual is False):
+            raise ValueError(f"[CheckFunc] `{self.func_name}` requests successful, check response error failed !!!")
 
         if isinstance(res, MilvusException):
-            assert res.code == error_dict[dv.err_code] or error_dict[dv.err_msg] in res.message
+            if isinstance(check_items, dict):
+                check_items = Error(check_items)
+                if (check_items.code is not None or check_items.message is not None) and (
+                        not (check_items.code == res.code or check_items.message in res.message)):
+                    raise ValueError("[CheckFunc] Check `{0}` response error failed: ({1} == {2} or {3} in {4})".format(
+                        self.func_name, check_items.code, res.code, check_items.message, res.message))
+            else:
+                log.warning(f"[CheckFunc] `check_items` is not a dict, please check !!!")
         else:
-            log.error("[CheckFunc] Response of API is not an error: %s" % str(res))
+            log.error(f"[CheckFunc] Response of API is not an error of `MilvusException`: {type(res)}")
             assert False
 
         return True
@@ -101,3 +150,47 @@ class ResponseChecker:
             assert res_obj == value_content
 
         return True
+
+    def ignore_rate_limit(self, actual_res, actual_res_check):
+        if actual_res_check is True:
+            return True
+
+        if isinstance(actual_res, MilvusException):
+            assert ServerExceptionsMessage.RateLimitError in actual_res.message
+            log.warning(f"[CheckFunc] Catch `{self.func_name}` rate limit error: {actual_res}")
+            return True
+
+        raise ValueError("[CheckFunc] Response of API is not an error of `MilvusException`: %s" % type(actual_res))
+
+    def ignore_expected_errors(self, actual_res, actual_res_check, check_items: Union[dict, List[dict]] = {}):
+        """
+        :param actual_res: MilvusException
+        :param actual_res_check: bool
+        :param check_items: Union[dict, List[dict]]
+                        dict<{"code": <int>, "message": <str>}>
+                            - check `code` and `message`
+                        list[dict<{"code": <int>, "message": <str>}>, ... ]
+                            - check (`code` and `message`) || `code` || `message`
+        """
+        if actual_res_check is True:
+            return True
+
+        if isinstance(actual_res, MilvusException):
+            res = []
+            for check_item in parser_check_items(check_items):
+
+                _res = True
+                if check_item.code is not None:
+                    _res = _res and check_item.code == actual_res.code
+                if check_item.message is not None:
+                    _res = _res and check_item.message in actual_res.message
+                res.append(_res)
+
+            if sum(res) == 0:
+                log.error("[CheckFunc] Request: `{0}` error doesn't meet expectations: {1}, error: {2}".format(
+                    self.func_name, check_items, actual_res))
+                return False
+
+            log.warning(f"[CheckFunc] Ignore request `{self.func_name}` error: {actual_res}")
+            return True
+        raise ValueError("[CheckFunc] Response of API is not an error of `MilvusException`: %s" % type(actual_res))

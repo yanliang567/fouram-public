@@ -10,17 +10,35 @@ class Error:
     """ define error class """
 
     def __init__(self, res: dict):
-        self.code = res.get("code", -1)
-        self.message = res.get("message", str(res))
+        self.code = res.get("code", None)
+        self.message = res.get("message", None)
+
+        self.response = res
 
 
 class CheckTasks:
     """ The name of the method used to check the result """
-    check_nothing = "check_nothing"
-    err_res = "error_response"
-    ccr = "check_connection_result"
-    assert_result = "assert_result"
-    ignore_check = "ignore_check"
+    checkConnectionResponse = "check_connection_response"
+    checkErrorResponse = "check_error_response"
+    checkResponse = "check_response"
+    checkIgnore = "check_ignore"
+    checkIgnoreRateLimit = "check_ignore_rate_limit"
+    checkIgnoreExpectedErrors = "check_ignore_expected_errors"
+
+    @staticmethod
+    def all_tasks():
+        return [n for n in CheckTasks.__dict__.values() if isinstance(n, str) and n.startswith("check_")]
+
+    @staticmethod
+    def check_task_exits(task_name: str):
+        return task_name in CheckTasks.all_tasks()
+
+    @staticmethod
+    def base_check(*args) -> list:
+        _base = [None, CheckTasks.checkResponse, CheckTasks.checkErrorResponse]
+        if len(args) > 0:
+            _base.extend(args)
+        return _base
 
 
 class CaseLabel:
@@ -56,8 +74,8 @@ class DefaultValue:
     default_sparse_float_vector_name = "sparse_float_vector"
     default_varchar_field_name = "varchar"
 
-    err_code = "err_code"
-    err_msg = "err_msg"
+    code = "code"
+    message = "message"
     Not_Exist = "Not_Exist"
     list_content = "list_content"
     dict_content = "dict_content"

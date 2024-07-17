@@ -1,7 +1,7 @@
 import copy
 import dacite
 
-from client.common.common_type import Precision, CaseIterParams
+from client.common.common_type import Precision, CaseIterParams, DefaultValue as dv
 from client.common.common_parser import (
     ParserInputParams, GoSearchParams, GoBenchParams, ParserFieldsParams
 )
@@ -10,7 +10,6 @@ from client.common.common_func import (
     parser_set_properties_params, parser_alter_index_params, check_sparse_range
 )
 from client.common.common_param import CustomAPIInsert
-from client.common.common_type import DefaultValue as dv
 from client.util.params_check import check_params
 from client.util.api_request import info_logout
 from client.cases.common_cases import CommonCases

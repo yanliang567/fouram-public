@@ -2,7 +2,7 @@ import pytest
 
 from client.cases import ConcurrentClientBase, GoBenchCases
 from client.common.common_func import parser_data_size  # do not remove
-from client.common.common_type import DefaultValue as dv
+from client.common.common_type import DefaultValue as dv, CheckTasks
 from client.parameters.input_params import ConcurrentParams, HybridSearchReqParams, HybridSearchRerankParams
 from client.parameters import params_name as pn
 import client.parameters.input_params.define_params as cdp
@@ -596,7 +596,9 @@ class TestConcurrentCases(PerfTemplate):
             ConcurrentParams.params_query(weight=10, ids=[i for i in range(10)]),
             ConcurrentParams.params_load(weight=1),
             ConcurrentParams.params_scene_insert_delete_flush(
-                weight=1, insert_length=1, delete_length=1, random_id=True, random_vector=True, varchar_filled=True)]
+                weight=1, insert_length=1, delete_length=1, random_id=True, random_vector=True, varchar_filled=True,
+                check_tasks=cdp.DefaultCheckTasks.task(pn.flush, check_task=CheckTasks.checkIgnoreRateLimit))
+        ]
         default_case_params = ConcurrentParams().params_scene_concurrent(
             concurrent_tasks, concurrent_number=[20], during_time="5h", interval=20, dataset_size=data_size,
             other_fields=["float_1"], **cdp.DefaultIndexParams.HNSW)
@@ -623,7 +625,9 @@ class TestConcurrentCases(PerfTemplate):
             ConcurrentParams.params_query(weight=10, ids=[i for i in range(10)]),
             ConcurrentParams.params_load(weight=1),
             ConcurrentParams.params_scene_insert_delete_flush(
-                weight=1, insert_length=1, delete_length=1, random_id=True, random_vector=True, varchar_filled=True)]
+                weight=1, insert_length=1, delete_length=1, random_id=True, random_vector=True, varchar_filled=True,
+                check_tasks=cdp.DefaultCheckTasks.task(pn.flush, check_task=CheckTasks.checkIgnoreRateLimit))
+        ]
         default_case_params = ConcurrentParams().params_scene_concurrent(
             concurrent_tasks, concurrent_number=[20], during_time="5h", interval=20, dataset_size=data_size,
             other_fields=["float_1"], **cdp.DefaultIndexParams.HNSW)
@@ -655,7 +659,9 @@ class TestConcurrentCases(PerfTemplate):
             ConcurrentParams.params_query(weight=10, ids=[i for i in range(10)]),
             ConcurrentParams.params_load(weight=1),
             ConcurrentParams.params_scene_insert_delete_flush(
-                weight=1, insert_length=1, delete_length=1, random_id=True, random_vector=True, varchar_filled=True)]
+                weight=1, insert_length=1, delete_length=1, random_id=True, random_vector=True, varchar_filled=True,
+                check_tasks=cdp.DefaultCheckTasks.task(pn.flush, check_task=CheckTasks.checkIgnoreRateLimit))
+        ]
         default_case_params = ConcurrentParams().params_scene_concurrent(
             concurrent_tasks, concurrent_number=[20], during_time="5h", interval=20, dataset_size=data_size,
             other_fields=["float_1"], **cdp.DefaultIndexParams.DISKANN)
@@ -682,7 +688,9 @@ class TestConcurrentCases(PerfTemplate):
             ConcurrentParams.params_query(weight=10, ids=[i for i in range(10)]),
             ConcurrentParams.params_load(weight=1),
             ConcurrentParams.params_scene_insert_delete_flush(
-                weight=1, insert_length=1, delete_length=1, random_id=True, random_vector=True, varchar_filled=True)]
+                weight=1, insert_length=1, delete_length=1, random_id=True, random_vector=True, varchar_filled=True,
+                check_tasks=cdp.DefaultCheckTasks.task(pn.flush, check_task=CheckTasks.checkIgnoreRateLimit))
+        ]
         default_case_params = ConcurrentParams().params_scene_concurrent(
             concurrent_tasks, concurrent_number=[20], during_time="5h", interval=20, dataset_size=data_size,
             other_fields=["float_1"], **cdp.DefaultIndexParams.DISKANN)

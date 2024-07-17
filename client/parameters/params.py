@@ -1,17 +1,21 @@
 import copy
 import random
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from typing import Optional, Union, List
 
 from client.client_base import RRFRanker, WeightedRanker, AnnSearchRequest, DataType
 from client.common.common_parser import ParserFieldsParams
 from client.common.common_func import (
-    gen_combinations, update_dict_value, loop_ids, gen_vectors, get_default_field_name, check_vector_length
+    gen_combinations, update_dict_value, loop_ids, gen_vectors, get_default_field_name, check_vector_length,
+    parser_check_tasks
 )
-from client.common.common_type import concurrent_global_params, DefaultValue
+from client.common.common_type import concurrent_global_params, DefaultValue, CheckTasks
+from client.check.func_check import InterfaceCheckTasks
+
 from client.parameters.params_name import *
 
 from configs.config_info import config_info
+from utils.util_log import log
 
 
 @dataclass
@@ -263,6 +267,10 @@ class ConcurrentInputParamsSearch(DataClassBase):
     timeout: Optional[int] = DefaultValue.default_timeout
     random_data: Optional[bool] = False
 
+    # check request result
+    check_task: Optional[str] = CheckTasks.checkResponse
+    check_items: Union[dict, list] = field(default_factory=lambda: {})
+
 
 @dataclass
 class ConcurrentTaskSearch(DataClassBase):
@@ -284,25 +292,42 @@ class ConcurrentTaskSearch(DataClassBase):
     sparse_range: Optional[List[int]] = field(default_factory=lambda: DefaultValue.default_sparse_range)
 
     # save obj_params
-    _obj_params: Optional[dict] = None
+    obj_params: Optional[dict] = None
 
-    @property
-    def obj_params(self):
-        if self._obj_params is None:
-            _p = copy.deepcopy(self.to_dict)
-            for i in ["dim", "data", "random_data", "sparse_range", "_obj_params"]:
-                del _p[i]
+    # check request result
+    check_task: Optional[str] = CheckTasks.checkResponse
+    check_items: Union[dict, list] = field(default_factory=lambda: {})
 
-            for n in ["guarantee_timestamp", "group_by_field", "partition_names"]:
-                if _p[n] is None:
-                    del _p[n]
+    def __post_init__(self):
+        support_tasks = InterfaceCheckTasks.search
+        if self.check_task not in support_tasks:
+            raise ValueError(
+                "[{0}] Check task:`{1}` can't be used in `{2}` concurrent request, only supports:{3}".format(
+                    "ConcurrentTaskSearch", self.check_task, "search", support_tasks))
 
-            if _p["ignore_growing"] is False:
-                del _p["ignore_growing"]
+        # set obj params
+        _p = {
+            "anns_field": self.anns_field,
+            "param": self.param,
+            "limit": self.limit,
+            "expr": self.expr,
+            "partition_names": self.partition_names,
+            "guarantee_timestamp": self.guarantee_timestamp,
+            "output_fields": self.output_fields,
+            "ignore_growing": self.ignore_growing,
+            "group_by_field": self.group_by_field,
+            "timeout": self.timeout,
+            "check_task": self.check_task,
+            "check_items": self.check_items
+        }
+        for n in ["guarantee_timestamp", "group_by_field"]:
+            if _p[n] is None:
+                del _p[n]
+        if _p["ignore_growing"] is False:
+            del _p["ignore_growing"]
+        self.obj_params = _p
 
-            self._obj_params = _p
-
-        return self._obj_params
+        log.debug("[{0}] Init done, search obj_params:{1}".format("ConcurrentTaskSearch", self.obj_params))
 
 
 @dataclass
@@ -330,6 +355,10 @@ class ConcurrentInputParamsHybridSearch(DataClassBase):
 
     random_data: Optional[bool] = False
 
+    # check request result
+    check_task: Optional[str] = CheckTasks.checkResponse
+    check_items: Union[dict, list] = field(default_factory=lambda: {})
+
 
 @dataclass
 class ConcurrentTaskHybridSearch(DataClassBase):
@@ -348,9 +377,37 @@ class ConcurrentTaskHybridSearch(DataClassBase):
     random_data: Optional[bool] = False
 
     # save obj_params
-    _obj_params: Optional[dict] = None
+    obj_params: Optional[dict] = None
     # save hybrid_search params
     _get_all_params: Optional[dict] = None
+
+    # check request result
+    check_task: Optional[str] = CheckTasks.checkResponse
+    check_items: Union[dict, list] = field(default_factory=lambda: {})
+
+    def __post_init__(self):
+        support_tasks = InterfaceCheckTasks.hybrid_search
+        if self.check_task not in support_tasks:
+            raise ValueError(
+                "[{0}] Check task:`{1}` can't be used in `{2}` concurrent request, only supports:{3}".format(
+                    "ConcurrentTaskHybridSearch", self.check_task, "hybrid_search", support_tasks))
+
+        # set obj params
+        self.obj_params = {
+            "rerank": self.rerank,
+            "limit": self.limit,
+            "output_fields": self.output_fields,
+            "partition_names": self.partition_names,
+            "timeout": self.timeout,
+            "check_task": self.check_task,
+            "check_items": self.check_items
+        }
+        if self.guarantee_timestamp is not None:
+            self.obj_params["guarantee_timestamp"] = self.guarantee_timestamp
+        if self.ignore_growing:
+            self.obj_params["ignore_growing"] = self.ignore_growing
+
+        log.debug("[{0}] Init done, hybrid_search obj_params:{1}".format("ConcurrentTaskHybridSearch", self.obj_params))
 
     def get_random_data(self):
         _reqs = self.reqs
@@ -365,23 +422,6 @@ class ConcurrentTaskHybridSearch(DataClassBase):
                         "limit": r.limit,
                         "expr": r.expr,
                         "nq": check_vector_length(r.data)} for r in _reqs]
-
-    @property
-    def obj_params(self):
-        if self._obj_params is None:
-            _p = {n: getattr(self, n) for n in ["rerank", "limit", "output_fields", "ignore_growing",
-                                                "guarantee_timestamp", "partition_names", "timeout"]}
-
-            for n in ["guarantee_timestamp", "partition_names"]:
-                if _p[n] is None:
-                    del _p[n]
-
-            if _p["ignore_growing"] is False:
-                del _p["ignore_growing"]
-
-            self._obj_params = copy.deepcopy(_p)
-
-        return self._obj_params
 
     @property
     def get_all_params(self):
@@ -416,6 +456,10 @@ class ConcurrentInputParamsQuery(DataClassBase):
     field_name: Optional[str] = DefaultValue.default_query_field
     field_type: Optional[str] = DefaultValue.default_int64_field_name
 
+    # check request result
+    check_task: Optional[str] = CheckTasks.checkResponse
+    check_items: Union[dict, list] = field(default_factory=lambda: {})
+
 
 @dataclass
 class ConcurrentTaskQuery(DataClassBase):
@@ -434,19 +478,29 @@ class ConcurrentTaskQuery(DataClassBase):
     field_name: Optional[str] = DefaultValue.default_query_field
     field_type: Optional[str] = DefaultValue.default_int64_field_name
 
-    @property
-    def obj_params(self):
-        _p = copy.deepcopy(self.to_dict)
-        if _p["ignore_growing"] not in [True]:
-            del _p["ignore_growing"]
+    # save obj_params
+    obj_params: Optional[dict] = None
 
-        for i in ["offset", "limit", "partition_names"]:
-            if _p[i] is None:
-                del _p[i]
+    # check request result
+    check_task: Optional[str] = CheckTasks.checkResponse
+    check_items: Union[dict, list] = field(default_factory=lambda: {})
 
-        for j in ["expr", "random_data", "random_count", "random_range", "field_name", "field_type"]:
-            del _p[j]
-        return _p
+    def __post_init__(self):
+        support_tasks = InterfaceCheckTasks.query
+        if self.check_task not in support_tasks:
+            raise ValueError(
+                "[{0}] Check task:`{1}` can't be used in `{2}` concurrent request, only supports:{3}".format(
+                    "ConcurrentTaskQuery", self.check_task, "query", support_tasks))
+
+        # set obj params
+        self.obj_params = {n: getattr(self, n) for n in ["output_fields", "timeout", "check_task", "check_items"]}
+        self.obj_params.update(
+            {n: getattr(self, n) for n in ["offset", "limit", "partition_names"] if getattr(self, n) is not None}
+        )
+        if self.ignore_growing:
+            self.obj_params["ignore_growing"] = self.ignore_growing
+
+        log.debug("[{0}] Init done, query obj_params:{1}".format("ConcurrentTaskQuery", self.obj_params))
 
 
 @dataclass
@@ -460,10 +514,26 @@ class ConcurrentGoBenchParamsQuery(DataClassBase):
 class ConcurrentInputParamsFlush(DataClassBase):
     timeout: Optional[int] = DefaultValue.default_timeout
 
+    # check request result
+    check_task: Optional[str] = CheckTasks.checkResponse
+    check_items: Union[dict, list] = field(default_factory=lambda: {})
+
 
 @dataclass
 class ConcurrentTaskFlush(DataClassBase):
     timeout: Optional[int] = DefaultValue.default_timeout
+
+    # check request result
+    check_task: Optional[str] = CheckTasks.checkResponse
+    check_items: Union[dict, list] = field(default_factory=lambda: {})
+
+    def __post_init__(self):
+        support_tasks = InterfaceCheckTasks.flush
+        if self.check_task not in support_tasks:
+            raise ValueError(
+                "[{0}] Check task:`{1}` can't be used in `{2}` concurrent request, only supports:{3}".format(
+                    "ConcurrentTaskFlush", self.check_task, "flush", support_tasks))
+        log.debug("[ConcurrentTaskFlush] Init done.")
 
 
 @dataclass
@@ -471,21 +541,53 @@ class ConcurrentInputParamsLoad(DataClassBase):
     replica_number: Optional[int] = 1
     timeout: Optional[int] = DefaultValue.default_timeout
 
+    # check request result
+    check_task: Optional[str] = CheckTasks.checkResponse
+    check_items: Union[dict, list] = field(default_factory=lambda: {})
+
 
 @dataclass
 class ConcurrentTaskLoad(DataClassBase):
     replica_number: Optional[int] = 1
     timeout: Optional[int] = DefaultValue.default_timeout
 
+    # check request result
+    check_task: Optional[str] = CheckTasks.checkResponse
+    check_items: Union[dict, list] = field(default_factory=lambda: {})
+
+    def __post_init__(self):
+        support_tasks = InterfaceCheckTasks.load
+        if self.check_task not in support_tasks:
+            raise ValueError(
+                "[{0}] Check task:`{1}` can't be used in `{2}` concurrent request, only supports:{3}".format(
+                    "ConcurrentTaskLoad", self.check_task, "load", support_tasks))
+        log.debug("[ConcurrentTaskLoad] Init done.")
+
 
 @dataclass
 class ConcurrentInputParamsRelease(DataClassBase):
     timeout: Optional[int] = DefaultValue.default_timeout
 
+    # check request result
+    check_task: Optional[str] = CheckTasks.checkResponse
+    check_items: Union[dict, list] = field(default_factory=lambda: {})
+
 
 @dataclass
 class ConcurrentTaskRelease(DataClassBase):
     timeout: Optional[int] = DefaultValue.default_timeout
+
+    # check request result
+    check_task: Optional[str] = CheckTasks.checkResponse
+    check_items: Union[dict, list] = field(default_factory=lambda: {})
+
+    def __post_init__(self):
+        support_tasks = InterfaceCheckTasks.release
+        if self.check_task not in support_tasks:
+            raise ValueError(
+                "[{0}] Check task:`{1}` can't be used in `{2}` concurrent request, only supports:{3}".format(
+                    "ConcurrentTaskRelease", self.check_task, "release", support_tasks))
+        log.debug("[ConcurrentTaskRelease] Init done.")
 
 
 @dataclass
@@ -493,11 +595,35 @@ class ConcurrentInputParamsLoadRelease(DataClassBase):
     replica_number: Optional[int] = 1
     timeout: Optional[int] = DefaultValue.default_timeout
 
+    # check request result
+    check_tasks: Optional[dict] = field(default_factory=lambda: {})
+
 
 @dataclass
 class ConcurrentTaskLoadRelease(DataClassBase):
     replica_number: Optional[int] = 1
     timeout: Optional[int] = DefaultValue.default_timeout
+
+    # check request result
+    check_tasks: Optional[dict] = field(default_factory=lambda: {})
+
+    load_obj_params: Optional[dict] = None
+    release_obj_params: Optional[dict] = None
+
+    def __post_init__(self):
+        self.load_obj_params = {"timeout": self.timeout, "check_task": CheckTasks.checkResponse, "check_items": {}}
+        self.release_obj_params = {"timeout": self.timeout, "check_task": CheckTasks.checkResponse, "check_items": {}}
+
+        for k, v in parser_check_tasks(check_tasks=self.check_tasks, requests=[load, release]).items():
+            _obj = getattr(self, f"{k}_obj_params", None)
+            if _obj and isinstance(_obj, dict) and isinstance(v, dict):
+                _obj.update({
+                    "check_task": v.get("check_task", _obj.get("check_task", CheckTasks.checkResponse)),
+                    "check_items": v.get("check_items", _obj.get("check_items", {}))
+                })
+
+        log.debug("[{0}] Init done, load_obj_params:{1}, release_obj_params:{2}".format(
+            "ConcurrentTaskLoadRelease", self.load_obj_params, self.release_obj_params))
 
 
 @dataclass
@@ -510,6 +636,10 @@ class ConcurrentInputParamsInsert(DataClassBase):
     random_vector: Optional[bool] = False
     varchar_filled: Optional[bool] = False
     start_id: Optional[int] = 0
+
+    # check request result
+    check_task: Optional[str] = CheckTasks.checkResponse
+    check_items: Union[dict, list] = field(default_factory=lambda: {})
 
 
 @dataclass
@@ -530,6 +660,18 @@ class ConcurrentTaskInsert(DataClassBase):
     _loop_ids = None
     fixed_ids = None
     fixed_vectors = None
+
+    # check request result
+    check_task: Optional[str] = CheckTasks.checkResponse
+    check_items: Union[dict, list] = field(default_factory=lambda: {})
+
+    def __post_init__(self):
+        support_tasks = InterfaceCheckTasks.insert
+        if self.check_task not in support_tasks:
+            raise ValueError(
+                "[{0}] Check task:`{1}` can't be used in `{2}` concurrent request, only supports:{3}".format(
+                    "ConcurrentTaskInsert", self.check_task, "insert", support_tasks))
+        log.debug("[ConcurrentTaskInsert] Init done.")
 
     def set_params(self):
         self._loop_ids = loop_ids(step=self.nb, start_id=self.start_id)
@@ -554,7 +696,7 @@ class ConcurrentTaskInsert(DataClassBase):
 
     @property
     def obj_params(self):
-        return {"timeout": self.timeout}
+        return {"timeout": self.timeout, "check_task": self.check_task, "check_items": self.check_items}
 
 
 @dataclass
@@ -563,8 +705,60 @@ class ConcurrentInputParamsUpsert(ConcurrentInputParamsInsert):
 
 
 @dataclass
-class ConcurrentTaskUpsert(ConcurrentTaskInsert):
-    pass
+class ConcurrentTaskUpsert(DataClassBase):
+    dim: int
+    sparse_range: Optional[List[int]] = field(default_factory=lambda: DefaultValue.default_sparse_range)
+    scalars_params: Optional[dict] = field(default_factory=lambda: {})
+    nb: Optional[int] = 1
+    timeout: Optional[int] = DefaultValue.default_timeout
+    anns_field: Optional[str] = None
+
+    # random id or vectors
+    random_id: Optional[bool] = False
+    random_vector: Optional[bool] = False
+    varchar_filled: Optional[bool] = False
+    start_id: Optional[int] = 0
+
+    _loop_ids = None
+    fixed_ids = None
+    fixed_vectors = None
+
+    # check request result
+    check_task: Optional[str] = CheckTasks.checkResponse
+    check_items: Union[dict, list] = field(default_factory=lambda: {})
+
+    def __post_init__(self):
+        support_tasks = InterfaceCheckTasks.upsert
+        if self.check_task not in support_tasks:
+            raise ValueError(
+                "[{0}] Check task:`{1}` can't be used in `{2}` concurrent request, only supports:{3}".format(
+                    "ConcurrentTaskUpsert", self.check_task, "upsert", support_tasks))
+        log.debug("[ConcurrentTaskUpsert] Init done.")
+
+    def set_params(self):
+        self._loop_ids = loop_ids(step=self.nb, start_id=self.start_id)
+        self.fixed_ids = [k for k in range(self.start_id, self.start_id + self.nb)]
+        self.fixed_vectors = gen_vectors(self.nb, self.dim, field_name=self.anns_field, sparse_range=self.sparse_range)
+
+    @property
+    def get_ids(self):
+        if self.random_id:
+            _ids = next(self._loop_ids)
+            concurrent_global_params.put_data_to_insert_queue(concurrent_global_params.concurrent_insert_ids, _ids)
+            return _ids
+        concurrent_global_params.put_data_to_insert_queue(
+            concurrent_global_params.concurrent_insert_ids, self.fixed_ids)
+        return self.fixed_ids
+
+    @property
+    def get_vectors(self):
+        if self.random_vector:
+            return gen_vectors(self.nb, self.dim, field_name=self.anns_field, sparse_range=self.sparse_range)
+        return self.fixed_vectors
+
+    @property
+    def obj_params(self):
+        return {"timeout": self.timeout, "check_task": self.check_task, "check_items": self.check_items}
 
 
 @dataclass
@@ -573,12 +767,28 @@ class ConcurrentInputParamsDelete(DataClassBase):
     delete_length: Optional[int] = 1
     timeout: Optional[int] = DefaultValue.default_timeout
 
+    # check request result
+    check_task: Optional[str] = CheckTasks.checkResponse
+    check_items: Union[dict, list] = field(default_factory=lambda: {})
+
 
 @dataclass
 class ConcurrentTaskDelete(DataClassBase):
     expr: Optional[str] = None
     delete_length: Optional[int] = 1
     timeout: Optional[int] = DefaultValue.default_timeout
+
+    # check request result
+    check_task: Optional[str] = CheckTasks.checkResponse
+    check_items: Union[dict, list] = field(default_factory=lambda: {})
+
+    def __post_init__(self):
+        support_tasks = InterfaceCheckTasks.delete
+        if self.check_task not in support_tasks:
+            raise ValueError(
+                "[{0}] Check task:`{1}` can't be used in `{2}` concurrent request, only supports:{3}".format(
+                    "ConcurrentTaskDelete", self.check_task, "delete", support_tasks))
+        log.debug("[ConcurrentTaskDelete] Init done.")
 
     @property
     def get_expr(self):
@@ -593,7 +803,7 @@ class ConcurrentTaskDelete(DataClassBase):
 
     @property
     def obj_params(self):
-        return {"timeout": self.timeout}
+        return {"timeout": self.timeout, "check_task": self.check_task, "check_items": self.check_items}
 
 
 @dataclass
@@ -670,6 +880,9 @@ class ConcurrentInputParamsSceneInsertDeleteFlush(DataClassBase):
     varchar_filled: Optional[bool] = False
     timeout: Optional[int] = None
 
+    # check request result
+    check_tasks: Optional[dict] = field(default_factory=lambda: {})
+
 
 @dataclass
 class ConcurrentTaskSceneInsertDeleteFlush(DataClassBase):
@@ -690,6 +903,30 @@ class ConcurrentTaskSceneInsertDeleteFlush(DataClassBase):
     _loop_ids = None
     fixed_ids = None
     fixed_vectors = None
+
+    # check request result
+    check_tasks: Optional[dict] = field(default_factory=lambda: {})
+
+    insert_obj_params: Optional[dict] = None
+    delete_obj_params: Optional[dict] = None
+    flush_obj_params: Optional[dict] = None
+
+    def __post_init__(self):
+        self.insert_obj_params = {"timeout": self.timeout, "check_task": None, "check_items": None}
+        self.delete_obj_params = {"timeout": self.timeout, "check_task": None, "check_items": None}
+        self.flush_obj_params = {"timeout": self.timeout, "check_task": None, "check_items": None}
+
+        for k, v in parser_check_tasks(check_tasks=self.check_tasks, requests=[insert, delete, flush]).items():
+            _obj = getattr(self, f"{k}_obj_params", None)
+            if _obj and isinstance(_obj, dict) and isinstance(v, dict):
+                _obj.update({
+                    "check_task": v.get("check_task", _obj.get("check_task", None)),
+                    "check_items": v.get("check_items", _obj.get("check_items", None))
+                })
+
+        log.debug("[{0}] Init done, insert_obj_params:{1}, delete_obj_params:{2}, flush_obj_params:{3}".format(
+            "ConcurrentTaskSceneInsertDeleteFlush", self.insert_obj_params, self.delete_obj_params,
+            self.flush_obj_params))
 
     def set_params(self):
         self._loop_ids = loop_ids(step=self.insert_length, start_id=self.start_id)
@@ -718,10 +955,6 @@ class ConcurrentTaskSceneInsertDeleteFlush(DataClassBase):
     def get_delete_ids(self):
         return concurrent_global_params.get_data_from_insert_queue(
             concurrent_global_params.concurrent_insert_delete_flush, self.delete_length)
-
-    @property
-    def obj_params(self):
-        return {"timeout": self.timeout}
 
 
 @dataclass
@@ -932,6 +1165,7 @@ class ConcurrentInputParamsLoadSearchRelease(DataClassBase):
     top_k: int
     search_param: dict
     expr: Optional[str] = None
+    partition_names: Optional[list] = None
     guarantee_timestamp: Optional[int] = None
     output_fields: Optional[list] = None
     group_by_field: Optional[str] = None
@@ -940,6 +1174,9 @@ class ConcurrentInputParamsLoadSearchRelease(DataClassBase):
     replica_number: Optional[int] = 1
     random_data: Optional[bool] = False
     search_counts: Optional[int] = 1
+
+    # check request result
+    check_tasks: Optional[dict] = field(default_factory=lambda: {})
 
 
 @dataclass
@@ -950,6 +1187,7 @@ class ConcurrentTaskLoadSearchRelease(DataClassBase):
     param: dict
     limit: int
     expr: Optional[str] = None
+    partition_names: Optional[list] = None
     guarantee_timestamp: Optional[int] = None
     output_fields: Optional[list] = None
     group_by_field: Optional[str] = None
@@ -957,26 +1195,50 @@ class ConcurrentTaskLoadSearchRelease(DataClassBase):
 
     # for load
     replica_number: Optional[int] = 1
-    sparse_range: Optional[List[int]] = field(default_factory=lambda: DefaultValue.default_sparse_range)
 
     # other params
+    sparse_range: Optional[List[int]] = field(default_factory=lambda: DefaultValue.default_sparse_range)
     random_data: Optional[bool] = False
     search_counts: Optional[int] = 1
 
-    @property
-    def obj_params(self):
-        _p = copy.deepcopy(self.to_dict)
-        del _p["dim"]
-        del _p["random_data"]
-        del _p["sparse_range"]
-        del _p["replica_number"]
+    # check request result
+    check_tasks: Optional[dict] = field(default_factory=lambda: {})
 
-        if _p["guarantee_timestamp"] is None:
-            del _p["guarantee_timestamp"]
+    load_obj_params: Optional[dict] = None
+    search_obj_params: Optional[dict] = None
+    release_obj_params: Optional[dict] = None
 
-        if _p["group_by_field"] is None:
-            del _p["group_by_field"]
-        return _p
+    def __post_init__(self):
+        # init setting params
+        self.load_obj_params = {"timeout": self.timeout, "check_task": CheckTasks.checkResponse, "check_items": {}}
+        self.search_obj_params = {"timeout": self.timeout, "check_task": CheckTasks.checkResponse, "check_items": {}}
+        self.release_obj_params = {"timeout": self.timeout, "check_task": CheckTasks.checkResponse, "check_items": {}}
+
+        # parser check tasks
+        for k, v in parser_check_tasks(check_tasks=self.check_tasks, requests=[load, search, release]).items():
+            _obj = getattr(self, f"{k}_obj_params", None)
+            if _obj and isinstance(_obj, dict) and isinstance(v, dict):
+                _obj.update({
+                    "check_task": v.get("check_task", _obj.get("check_task", CheckTasks.checkResponse)),
+                    "check_items": v.get("check_items", _obj.get("check_items", {}))
+                })
+
+        # set search base params
+        _search_params = {
+            "anns_field": self.anns_field,
+            "param": self.param,
+            "limit": self.limit,
+            "expr": self.expr,
+            "partition_names": self.partition_names,
+            "output_fields": self.output_fields
+        }
+        for n in ["guarantee_timestamp", "group_by_field"]:
+            if getattr(self, n, None) is not None:
+                _search_params[n] = getattr(self, n, None)
+        self.search_obj_params.update(_search_params)
+
+        log.debug("[{0}] Init done, load_obj_params:{1}, search_obj_params:{2}, release_obj_params:{3}".format(
+            "ConcurrentTaskLoadSearchRelease", self.load_obj_params, self.search_obj_params, self.release_obj_params))
 
 
 @dataclass
@@ -985,6 +1247,7 @@ class ConcurrentInputParamsLoadHybridSearchRelease(DataClassBase):
     top_k: int
     reqs: list
     rerank: dict
+    partition_names: Optional[list] = None
     output_fields: Optional[list] = None
     ignore_growing: Optional[bool] = False
     guarantee_timestamp: Optional[int] = None
@@ -993,6 +1256,9 @@ class ConcurrentInputParamsLoadHybridSearchRelease(DataClassBase):
     replica_number: Optional[int] = 1
     random_data: Optional[bool] = False
     hybrid_search_counts: Optional[int] = 1
+
+    # check request result
+    check_tasks: Optional[dict] = field(default_factory=lambda: {})
 
 
 @dataclass
@@ -1002,6 +1268,7 @@ class ConcurrentTaskLoadHybridSearchRelease(DataClassBase):
     reqs: List[AnnSearchRequest]
     rerank: Union[RRFRanker, WeightedRanker]
     limit: int
+    partition_names: Optional[list] = None
     output_fields: Optional[list] = None
     ignore_growing: Optional[bool] = False
     guarantee_timestamp: Optional[int] = None
@@ -1014,21 +1281,46 @@ class ConcurrentTaskLoadHybridSearchRelease(DataClassBase):
     random_data: Optional[bool] = False
     hybrid_search_counts: Optional[int] = 1
 
+    # check request result
+    check_tasks: Optional[dict] = field(default_factory=lambda: {})
+
+    load_obj_params: Optional[dict] = None
+    hybrid_search_obj_params: Optional[dict] = None
+    release_obj_params: Optional[dict] = None
+
+    def __post_init__(self):
+        # init setting params
+        self.load_obj_params = {"timeout": self.timeout, "check_task": CheckTasks.checkResponse, "check_items": {}}
+        self.hybrid_search_obj_params = {"timeout": self.timeout, "check_task": CheckTasks.checkResponse,
+                                         "check_items": {}}
+        self.release_obj_params = {"timeout": self.timeout, "check_task": CheckTasks.checkResponse, "check_items": {}}
+
+        # parser check tasks
+        for k, v in parser_check_tasks(check_tasks=self.check_tasks, requests=[load, hybrid_search, release]).items():
+            _obj = getattr(self, f"{k}_obj_params", None)
+            if _obj and isinstance(_obj, dict) and isinstance(v, dict):
+                _obj.update({
+                    "check_task": v.get("check_task", _obj.get("check_task", CheckTasks.checkResponse)),
+                    "check_items": v.get("check_items", _obj.get("check_items", {}))
+                })
+
+        # set hybrid_search base params
+        _hybrid_search = {n: getattr(self, n) for n in ["rerank", "limit", "partition_names", "output_fields"]}
+        if self.guarantee_timestamp is not None:
+            _hybrid_search["guarantee_timestamp"] = self.guarantee_timestamp
+        if self.ignore_growing in [True]:
+            _hybrid_search["ignore_growing"] = self.ignore_growing
+        self.hybrid_search_obj_params.update(_hybrid_search)
+
+        log.debug("[{0}] Init done, load_obj_params:{1}, hybrid_search_obj_params:{2}, release_obj_params:{3}".format(
+            "ConcurrentTaskLoadHybridSearchRelease", self.load_obj_params, self.hybrid_search_obj_params,
+            self.release_obj_params))
+
     def set_random_data(self):
         for r in self.reqs:
             _field_params = self.all_fields_params.get_fields_params(r.anns_field)
             r._data = gen_vectors(nb=check_vector_length(r.data), dim=_field_params.dim, field_name=r.anns_field,
                                   sparse_range=_field_params.sparse_range)
-
-    @property
-    def hybrid_search_obj_params(self):
-        _p = {n: getattr(self, n) for n in ["reqs", "rerank", "limit", "output_fields", "timeout"]}
-
-        if self.guarantee_timestamp is not None:
-            _p["guarantee_timestamp"] = self.guarantee_timestamp
-        if self.ignore_growing in [True]:
-            _p["ignore_growing"] = self.ignore_growing
-        return _p
 
     @property
     def get_all_hybrid_search_params(self):
@@ -1042,6 +1334,7 @@ class ConcurrentTaskLoadHybridSearchRelease(DataClassBase):
             } for r in self.reqs],
             "rerank": self.rerank.dict(),
             "limit": self.limit,
+            "partition_names": self.partition_names,
             "output_fields": self.output_fields,
             "ignore_growing": self.ignore_growing,
             "guarantee_timestamp": self.guarantee_timestamp,
@@ -1335,11 +1628,13 @@ class ConcurrentTasksParamsBase:
 
     @property
     def to_list(self):
-        return [v for v in self.to_dict.values()]
+        return list(self.to_dict.values())
+        # return [v for v in self.to_dict.values()]
 
     @property
     def to_dict(self):
-        return self.deal_vars(vars(self))
+        return asdict(self)
+        # return self.deal_vars(vars(self))
 
     @staticmethod
     def deal_vars(input_dict: dict):

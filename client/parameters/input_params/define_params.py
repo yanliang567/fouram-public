@@ -292,3 +292,14 @@ class DefaultDatasetParams:
             "datasizes": datasizes,
             "data_repeated": data_repeated
         }
+
+
+class DefaultCheckTasks:
+    @staticmethod
+    def task(name: str, check_task: str, check_items: Union[dict, List[dict]] = None):
+        return {
+            name: {
+                "check_task": check_task,
+                "check_items": check_items
+            }
+        }

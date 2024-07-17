@@ -4,7 +4,7 @@ from client.parameters.input_params import HybridSearchReqParams, HybridSearchRe
 from client.parameters.input_params.input_params_common import CommonParams
 from client.parameters import params_name as pn
 from client.common.common_func import dict_recursive_key, parser_data_size, update_dict_value
-from client.common.common_type import DefaultValue
+from client.common.common_type import DefaultValue, CheckTasks
 
 from utils.util_log import log
 
@@ -171,11 +171,14 @@ class ConcurrentParams(CommonParams):
                            "field_name": field_name, "field_type": field_type}}
 
     @staticmethod
-    def params_flush(weight=1, timeout: Optional[int] = 30):
+    def params_flush(weight=1, timeout: Optional[int] = 30, check_task: Optional[str] = CheckTasks.checkResponse):
         """
         timeout: Optional[int] = DefaultValue.default_timeout
+
+        # check request result
+        check_task: Optional[str] = CheckTasks.assert_result
         """
-        return {"type": "flush", "weight": weight, "params": {"timeout": timeout}}
+        return {"type": "flush", "weight": weight, "params": {"timeout": timeout, "check_task": check_task}}
 
     @staticmethod
     def params_load(weight=1, replica_number=1, timeout: Optional[int] = 30):
@@ -290,7 +293,7 @@ class ConcurrentParams(CommonParams):
     @staticmethod
     def params_scene_insert_delete_flush(weight=1, insert_length=1, delete_length=1, start_id=0,
                                          random_id=False, random_vector=False, varchar_filled=False,
-                                         timeout: Optional[int] = None):
+                                         timeout: Optional[int] = None, check_tasks: dict = None):
         """
         insert_length: Optional[int] = 1
         delete_length: Optional[int] = 1
@@ -301,11 +304,14 @@ class ConcurrentParams(CommonParams):
         random_vector: Optional[bool] = False
         varchar_filled: Optional[bool] = False
         timeout: Optional[int] = None
+
+        # check request result
+        check_tasks: Optional[dict] = field(default_factory=lambda: {})
         """
         return {"type": "scene_insert_delete_flush", "weight": weight,
                 "params": {"insert_length": insert_length, "delete_length": delete_length, "start_id": start_id,
                            "random_id": random_id, "random_vector": random_vector, "varchar_filled": varchar_filled,
-                           "timeout": timeout}}
+                           "timeout": timeout, "check_tasks": check_tasks}}
 
     @staticmethod
     def params_scene_insert_partition(weight=1, data_size="1m", ni=5, with_flush=False, timeout: Optional[int] = 30):
