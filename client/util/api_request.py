@@ -12,7 +12,7 @@ from utils.util_log import log
 
 class InfoLogout:
     _log_output = ["Collection.insert", "Collection.upsert", "Collection.delete", "Index", "Collection.load",
-                   "Collection.search", "Collection.query", "Collection.hybrid_search"]
+                   "Collection.search", "Collection.query", "Collection.hybrid_search", "Collection.flush"]
     log_output = _log_output
     log_row_length = 3000
 

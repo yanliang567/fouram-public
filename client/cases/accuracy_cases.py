@@ -64,6 +64,7 @@ class CommonCases(Base):
             vector_type, self.params_obj.dataset_params.get(pn.vector_field_name, ""))
         scalars_params = ParserFieldsParams(self.params_obj.dataset_params, self.params_obj.collection_params,
                                             main_field_name=vector_default_field_name).get_scalar_other_params
+        varchar_id = self.params_obj.collection_params.get(pn.varchar_id, False)
 
         self.clean_all_rbac(reset_rbac=self.params_obj.database_user_params.get(pn.reset_rbac, False))
         self.connect()
@@ -93,12 +94,13 @@ class CommonCases(Base):
             extra_partitions = self.params_obj.dataset_params.get(pn.extra_partitions, None)
             # insert to partitions
             if extra_partitions:
-                param_list = dacite.from_dict(
-                    data_class=ExtraPartitionsParams,
-                    data=extra_partitions).combination_params(input_datasize=len(self.dataset_train))
+                partitions_obj = dacite.from_dict(data_class=ExtraPartitionsParams, data=extra_partitions)
+                param_list = partitions_obj.combination_params(input_datasize=len(self.dataset_train))
+
                 insert_obj = PrepareInsertParams(
                     ni=self.params_obj.dataset_params[pn.ni_per], scalars_params=scalars_params,
-                    dataset_size=len(self.dataset_train), acc_dataset_train=self.dataset_train)
+                    dataset_size=partitions_obj.max_data_size, acc_dataset_train=self.dataset_train,
+                    varchar_id=varchar_id)
 
                 inert_time = []
                 for p in param_list:
@@ -114,14 +116,14 @@ class CommonCases(Base):
                         source_vectors=self.dataset_train, size=p.data_size,
                         ni=self.params_obj.dataset_params[pn.ni_per], scalars_params=scalars_params,
                         input_obj=insert_obj, partition_name=p.partition_name, anns_field=vector_default_field_name,
-                        custom_api_insert=custom_api_insert))
+                        custom_api_insert=custom_api_insert, varchar_id=varchar_id))
                 self.case_report.add_attr(**deal_insert_result(inert_time, acc=True))
 
             else:
                 res_insert = self.ann_insert(
                     source_vectors=self.dataset_train, ni=self.params_obj.dataset_params[pn.ni_per],
                     scalars_params=scalars_params, anns_field=vector_default_field_name,
-                    custom_api_insert=custom_api_insert)
+                    custom_api_insert=custom_api_insert, varchar_id=varchar_id)
                 self.case_report.add_attr(**res_insert)
 
             if self.params_obj.flush_params.get(pn.prepare_flush, True):

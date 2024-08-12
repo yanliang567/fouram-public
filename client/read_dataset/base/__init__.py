@@ -18,4 +18,4 @@ def get_client_obj(name: str):
     raise ValueError(f"[get_client_obj] Does not support reading `{name}` format files.")
 
 
-__all__ = [ReadNumpy, ReadParquet, ReadCSR, get_client_obj]
+__all__ = [get_client_obj, ReadNumpy, ReadParquet, ReadCSR, RandomAlgorithm]

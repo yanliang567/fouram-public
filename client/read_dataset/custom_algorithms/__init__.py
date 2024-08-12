@@ -5,7 +5,7 @@ from client.read_dataset.custom_algorithms.random_algorithms import (
     AlgorithmRandomRange,
     AlgorithmFixedValueRange,
     AlgorithmSpecifyScopeCustomSize,
-    AlgorithmRandomRangeCustomSize
+    AlgorithmRandomRangeCustomSize,
 )
 
 AlgorithmObjects = {
@@ -31,5 +31,7 @@ __all__ = [
     AlgorithmBase,
     AlgorithmSpecifyScope,
     AlgorithmRandomRange,
-    AlgorithmFixedValueRange
+    AlgorithmFixedValueRange,
+    AlgorithmSpecifyScopeCustomSize,
+    AlgorithmRandomRangeCustomSize,
 ]

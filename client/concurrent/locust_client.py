@@ -60,6 +60,9 @@ class MyTaskSet(TaskSet):
     def release(self):
         self.client.release(self.tasks_params.release.params)
 
+    def release_partitions(self):
+        self.client.release_partitions(self.tasks_params.release_partitions.params)
+
     def load_release(self):
         self.client.load_release(self.tasks_params.load_release.params)
 

@@ -82,15 +82,20 @@ class CommonCases(Base):
         custom_api_insert = dacite.from_dict(
             data_class=CustomAPIInsert, data=self.params_obj.common_params.get(pn.custom_api, {})).api
         data_size = self.params_obj.dataset_params.get(pn.dataset_size, 0)
+        varchar_id = self.params_obj.collection_params.get(pn.varchar_id, False)
 
         # insert to partitions
         extra_partitions = self.params_obj.dataset_params.get(pn.extra_partitions, None)
         if extra_partitions:
-            param_list = dacite.from_dict(data_class=ExtraPartitionsParams, data=extra_partitions).combination_params(
-                input_datasize=data_size)
+            partitions_obj = dacite.from_dict(data_class=ExtraPartitionsParams, data=extra_partitions)
+            param_list = partitions_obj.combination_params(input_datasize=data_size)
+
             insert_obj = PrepareInsertParams(
-                ni=ni, dim=dim, data_type=data_type, scalars_params=scalars_params, dataset_size=data_size,
-                column_name=self.params_obj.dataset_params.get(pn.column_name, ""))
+                ni=ni, dim=dim, data_type=data_type, scalars_params=scalars_params,
+                dataset_size=partitions_obj.max_data_size,
+                column_name=self.params_obj.dataset_params.get(pn.column_name, ""),
+                varchar_id=varchar_id
+            )
 
             inert_time = []
             for p in param_list:
@@ -105,7 +110,7 @@ class CommonCases(Base):
                     data_type=data_type, dim=dim, size=p.data_size, ni=ni, varchar_filled=varchar_filled,
                     scalars_params=scalars_params, column_name=self.params_obj.dataset_params.get(pn.column_name, ""),
                     input_obj=insert_obj, partition_name=p.partition_name, anns_field=vector_field_name,
-                    sparse_range=sparse_range, custom_api_insert=custom_api_insert
+                    sparse_range=sparse_range, custom_api_insert=custom_api_insert, varchar_id=varchar_id
                 ))
             self.case_report.add_attr(**deal_insert_result(inert_time))
 
@@ -113,7 +118,8 @@ class CommonCases(Base):
             res_insert = self.insert(
                 data_type=data_type, dim=dim, size=size, ni=ni, varchar_filled=varchar_filled,
                 scalars_params=scalars_params, column_name=self.params_obj.dataset_params.get(pn.column_name, ""),
-                anns_field=vector_field_name, sparse_range=sparse_range, custom_api_insert=custom_api_insert
+                anns_field=vector_field_name, sparse_range=sparse_range, custom_api_insert=custom_api_insert,
+                varchar_id=varchar_id
             )
             self.case_report.add_attr(**res_insert)
 

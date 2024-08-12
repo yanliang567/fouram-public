@@ -1,0 +1,289 @@
+## Custom Algorithms
+
+Mainly used for custom generation algorithms of scalar data.
+
+Used in `dataset_params.scalars_params` and concurrent request params
+
+### Random algorithms
+
+#### 1. `specify_scope`
+
+**config example:**
+
+```yaml
+<dataset_params or param under concurrent_tasks>:
+  scalars_params:
+    int64_1:
+      other_params:
+        dataset: random_algorithm
+        algorithm_params:
+          algorithm_name: specify_scope
+          specify_range: [ -100, 100 ]
+    array_int64_1:
+      other_params:
+        dataset: random_algorithm
+        algorithm_params:
+          algorithm_name: specify_scope
+          specify_range: [ -100, 100 ]
+          max_capacity: 2
+```
+
+```text
+Algorithm name: specify_scope
+
+Support data type: INT8, INT16, INT32, INT64, DOUBLE, FLOAT, VARCHAR, ARRAY(supported elements as above)
+
+Params:
+    specify_range: List<int>, e.g.: [ 1, 100 ] => 1 ~ 99
+    max_capacity: <int> <- for ARRAY
+
+Introduce:
+    Read the scalar values in `specify_range` sequentially,
+    process the scalar values according to the scalar data type.
+
+    e.g.:
+        specify_range: [0, 3]
+        max_capacity: 2
+    -> handling scalar value types: [0, 1, 2] or [[0, 0], [1, 1], [2, 2]]
+    -> scalar_values
+        int: [0, 1, 2, 0, 1, 2, ... <repeated>]
+        str: ["0", "1", "2", "0", "1", "2", ... <repeated>]
+        array<int>: [[0, 0], [1, 1], [2, 2], [0, 0], [1, 1], [2, 2], ... <repeated>]
+        ...
+    -> get the specified length: scalar_values[:<insert batch size>]
+```
+
+#### 2. `random_range`
+
+**config example:**
+
+```yaml
+<dataset_params or param under concurrent_tasks>:
+  scalars_params:
+    varchar_1:
+      other_params:
+        dataset: random_algorithm
+        algorithm_params:
+          algorithm_name: random_range
+          specify_range: [ -100, 100 ]
+    array_varchar_1:
+      other_params:
+        dataset: random_algorithm
+        algorithm_params:
+          algorithm_name: random_range
+          specify_range: [ -100, 100 ]
+          max_capacity: 2
+```
+
+```text
+Algorithm name: random_range
+
+Support data type: INT8, INT16, INT32, INT64, DOUBLE, FLOAT, VARCHAR, ARRAY(supported elements as above)
+
+Params:
+    specify_range: List<int>, e.g.: [ 1, 100 ] => 1 ~ 99
+    max_capacity: <int> <- for ARRAY
+
+Introduce:
+    Read the scalar values in `specify_range` sequentially,
+    process the scalar values according to the scalar data type.
+
+    e.g.:
+        specify_range: [0, 3]
+    -> handling scalar value types: [0, 1, 2]
+    -> scalar_values
+        int: [0, 1, 2, 0, 1, 2, ... <repeated>]
+        str: ["0", "1", "2", "0", "1", "2", ... <repeated>]
+        array<int>: [[0, 0], [1, 1], [2, 2], [0, 0], [1, 1], [2, 2], ... <repeated>]
+        ...
+    -> get the specified length and break the sequence: random.shuffle(scalar_values[:<insert batch size>])
+```
+
+#### 3. `fixed_value_range`
+
+**config example:**
+
+```yaml
+<dataset_params or param under concurrent_tasks>:
+  scalars_params:
+    float_1:
+      other_params:
+        dataset: random_algorithm
+        algorithm_params:
+          algorithm_name: fixed_value_range
+          specify_range: [ -100, 100 ]
+          batch: 50
+    array_float_1:
+      other_params:
+        dataset: random_algorithm
+        algorithm_params:
+          algorithm_name: fixed_value_range
+          specify_range: [ -100, 100 ]
+          batch: 50
+          max_capacity: 2
+```
+
+```text
+Algorithm name: fixed_value_range
+
+Support data type: INT8, INT16, INT32, INT64, DOUBLE, FLOAT, VARCHAR, ARRAY(supported elements as above)
+
+Params:
+    specify_range: List<int>, e.g.: [ 0, 100 ] => 0 ~ 99
+    batch: <int>, > 0 <- the number of times the same value is repeated
+    max_capacity: <int> <- for ARRAY
+
+Introduce:
+    Read the scalar values in `specify_range` sequentially,
+    process the scalar values according to the scalar data type.
+
+    e.g.:
+        specify_range: [0, 3]
+        batch: 2
+    -> handling scalar value types: [0, 0, 1, 1, 2, 2]
+    -> scalar_values
+        int: [0, 0, 1, 1, 2, 2, 0, 0, 1, 1, 2, 2, ... <repeated>]
+        str: ["0", "0", "1", "1", "2", "2", "0", "0", "1", "1", "2", "2", ... <repeated>]
+        array<int>: [[0, 0], [0, 0], [1, 1], [1, 1], [2, 2], [2, 2], [0, 0], [0, 0], ... <repeated>]
+        ...
+    -> get the specified length: scalar_values[:<insert batch size>]
+```
+
+#### 4. `specify_scope_custom_size`
+
+**config example:**
+
+```yaml
+<dataset_params or param under concurrent_tasks>:
+  scalars_params:
+    float_1:
+      other_params:
+        dataset: random_algorithm
+        algorithm_params:
+          algorithm_name: specify_scope_custom_size
+          specify_range: [ -100, 100 ]
+          base_size: 50
+          custom_size:
+            "4": 1
+            "1": [ 2, 3 ]
+    array_float_1:
+      other_params:
+        dataset: random_algorithm
+        algorithm_params:
+          algorithm_name: specify_scope_custom_size
+          specify_range: [ -100, 100 ]
+          base_size: 50
+          custom_size: { }
+          max_capacity: 2
+```
+
+```text
+Algorithm name: specify_scope_custom_size
+
+Support data type: INT8, INT16, INT32, INT64, DOUBLE, FLOAT, VARCHAR, ARRAY(supported elements as above)
+
+Params:
+    specify_range: List<int>, e.g.: [ 0, 100 ] => 0 ~ 99
+    max_capacity: <int> <- for ARRAY
+    base_size: Union[int, str] <- the number of each value
+    custom_size: dict<str: Union[str, list]>, this value will overrides `base_size`
+                 - key: the number of value, e.g.: "100", "10k"
+                 - value: scalar value, must be within the `specified_range`, e.g.: 1, [10, 51]
+
+Introduce:
+    Read the scalar values in `specify_range` sequentially,
+    process the scalar values according to the scalar data type.
+
+    e.g.:
+        specify_range: [0, 4]
+        base_size: 2
+        custom_size: {"4": 1, "1": [2, 3]}
+    -> scalar_values = [0, 1, 2, 3, 0, 1, 1, 1]
+    -> get the specified length: scalar_values[:<insert batch size>]
+    -> handling scalar value types
+
+Notice:
+    The total number of scalars set cannot be less than the total number that needs to be inserted,
+    otherwise an error will be reported after the custom values are inserted done!!
+```
+
+**Data reading logic diagram:**
+
+```text
+       0,0   1,1,1,1    2      3
+        |       |       |      |
+        V       V       V      V
+    <Place one element value at a time>
+       ----------------------------> <read batch_size in order>
+    <Read element values from left to right in a loop until the specified batch size is reached.>
+```
+
+#### 5. `random_range_custom_size`
+
+**config example:**
+
+```yaml
+<dataset_params or param under concurrent_tasks>:
+  scalars_params:
+    float_1:
+      other_params:
+        dataset: random_algorithm
+        algorithm_params:
+          algorithm_name: random_range_custom_size
+          specify_range: [ -100, 100 ]
+          base_size: 50
+          custom_size: { }
+    array_float_1:
+      other_params:
+        dataset: random_algorithm
+        algorithm_params:
+          algorithm_name: random_range_custom_size
+          specify_range: [ -100, 100 ]
+          base_size: 50
+          custom_size:
+            100: 1
+            "10k": [ 10, 51 ]
+          max_capacity: 2
+```
+
+```text
+Algorithm name: random_range_custom_size
+
+Support data type: INT8, INT16, INT32, INT64, DOUBLE, FLOAT, VARCHAR, ARRAY(supported elements as above)
+
+Params:
+    specify_range: List<int>, e.g.: [ 0, 100 ] => 0 ~ 99
+    max_capacity: <int> <- for ARRAY
+    base_size: Union[int, str] <- the number of each value
+    custom_size: dict<str: Union[str, list]>, this value will overrides `base_size`
+                 - key: the number of value, e.g.: "100", "10k"
+                 - value: scalar value, must be within the `specified_range`, e.g.: 1, [10, 51]
+
+Introduce:
+    Read the scalar values in `specify_range` sequentially,
+    disrupt the order of the scalars,
+    process the scalar values according to the scalar data type.
+
+    e.g.:
+        specify_range: [0, 3]
+        base_size: 2
+        custom_size: {"4": 1, "1": 2}
+    -> scalar_values = [0, 1, 2, 0, 1, 1, 1]
+    -> get the specified length and break the sequence: random.shuffle(scalar_values[:<insert batch size>])
+    -> handling scalar value types
+
+Notice:
+    The total number of scalars set cannot be less than the total number that needs to be inserted,
+    otherwise an error will be reported after the custom values are inserted done!!
+```
+
+**Data reading logic diagram:**
+
+```text
+       0,0   1,1,1,1    2      3
+        |       |       |      |
+        V       V       V      V
+    <Place one element value at a time>
+       ----------------------------> <read batch_size and break the sequence>
+    <Read element values from left to right in a loop until the specified batch size is reached.>
+```

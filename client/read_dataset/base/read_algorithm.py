@@ -12,7 +12,8 @@ class RandomAlgorithm(ReadBase):
     for scalars fields, not support for vector fields
     """
 
-    def __init__(self, field_name: str, algorithm_params: dict = {}, dataset_size=0, **kwargs):
+    def __init__(self, field_name: str, algorithm_params: dict = {}, dataset_size=0, varchar_id: bool = False,
+                 **kwargs):
         """
         dataset: "random_algorithm"
         algorithm_params:
@@ -27,12 +28,13 @@ class RandomAlgorithm(ReadBase):
         self._field_name = field_name
         self._algorithm_params = algorithm_params
         self._dataset_size = dataset_size
+        self._varchar_id = varchar_id
 
         # parser algorithm's name and params
         self._algorithm_name, self._algorithm_kwargs = self._parser_algorithm_params(**self._algorithm_params)
 
         # parser data type
-        self._filed_dtype, self._element_dtype = get_field_dtype(self._field_name)
+        self._filed_dtype, self._element_dtype = get_field_dtype(self._field_name, self._varchar_id)
 
         # init algorithm object
         self.algorithm_obj = self._init_algorithm_obj(algorithm_name=self._algorithm_name)

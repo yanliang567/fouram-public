@@ -26,6 +26,7 @@ query = "query"
 flush = "flush"
 load = "load"
 release = "release"
+release_partitions = "release_partitions"
 load_release = "load_release"
 insert = "insert"
 upsert = "upsert"
@@ -232,3 +233,12 @@ class IndexTypeName:
     IVF_HNSW = "IVF_HNSW"
     DISKANN = "DISKANN"  # search_list=[topk, ∞]
     AUTOINDEX = "AUTOINDEX"  # level=[1, 2, 3]
+    SPARSE_WAND = "SPARSE_WAND"
+    SPARSE_INVERTED_INDEX = "SPARSE_INVERTED_INDEX"
+
+    # scalar
+    STL_SORT = "STL_SORT"
+    Trie = "Trie"
+    INVERTED = "INVERTED"
+    BITMAP = "BITMAP"
+

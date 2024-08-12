@@ -144,82 +144,18 @@ dataset_params:
       other_params:
         dataset: random_algorithm
         algorithm_params:
-          #  Algorithm name: specify_scope
-          #
-          #  Support data type: INT8, INT16, INT32, INT64, DOUBLE, FLOAT, VARCHAR, ARRAY
-          #
-          #  Params:
-          #      specify_range: List<int>, e.g.: [ 1, 100 ] => 1 ~ 99
-          #      max_capacity: <int> <- for ARRAY
-          #
-          #  Introduce:
-          #      Read the scalar values in `specify_range` sequentially,
-          #      process the scalar values according to the scalar data type.
-          #
-          #      e.g.:
-          #          specify_range: [0, 3]
-          #          max_capacity: 2
-          #      -> handling scalar value types: [0, 1, 2] or [[0, 0], [1, 1], [2, 2]]
-          #      -> scalar_values
-          #          int: [0, 1, 2, 0, 1, 2, ... <repeated>]
-          #          str: ["0", "1", "2", "0", "1", "2", ... <repeated>]
-          #          array<int>: [[0, 0], [1, 1], [2, 2], [0, 0], [1, 1], [2, 2], ... <repeated>]
-          #          ...
-          #      -> get the specified length: scalar_values[:<insert batch size>]
           algorithm_name: specify_scope
           specify_range: [ -100, 100 ]
     int64_3:
       other_params:
         dataset: random_algorithm
         algorithm_params:
-          #  Algorithm name: random_range
-          #
-          #  Support data type: INT8, INT16, INT32, INT64, DOUBLE, FLOAT, VARCHAR, ARRAY
-          #
-          #  Params:
-          #      specify_range: List<int>, e.g.: [ 1, 100 ] => 1 ~ 99
-          #      max_capacity: <int> <- for ARRAY
-          #
-          #  Introduce:
-          #      Read the scalar values in `specify_range` sequentially,
-          #      process the scalar values according to the scalar data type.
-          #
-          #      e.g.:
-          #          specify_range: [0, 3]
-          #      -> handling scalar value types: [0, 1, 2]
-          #      -> scalar_values
-          #          int: [0, 1, 2, 0, 1, 2, ... <repeated>]
-          #          str: ["0", "1", "2", "0", "1", "2", ... <repeated>]
-          #          ...
-          #      -> get the specified length and break the sequence: random.shuffle(scalar_values[:<insert batch size>])
           algorithm_name: random_range
           specify_range: [ -123, 100 ]
     int64_4:
       other_params:
         dataset: random_algorithm
         algorithm_params:
-          #  Algorithm name: fixed_value_range
-          #
-          #  Support data type: INT8, INT16, INT32, INT64, DOUBLE, FLOAT, VARCHAR, ARRAY
-          #
-          #  Params:
-          #      specify_range: List<int>, e.g.: [ 1, 100 ] => 1 ~ 99
-          #      batch: <int>, > 0 <- the number of times the same value is repeated
-          #      max_capacity: <int> <- for ARRAY
-          #
-          #  Introduce:
-          #      Read the scalar values in `specify_range` sequentially,
-          #      process the scalar values according to the scalar data type.
-          #
-          #      e.g.:
-          #          specify_range: [0, 3]
-          #          batch: 2
-          #      -> handling scalar value types: [0, 0, 1, 1, 2, 2]
-          #      -> scalar_values
-          #          int: [0, 0, 1, 1, 2, 2, 0, 0, 1, 1, 2, 2, ... <repeated>]
-          #          str: ["0", "0", "1", "1", "2", "2", "0", "0", "1", "1", "2", "2", ... <repeated>]
-          #          ...
-          #      -> get the specified length: scalar_values[:<insert batch size>]
           algorithm_name: fixed_value_range
           specify_range: [ 0, 100 ]
           batch: 50
@@ -227,33 +163,6 @@ dataset_params:
       other_params:
         dataset: random_algorithm
         algorithm_params:
-          #  Algorithm name: specify_scope_custom_size
-          #
-          #  Support data type: INT8, INT16, INT32, INT64, DOUBLE, FLOAT, VARCHAR, ARRAY
-          #
-          #  Params:
-          #      specify_range: List<int>, e.g.: [ 0, 100 ] => 0 ~ 99
-          #      max_capacity: <int> <- for ARRAY
-          #      base_size: Union[int, str] <- the number of each value
-          #      custom_size: dict<str: Union[int, list]>, this value will overrides `base_size`
-          #                   - key: the number of value, e.g.: "100", "10k"
-          #                   - value: scalar value, must be within the `specified_range`, e.g.: 1, [10, 51]
-          #
-          #  Introduce:
-          #      Read the scalar values in `specify_range` sequentially,
-          #      process the scalar values according to the scalar data type.
-          #
-          #      e.g.:
-          #          specify_range: [0, 4]
-          #          base_size: 2
-          #          custom_size: {"4": 1, "1": [2, 3]}
-          #      -> scalar_values = [0, 1, 2, 3, 0, 1, 1, 1]
-          #      -> get the specified length: scalar_values[:<insert batch size>]
-          #      -> handling scalar value types
-          #
-          #  Notice:
-          #      The total number of scalars set cannot be less than the total number that needs to be inserted,
-          #      otherwise an error will be reported after the custom values are inserted done!!
           algorithm_name: specify_scope_custom_size
           specify_range: [ -101, 100 ]
           base_size: "6w"
@@ -262,34 +171,6 @@ dataset_params:
       other_params:
         dataset: random_algorithm
         algorithm_params:
-          #  Algorithm name: random_range_custom_size
-          #
-          #  Support data type: INT8, INT16, INT32, INT64, DOUBLE, FLOAT, VARCHAR, ARRAY
-          #
-          #  Params:
-          #    specify_range: List<int>, e.g.: [ 0, 100 ] => 0 ~ 99
-          #    max_capacity: <int> <- for ARRAY
-          #    base_size: Union[int, str] <- the number of each value
-          #    custom_size: dict<str: Union[int, list]>, this value will overrides `base_size`
-          #                            - key: the number of value, e.g.: "100", "10k"
-          #                            - value: scalar value, must be within the `specified_range`, e.g.: 1, [10, 51]
-          #
-          #  Introduce:
-          #    Read the scalar values in `specify_range` sequentially,
-          #    disrupt the order of the scalars,
-          #    process the scalar values according to the scalar data type.
-          #
-          #    e.g.:
-          #      specify_range: [ 0, 3 ]
-          #      base_size: 2
-          #      custom_size: { "4": 1, "1": 2 }
-          #    -> scalar_values = [0, 1, 2, 0, 1, 1, 1]
-          #    -> get the specified length and break the sequence: random.shuffle(scalar_values[:<insert batch size>])
-          #    -> handling scalar value types
-          #
-          #  Notice:
-          #    The total number of scalars set cannot be less than the total number that needs to be inserted,
-          #    otherwise an error will be reported after the custom values are inserted done!!
           algorithm_name: random_range_custom_size
           specify_range: [ 1, 100 ]
           base_size: "6w"
@@ -683,6 +564,17 @@ concurrent_tasks:
       check_task: Optional[str] = "check_response"
       check_items: Union[dict, list] = {}
 
+  - type: release_partitions
+    weight: 1
+    params:
+      partitions: Union[List[str], str] = "_default"  # e.g.: ['_default', 'partition_1', 'partition_2', ...]
+      timeout: Optional[int] = 60
+
+      # check request result
+      # supports: `check_response`, `check_error_response`, `check_ignore_expected_errors`
+      check_task: Optional[str] = "check_response"
+      check_items: Union[dict, list] = {}
+
   # load and release collection, you can only set concurrent_number=1
   - type: load_release
     weight: 1
@@ -870,6 +762,7 @@ concurrent_tasks:
       timeout: Optional[int] = 60
 
       replica_number: Optional[int] = 1
+      resource_groups: Union[int, list] = None  # same as `load_params._resource_groups`
       random_data: Optional[bool] = False
       search_counts: Optional[int] = 1  # Number of serial search
 
@@ -892,6 +785,7 @@ concurrent_tasks:
       timeout: Optional[int] = 60
 
       replica_number: Optional[int] = 1
+      resource_groups: Union[int, list] = None  # same as `load_params._resource_groups`
       random_data: Optional[bool] = False
       hybrid_search_counts: Optional[int] = 1  # Number of serial hybrid_search
 

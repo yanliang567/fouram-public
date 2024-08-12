@@ -142,8 +142,8 @@ class PerfTemplate(Base):
                 if len(res) == 2:
                     Report_Metric_Object.update_result(test_result=res[0])
                     # report data to mongodb
-                    log.info("[PerfTemplate] Report data: \n{}".format(pformat(Report_Metric_Object.to_dict(),
-                                                                               sort_dicts=False)))
+                    log.info("[PerfTemplate] Report data: \n{}".format(
+                        pformat(Report_Metric_Object.to_dict(), sort_dicts=False, width=160, compact=True)))
                     Database_Client.mongo_insert(Report_Metric_Object.to_dict())
                     if res[1] is False:
                         param_info.test_status = False

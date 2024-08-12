@@ -24,6 +24,8 @@ class CheckTasks:
     checkIgnore = "check_ignore"
     checkIgnoreRateLimit = "check_ignore_rate_limit"
     checkIgnoreExpectedErrors = "check_ignore_expected_errors"
+    checkQueryOutput = "check_query_output"
+    checkSearchOutput = "check_search_output"
 
     @staticmethod
     def all_tasks():
@@ -35,7 +37,7 @@ class CheckTasks:
 
     @staticmethod
     def base_check(*args) -> list:
-        _base = [None, CheckTasks.checkResponse, CheckTasks.checkErrorResponse]
+        _base = [None, CheckTasks.checkResponse, CheckTasks.checkErrorResponse, CheckTasks.checkIgnoreExpectedErrors]
         if len(args) > 0:
             _base.extend(args)
         return _base

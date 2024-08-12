@@ -9,10 +9,11 @@ class ReadEntry:
 
     def __init__(self, dataset_type: Union[pn.NUMPY, pn.PARQUET, pn.CSR, pn.RandomAlgorithm],
                  iter_file: iter, column_name: str = "", allow_pickle: bool = False, dataset_name: str = None,
-                 field_name: str = "", algorithm_params: dict = {}, dataset_size=0, **kwargs):
+                 field_name: str = "", algorithm_params: dict = {}, dataset_size=0, varchar_id: bool = False, **kwargs):
         self.obj = get_client_obj(name=dataset_type)(
             iter_file=iter_file, column_name=column_name, allow_pickle=allow_pickle, dataset_name=dataset_name,
-            field_name=field_name, algorithm_params=algorithm_params, dataset_size=dataset_size)
+            field_name=field_name, algorithm_params=algorithm_params, dataset_size=dataset_size, varchar_id=varchar_id
+        )
 
     def get_data(self, data_length: int):
         return self.obj.get_data(data_length=data_length)

@@ -82,8 +82,8 @@ class AlgorithmBase:
 
     @staticmethod
     def _display_default_base_value(default_base_value: list):
-        if isinstance(default_base_value, list) and len(default_base_value) > 300:
-            return f"{str(default_base_value[:150])[:-1]} ... {str(default_base_value[-150:])[1:]}"
+        if isinstance(default_base_value, list) and len(default_base_value) > 20:
+            return f"{str(default_base_value[:10])[:-1]} ... {str(default_base_value[-10:])[1:]}"
         return default_base_value
 
     @staticmethod

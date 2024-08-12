@@ -48,7 +48,9 @@ def field_type() -> dict:
     return data_types
 
 
-def get_field_dtype(field_name: str):
+def get_field_dtype(field_name: str, primary_key_varchar_id: bool = False):
+    if str(field_name) == "id":
+        return DataType.VARCHAR if primary_key_varchar_id else DataType.INT64, None
     for _field, _dtype in field_type().items():
         if str(field_name).startswith(_field.lower()):
             return _dtype, None if _dtype != getattr(DataType, "ARRAY", -1) else get_array_element_type(field_name)[1]

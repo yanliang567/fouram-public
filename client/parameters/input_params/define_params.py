@@ -1,4 +1,5 @@
-from typing import Union, List
+from typing import Optional, Union, List, Dict
+from dataclasses import dataclass, field, asdict
 
 from client.parameters import params_name as pn
 
@@ -11,6 +12,9 @@ other_fields = ["int64_1", "int64_2", "float_1", "double_1", "varchar_1"]
 all_field_names = ["int8", "int16", "int32", "int64", "double", "float", "varchar", "bool", "json", "array_int8",
                    "array_int16", "array_int32", "array_int64", "array_double", "array_float", "array_varchar",
                    "array_bool"]
+
+all_bitmap_field_names = ["int8", "int16", "int32", "int64", "varchar", "bool", "array_int8", "array_int16",
+                          "array_int32", "array_int64", "array_varchar", "array_bool"]
 
 
 class DefaultIndexParams:
@@ -130,6 +134,26 @@ class DefaultVectorIndexParams:
             }
         }
 
+    @staticmethod
+    def SPARSE_WAND(field: str):
+        return {
+            field: {
+                pn.index_type: pn.IndexTypeName.SPARSE_WAND,
+                pn.index_param: {"drop_ratio_build": 0.2},
+                pn.metric_type: pn.MetricsTypeName.IP
+            }
+        }
+
+    @staticmethod
+    def SPARSE_INVERTED_INDEX(field: str):
+        return {
+            field: {
+                pn.index_type: pn.IndexTypeName.SPARSE_INVERTED_INDEX,
+                pn.index_param: {"drop_ratio_build": 0.2},
+                pn.metric_type: pn.MetricsTypeName.IP
+            }
+        }
+
 
 class DefaultScalarIndexParams:
     """ setting `dataset_params.scalars_index` """
@@ -148,13 +172,62 @@ class DefaultScalarIndexParams:
     def INVERTED(field: str):
         return {
             field: {
-                pn.index_type: "INVERTED"
+                pn.index_type: pn.IndexTypeName.INVERTED
             }
         }
 
     @staticmethod
     def INVERTED_list(fields: List[str]):
         return [DefaultScalarIndexParams.INVERTED(i) for i in fields]
+
+    @staticmethod
+    def BITMAP(field: str):
+        return {
+            field: {
+                pn.index_type: pn.IndexTypeName.BITMAP
+            }
+        }
+
+    @staticmethod
+    def BITMAP_list(fields: List[str]):
+        return [DefaultScalarIndexParams.BITMAP(i) for i in fields]
+
+    @staticmethod
+    def Trie(field: str):
+        return {
+            field: {
+                pn.index_type: pn.IndexTypeName.Trie
+            }
+        }
+
+    @staticmethod
+    def Trie_list(fields: List[str]):
+        return [DefaultScalarIndexParams.Trie(i) for i in fields]
+
+    @staticmethod
+    def STL_SORT(field: str):
+        return {
+            field: {
+                pn.index_type: pn.IndexTypeName.STL_SORT
+            }
+        }
+
+    @staticmethod
+    def STL_SORT_list(fields: List[str]):
+        return [DefaultScalarIndexParams.STL_SORT(i) for i in fields]
+
+
+@dataclass
+class SpecifyRange:
+    left: Optional[int] = -100
+    right: Optional[int] = 100
+
+    def __repr__(self):
+        return str(self.value)
+
+    @property
+    def value(self) -> list:
+        return [self.left, self.right]
 
 
 class DefaultScalarParams:
@@ -212,6 +285,18 @@ class DefaultScalarParams:
             field: {
                 "params": {"dim": 512},
                 "other_params": {"dataset": "binary"}
+            }
+        }
+
+    @staticmethod
+    def laion2b_multi(field: str):
+        """
+        :param field: float_vector_1
+        """
+        return {
+            field: {
+                "params": {"dim": 768},
+                "other_params": {"dataset": "laion2b_multi", "column_name": "float32_vector"}
             }
         }
 
@@ -274,6 +359,158 @@ class DefaultScalarParams:
             }
         }
 
+    @staticmethod
+    def specify_scope(field: str, specify_range: SpecifyRange = SpecifyRange(), max_capacity: int = 1):
+        """
+        setting random_algorithm
+
+        :param field: str
+        :param specify_range: SpecifyRange
+        :param max_capacity: int
+        """
+        algorithm_params = {
+            "algorithm_name": "specify_scope",
+            "specify_range": specify_range.value,
+            "max_capacity": max_capacity
+        }
+        return {field: {"other_params": {"dataset": "random_algorithm", "algorithm_params": algorithm_params}}}
+
+    @staticmethod
+    def specify_scope_list(fields: List[str], specify_range: SpecifyRange = SpecifyRange(), max_capacity: int = 1):
+        """
+        :param fields: ["id", "int64_1", "array_int16_1", ...]
+        :param specify_range: SpecifyRange
+        :param max_capacity: int
+        """
+        return [DefaultScalarParams.specify_scope(field, specify_range, max_capacity) for field in fields]
+
+    @staticmethod
+    def random_range(field: str, specify_range: SpecifyRange = SpecifyRange(), max_capacity: int = 1):
+        """
+        setting random_algorithm
+
+        :param field: str
+        :param specify_range: SpecifyRange
+        :param max_capacity: int
+        """
+        algorithm_params = {
+            "algorithm_name": "random_range",
+            "specify_range": specify_range.value,
+            "max_capacity": max_capacity
+        }
+        return {field: {"other_params": {"dataset": "random_algorithm", "algorithm_params": algorithm_params}}}
+
+    @staticmethod
+    def random_range_list(fields: List[str], specify_range: SpecifyRange = SpecifyRange(), max_capacity: int = 1):
+        """
+        :param fields: ["id", "int64_1", "array_int16_1", ...]
+        :param specify_range: SpecifyRange
+        :param max_capacity: int
+        """
+        return [DefaultScalarParams.random_range(field, specify_range, max_capacity) for field in fields]
+
+    @staticmethod
+    def fixed_value_range(field: str, specify_range: SpecifyRange = SpecifyRange(), batch: int = 50,
+                          max_capacity: int = 1):
+        """
+        setting random_algorithm
+
+        :param field: str
+        :param specify_range: SpecifyRange
+        :param batch: int
+        :param max_capacity: int
+        """
+        algorithm_params = {
+            "algorithm_name": "fixed_value_range",
+            "specify_range": specify_range.value,
+            "batch": batch,
+            "max_capacity": max_capacity
+        }
+        return {field: {"other_params": {"dataset": "random_algorithm", "algorithm_params": algorithm_params}}}
+
+    @staticmethod
+    def fixed_value_range_list(fields: List[str], specify_range: SpecifyRange = SpecifyRange(), batch: int = 50,
+                               max_capacity: int = 1):
+        """
+        :param fields: ["id", "int64_1", "array_int16_1", ...]
+        :param specify_range: SpecifyRange
+        :param batch: int
+        :param max_capacity: int
+        """
+        return [DefaultScalarParams.fixed_value_range(field, specify_range, batch, max_capacity) for field in fields]
+
+    @staticmethod
+    def specify_scope_custom_size(
+            field: str, specify_range: SpecifyRange = SpecifyRange(), base_size: Union[int, str] = "1w",
+            custom_size: Dict[str, Union[int, List[int]]] = {}, max_capacity: int = 1):
+        """
+        setting random_algorithm
+
+        :param field: str
+        :param specify_range: SpecifyRange
+        :param base_size: Union[int, str]
+        :param custom_size: Dict[str, Union[int, List[int]]]
+        :param max_capacity: int
+        """
+        algorithm_params = {
+            "algorithm_name": "specify_scope_custom_size",
+            "specify_range": specify_range.value,
+            "base_size": base_size,
+            "custom_size": custom_size,
+            "max_capacity": max_capacity
+        }
+        return {field: {"other_params": {"dataset": "random_algorithm", "algorithm_params": algorithm_params}}}
+
+    @staticmethod
+    def specify_scope_custom_size_list(
+            fields: List[str], specify_range: SpecifyRange = SpecifyRange(), base_size: Union[int, str] = "1w",
+            custom_size: Dict[str, Union[int, List[int]]] = {}, max_capacity: int = 1):
+        """
+        :param fields: ["id", "int64_1", "array_int16_1", ...]
+        :param specify_range: SpecifyRange
+        :param base_size: Union[int, str]
+        :param custom_size: Dict[str, Union[int, List[int]]]
+        :param max_capacity: int
+        """
+        return [DefaultScalarParams.specify_scope_custom_size(
+            field, specify_range, base_size, custom_size, max_capacity) for field in fields]
+
+    @staticmethod
+    def random_range_custom_size(
+            field: str, specify_range: SpecifyRange = SpecifyRange(), base_size: Union[int, str] = "1w",
+            custom_size: Dict[str, Union[int, List[int]]] = {}, max_capacity: int = 1):
+        """
+        setting random_algorithm
+
+        :param field: str
+        :param specify_range: SpecifyRange
+        :param base_size: Union[int, str]
+        :param custom_size: Dict[str, Union[int, List[int]]]
+        :param max_capacity: int
+        """
+        algorithm_params = {
+            "algorithm_name": "random_range_custom_size",
+            "specify_range": specify_range.value,
+            "base_size": base_size,
+            "custom_size": custom_size,
+            "max_capacity": max_capacity
+        }
+        return {field: {"other_params": {"dataset": "random_algorithm", "algorithm_params": algorithm_params}}}
+
+    @staticmethod
+    def random_range_custom_size_list(
+            fields: List[str], specify_range: SpecifyRange = SpecifyRange(), base_size: Union[int, str] = "1w",
+            custom_size: Dict[str, Union[int, List[int]]] = {}, max_capacity: int = 1):
+        """
+        :param fields: ["id", "int64_1", "array_int16_1", ...]
+        :param specify_range: SpecifyRange
+        :param base_size: Union[int, str]
+        :param custom_size: Dict[str, Union[int, List[int]]]
+        :param max_capacity: int
+        """
+        return [DefaultScalarParams.random_range_custom_size(
+            field, specify_range, base_size, custom_size, max_capacity) for field in fields]
+
 
 class DefaultDatasetParams:
     @staticmethod
@@ -303,3 +540,208 @@ class DefaultCheckTasks:
                 "check_items": check_items
             }
         }
+
+
+""" expressions """
+
+
+@dataclass
+class ExprBase:
+    expr: str
+
+    @property
+    def subset(self):
+        return f"({self.expr})"
+
+    def __repr__(self):
+        return self.expr
+
+    @property
+    def value(self):
+        return self.expr
+
+
+class Expr:
+    # BooleanConstant: 'true' | 'True' | 'TRUE' | 'false' | 'False' | 'FALSE'
+
+    @staticmethod
+    def LT(left, right):
+        return ExprBase(expr=f"{left} < {right}")
+
+    @staticmethod
+    def LE(left, right):
+        return ExprBase(expr=f"{left} <= {right}")
+
+    @staticmethod
+    def GT(left, right):
+        return ExprBase(expr=f"{left} > {right}")
+
+    @staticmethod
+    def GE(left, right):
+        return ExprBase(expr=f"{left} >= {right}")
+
+    @staticmethod
+    def EQ(left, right):
+        return ExprBase(expr=f"{left} == {right}")
+
+    @staticmethod
+    def NE(left, right):
+        return ExprBase(expr=f"{left} != {right}")
+
+    @staticmethod
+    def like(left, right):
+        return ExprBase(expr=f'{left} like "{right}"')
+
+    @staticmethod
+    def LIKE(left, right):
+        return ExprBase(expr=f'{left} LIKE "{right}"')
+
+    @staticmethod
+    def exists(name):
+        return ExprBase(expr=f'exists {name}')
+
+    @staticmethod
+    def EXISTS(name):
+        return ExprBase(expr=f'EXISTS {name}')
+
+    @staticmethod
+    def ADD(left, right):
+        return ExprBase(expr=f"{left} + {right}")
+
+    @staticmethod
+    def SUB(left, right):
+        return ExprBase(expr=f"{left} - {right}")
+
+    @staticmethod
+    def MUL(left, right):
+        return ExprBase(expr=f"{left} * {right}")
+
+    @staticmethod
+    def DIV(left, right):
+        return ExprBase(expr=f"{left} / {right}")
+
+    @staticmethod
+    def MOD(left, right):
+        return ExprBase(expr=f"{left} % {right}")
+
+    @staticmethod
+    def POW(left, right):
+        return ExprBase(expr=f"{left} ** {right}")
+
+    @staticmethod
+    def SHL(left, right):
+        # Note: not supported
+        return ExprBase(expr=f"{left}<<{right}")
+
+    @staticmethod
+    def SHR(left, right):
+        # Note: not supported
+        return ExprBase(expr=f"{left}>>{right}")
+
+    @staticmethod
+    def BAND(left, right):
+        # Note: not supported
+        return ExprBase(expr=f"{left} & {right}")
+
+    @staticmethod
+    def BOR(left, right):
+        # Note: not supported
+        return ExprBase(expr=f"{left} | {right}")
+
+    @staticmethod
+    def BXOR(left, right):
+        # Note: not supported
+        return ExprBase(expr=f"{left} ^ {right}")
+
+    @staticmethod
+    def AND(left, right):
+        return ExprBase(expr=f"{left} && {right}")
+
+    @staticmethod
+    def And(left, right):
+        return ExprBase(expr=f"{left} and {right}")
+
+    @staticmethod
+    def OR(left, right):
+        return ExprBase(expr=f"{left} || {right}")
+
+    @staticmethod
+    def Or(left, right):
+        return ExprBase(expr=f"{left} or {right}")
+
+    @staticmethod
+    def BNOT(name):
+        # Note: not supported
+        return ExprBase(expr=f"~{name}")
+
+    @staticmethod
+    def NOT(name):
+        return ExprBase(expr=f"!{name}")
+
+    @staticmethod
+    def Not(name):
+        return ExprBase(expr=f"not {name}")
+
+    @staticmethod
+    def In(left, right):
+        return ExprBase(expr=f"{left} in {right}")
+
+    @staticmethod
+    def Nin(left, right):
+        return ExprBase(expr=f"{left} not in {right}")
+
+    @staticmethod
+    def json_contains(left, right):
+        return ExprBase(expr=f"json_contains({left}, {right})")
+
+    @staticmethod
+    def JSON_CONTAINS(left, right):
+        return ExprBase(expr=f"JSON_CONTAINS({left}, {right})")
+
+    @staticmethod
+    def json_contains_all(left, right):
+        return ExprBase(expr=f"json_contains_all({left}, {right})")
+
+    @staticmethod
+    def JSON_CONTAINS_ALL(left, right):
+        return ExprBase(expr=f"JSON_CONTAINS_ALL({left}, {right})")
+
+    @staticmethod
+    def json_contains_any(left, right):
+        return ExprBase(expr=f"json_contains_any({left}, {right})")
+
+    @staticmethod
+    def JSON_CONTAINS_ANY(left, right):
+        return ExprBase(expr=f"JSON_CONTAINS_ANY({left}, {right})")
+
+    @staticmethod
+    def array_contains(left, right):
+        return ExprBase(expr=f"array_contains({left}, {right})")
+
+    @staticmethod
+    def ARRAY_CONTAINS(left, right):
+        return ExprBase(expr=f"ARRAY_CONTAINS({left}, {right})")
+
+    @staticmethod
+    def array_contains_all(left, right):
+        return ExprBase(expr=f"array_contains_all({left}, {right})")
+
+    @staticmethod
+    def ARRAY_CONTAINS_ALL(left, right):
+        return ExprBase(expr=f"ARRAY_CONTAINS_ALL({left}, {right})")
+
+    @staticmethod
+    def array_contains_any(left, right):
+        return ExprBase(expr=f"array_contains_any({left}, {right})")
+
+    @staticmethod
+    def ARRAY_CONTAINS_ANY(left, right):
+        return ExprBase(expr=f"ARRAY_CONTAINS_ANY({left}, {right})")
+
+    @staticmethod
+    def array_length(name):
+        return ExprBase(expr=f"array_length({name})")
+
+    @staticmethod
+    def ARRAY_LENGTH(name):
+        return ExprBase(expr=f"ARRAY_LENGTH({name})")

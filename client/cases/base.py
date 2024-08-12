@@ -41,6 +41,7 @@ from client.parameters.params import (
     ConcurrentTaskFlush,
     ConcurrentTaskLoad,
     ConcurrentTaskRelease,
+    ConcurrentTaskReleasePartitions,
     ConcurrentTaskLoadRelease,
     ConcurrentTaskInsert,
     ConcurrentTaskUpsert,
@@ -325,7 +326,9 @@ class Base:
 
     def get_collection_schema(self):
         self.collection_schema = self.collection_wrap.schema.to_dict()
-        log.info("[Base] Collection schema: {0}".format(self.collection_schema))
+        log.info("[Base] Collection schema: \n{0}".format(
+            pformat(self.collection_schema, compact=True, width=240, sort_dicts=False)
+        ))
 
     def get_collection_load_state(self, collection_obj: callable = None, log_level=LogLevel.DEBUG):
         """
@@ -367,7 +370,7 @@ class Base:
     def insert(self, data_type, dim, size, ni, varchar_filled=False, collection_obj: callable = None, column_name="",
                collection_schema=None, collection_name="", log_level=LogLevel.INFO, scalars_params={},
                input_obj: PrepareInsertParams = None, anns_field: str = None, sparse_range=dv.default_sparse_range,
-               **kwargs):
+               varchar_id: bool = False, **kwargs):
         data_size = parser_data_size(size)
         data_size_format = str(format(data_size, ',d'))
         ni_cunt = int(data_size / int(ni)) if int(ni) != 0 else 0
@@ -381,7 +384,7 @@ class Base:
             "[Base] Start inserting {0} vectors to collection {1}".format(data_size, collection_name))
 
         p_i = input_obj or PrepareInsertParams(ni=ni, scalars_params=scalars_params, dim=dim, data_type=data_type,
-                                               column_name=column_name, dataset_size=data_size)
+                                               column_name=column_name, dataset_size=data_size, varchar_id=varchar_id)
 
         if data_type == "local":
             for i in range(0, ni_cunt):
@@ -424,7 +427,7 @@ class Base:
         }
 
     def ann_insert(self, source_vectors, ni=100, scalars_params={}, size: int = None,
-                   input_obj: PrepareInsertParams = None, anns_field: str = None, **kwargs):
+                   input_obj: PrepareInsertParams = None, anns_field: str = None, varchar_id: bool = False, **kwargs):
         size = size if size is not None else len(source_vectors)
         data_size_format = str(format(size, ',d'))
         ni_cunt = int(size / int(ni))
@@ -435,7 +438,7 @@ class Base:
 
         log.info("[Base] Start inserting {} vectors".format(size))
         p_i = input_obj or PrepareInsertParams(ni=ni, scalars_params=scalars_params, acc_dataset_train=source_vectors,
-                                               dataset_size=size)
+                                               dataset_size=size, varchar_id=varchar_id)
 
         for i in range(ni_cunt):
             batch_rt += self.insert_batch(
@@ -900,6 +903,28 @@ class Base:
         return self.collection_wrap.release(**params.obj_params)
 
     @func_time_catch()
+    def concurrent_release_partitions(self, params: ConcurrentTaskReleasePartitions):
+        func_name = "concurrent_release_partitions"
+
+        # check partitions exist
+        all_partition, release_obj = {p.name: p for p in self.collection_wrap.partitions}, []
+        for i in params.partitions:
+            _obj = all_partition.get(i, None)
+            if _obj is None:
+                raise ValueError("[Base] {0} partition:`{1}` not in collection:{2}, partitions:{3}".format(
+                    func_name, i, self.collection_wrap.name, all_partition.keys()))
+            release_obj.append(_obj)
+
+        # release partitions
+        _partitions = []
+        for o in release_obj:
+            _partitions.append(o.name)
+            o.release(**params.obj_params)
+
+        log.debug(f"[Base] {func_name} release partitions done: {_partitions}")
+        return f"[Base] {func_name} finished."
+
+    @func_time_catch()
     def concurrent_load_release(self, params: ConcurrentTaskLoadRelease):
         func_name = "concurrent_load_release"
 
@@ -1158,11 +1183,11 @@ class Base:
 
     @func_time_catch()
     def concurrent_load_search_release(self, params: ConcurrentTaskLoadSearchRelease):
-        func_name = "concurrent_load_search_release"
+        log_level, func_name = LogLevel.DEBUG, "concurrent_load_search_release"
 
         # load
-        load_res = self.collection_wrap.load(replica_number=params.replica_number,
-                                             **params.load_obj_params).check_result
+        load_res = self.load_collection(replica_number=params.replica_number, log_level=log_level,
+                                        **params.load_obj_params).check_result
 
         # search
         search_res, _count = [], 0
@@ -1185,11 +1210,11 @@ class Base:
 
     @func_time_catch()
     def concurrent_load_hybrid_search_release(self, params: ConcurrentTaskLoadHybridSearchRelease):
-        func_name = "concurrent_load_hybrid_search_release"
+        log_level, func_name = LogLevel.DEBUG, "concurrent_load_hybrid_search_release"
 
         # load
-        load_res = self.collection_wrap.load(replica_number=params.replica_number,
-                                             **params.load_obj_params).check_result
+        load_res = self.load_collection(replica_number=params.replica_number, log_level=log_level,
+                                        **params.load_obj_params).check_result
 
         # hybrid_search
         hybrid_search_res, _count = [], 0
@@ -1197,7 +1222,7 @@ class Base:
             _count += 1
             if params.random_data:
                 params.set_random_data()
-            log.debug(f"[Base] Params of {func_name}: {params.get_all_hybrid_search_params}")
+            log.debug(f"[Base] Params of {func_name} hybrid_search: {params.get_all_hybrid_search_params}")
             hybrid_search_res.append(self.collection_wrap.hybrid_search(
                 reqs=params.reqs, **params.hybrid_search_obj_params).check_result)
 

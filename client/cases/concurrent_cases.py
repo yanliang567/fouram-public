@@ -24,6 +24,7 @@ from client.parameters.params import (
     ConcurrentTaskLoad, ConcurrentInputParamsLoad,
     ConcurrentTaskRelease, ConcurrentInputParamsRelease,
     ConcurrentTaskLoadRelease, ConcurrentInputParamsLoadRelease,
+    ConcurrentInputParamsReleasePartitions, ConcurrentTaskReleasePartitions,
     ConcurrentTaskInsert, ConcurrentInputParamsInsert,
     ConcurrentTaskUpsert, ConcurrentInputParamsUpsert,
     ConcurrentTaskDelete, ConcurrentInputParamsDelete,
@@ -371,6 +372,9 @@ class ConcurrentClientBase(CommonCases):
         elif req_type in [pn.flush, pn.load, pn.release, pn.delete, "debug"]:
             return eval(
                 "ConcurrentTask{0}(**ConcurrentInputParams{0}(**req_params).to_dict)".format(req_type.capitalize()))
+
+        elif req_type == pn.release_partitions:
+            return ConcurrentTaskReleasePartitions(**ConcurrentInputParamsReleasePartitions(**req_params).to_dict)
 
         elif req_type == pn.scene_insert_delete_flush:
             params = ConcurrentInputParamsSceneInsertDeleteFlush(**req_params).to_dict

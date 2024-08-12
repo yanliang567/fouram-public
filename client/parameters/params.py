@@ -591,6 +591,45 @@ class ConcurrentTaskRelease(DataClassBase):
 
 
 @dataclass
+class ConcurrentInputParamsReleasePartitions(DataClassBase):
+    partitions: Union[List[str], str] = DefaultValue.default_partition_name
+    timeout: Optional[int] = DefaultValue.default_timeout
+
+    # check request result
+    check_task: Optional[str] = CheckTasks.checkResponse
+    check_items: Union[dict, list] = field(default_factory=lambda: {})
+
+
+@dataclass
+class ConcurrentTaskReleasePartitions(DataClassBase):
+    partitions: Union[List[str], str] = DefaultValue.default_partition_name
+    timeout: Optional[int] = DefaultValue.default_timeout
+
+    # check request result
+    check_task: Optional[str] = CheckTasks.checkResponse
+    check_items: Union[dict, list] = field(default_factory=lambda: {})
+
+    def __post_init__(self):
+        support_tasks = InterfaceCheckTasks.release_partition
+        if self.check_task not in support_tasks:
+            raise ValueError(
+                "[{0}] Check task:`{1}` can't be used in `{2}` concurrent request, only supports:{3}".format(
+                    "ConcurrentTaskReleasePartitions", self.check_task, "release partition", support_tasks))
+
+        if isinstance(self.partitions, str):
+            self.partitions = [self.partitions]
+
+        if not isinstance(self.partitions, list):
+            raise ValueError("[0] Can't parser param `partitions`, type:{1}, value:{2}".format(
+                "ConcurrentTaskReleasePartitions", type(self.partitions), self.partitions))
+        log.debug("[ConcurrentTaskReleasePartitions] Init done.")
+
+    @property
+    def obj_params(self):
+        return {"timeout": self.timeout, "check_task": self.check_task, "check_items": self.check_items}
+
+
+@dataclass
 class ConcurrentInputParamsLoadRelease(DataClassBase):
     replica_number: Optional[int] = 1
     timeout: Optional[int] = DefaultValue.default_timeout
@@ -1108,7 +1147,7 @@ class ConcurrentTaskSceneTestPartitionHybridSearch(DataClassBase):
     @property
     def scalar_params(self):
         if self._scalar_params is None:
-            self._scalar_params = self.all_fields_params.get_scalar_other_params
+            self._scalar_params = self.all_fields_params.get_scalar_other_params_no_dataset
         return self._scalar_params
 
     @property
@@ -1172,6 +1211,7 @@ class ConcurrentInputParamsLoadSearchRelease(DataClassBase):
     timeout: Optional[int] = DefaultValue.default_timeout
 
     replica_number: Optional[int] = 1
+    resource_groups: Union[int, list] = None
     random_data: Optional[bool] = False
     search_counts: Optional[int] = 1
 
@@ -1195,6 +1235,7 @@ class ConcurrentTaskLoadSearchRelease(DataClassBase):
 
     # for load
     replica_number: Optional[int] = 1
+    resource_groups: Union[int, list] = None
 
     # other params
     sparse_range: Optional[List[int]] = field(default_factory=lambda: DefaultValue.default_sparse_range)
@@ -1210,7 +1251,8 @@ class ConcurrentTaskLoadSearchRelease(DataClassBase):
 
     def __post_init__(self):
         # init setting params
-        self.load_obj_params = {"timeout": self.timeout, "check_task": CheckTasks.checkResponse, "check_items": {}}
+        self.load_obj_params = {"timeout": self.timeout, resource_groups: self.resource_groups,  # _resource_groups
+                                "check_task": CheckTasks.checkResponse, "check_items": {}}
         self.search_obj_params = {"timeout": self.timeout, "check_task": CheckTasks.checkResponse, "check_items": {}}
         self.release_obj_params = {"timeout": self.timeout, "check_task": CheckTasks.checkResponse, "check_items": {}}
 
@@ -1254,6 +1296,7 @@ class ConcurrentInputParamsLoadHybridSearchRelease(DataClassBase):
     timeout: Optional[int] = DefaultValue.default_timeout
 
     replica_number: Optional[int] = 1
+    resource_groups: Union[int, list] = None
     random_data: Optional[bool] = False
     hybrid_search_counts: Optional[int] = 1
 
@@ -1276,6 +1319,7 @@ class ConcurrentTaskLoadHybridSearchRelease(DataClassBase):
 
     # for load
     replica_number: Optional[int] = 1
+    resource_groups: Union[int, list] = None
 
     # other params
     random_data: Optional[bool] = False
@@ -1290,7 +1334,8 @@ class ConcurrentTaskLoadHybridSearchRelease(DataClassBase):
 
     def __post_init__(self):
         # init setting params
-        self.load_obj_params = {"timeout": self.timeout, "check_task": CheckTasks.checkResponse, "check_items": {}}
+        self.load_obj_params = {"timeout": self.timeout, resource_groups: self.resource_groups,  # _resource_groups
+                                "check_task": CheckTasks.checkResponse, "check_items": {}}
         self.hybrid_search_obj_params = {"timeout": self.timeout, "check_task": CheckTasks.checkResponse,
                                          "check_items": {}}
         self.release_obj_params = {"timeout": self.timeout, "check_task": CheckTasks.checkResponse, "check_items": {}}
@@ -1686,6 +1731,8 @@ class ConcurrentTasksParams(ConcurrentTasksParamsBase):
         default_factory=lambda: ConcurrentObjParams(**{"params": ConcurrentTaskLoad}))
     release: Optional[ConcurrentObjParams] = field(
         default_factory=lambda: ConcurrentObjParams(**{"params": ConcurrentTaskRelease}))
+    release_partitions: Optional[ConcurrentObjParams] = field(
+        default_factory=lambda: ConcurrentObjParams(**{"params": ConcurrentTaskReleasePartitions}))
     load_release: Optional[ConcurrentObjParams] = field(
         default_factory=lambda: ConcurrentObjParams(**{"params": ConcurrentTaskLoadRelease}))
     insert: Optional[ConcurrentObjParams] = field(

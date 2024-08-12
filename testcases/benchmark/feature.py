@@ -32,6 +32,7 @@ from client.parameters.functional_params import (
 )
 from client.parameters import params_name as pn
 import client.parameters.input_params.define_params as cdp
+from client.parameters.input_params.define_params import SpecifyRange, Expr
 from client.common.common_type import DefaultValue as dv, CheckTasks
 from deploy.commons.common_params import (
     CLUSTER, STANDALONE, queryNode, dataNode, indexNode, proxy, kafka, pulsar, ClassID)
@@ -3540,6 +3541,1665 @@ class TestFeatureCases(PerfTemplate):
         node_resources = [
             NodeResource(nodes=[indexNode], replicas=4),
             NodeResource(nodes=[queryNode], replicas=2, cpu=16, mem=64)
+        ]
+
+        self.concurrency_template(
+            input_params=input_params, cpu=dp.default_cpu, mem=dp.default_mem, deploy_mode=deploy_mode,
+            old_version_format=self.get_report_version_format(False),
+            case_callable_obj=self.get_callable_object(ConcurrentClientBase().scene_concurrent_locust),
+            default_case_params=default_case_params, node_resources=node_resources)
+
+    """ BITMAP index """
+
+    @pytest.mark.parametrize("deploy_mode", [CLUSTER])
+    def test_bitmap_locust_pk_int64_dql_cluster(self, input_params: InputParamsBase, deploy_mode):
+        """
+        concurrent test and calculation of RT and QPS
+
+        :purpose:  `primary key: INT64`
+            1. building `BITMAP` index on all supported 12 scalar fields, hybrid index on INT64 primary key field
+            2. the other 22 scalar fields build `INVERTED`, `Trie`, `STL_SORT` indexes
+            3. 4 fields of different vector types
+            4. search for different expressions on BITMAP index fields
+
+        :test steps:
+            1. create collection with fields:
+                'binary_vector': 128dim
+                'float16_vector': 128dim
+                'bfloat16_vector': 128dim
+                'sparse_float_vector': sparse_range=[1, 100] <- the range of non-zero values of a sparse vector
+                'id': primary key type is INT64
+
+                all scalar fields: varchar max_length=10, array max_capacity=9
+            2. build indexes:
+                BIN_IVF_FLAT: 'binary_vector'
+                IVF_SQ8: 'float16_vector'
+                HNSW: 'bfloat16_vector'
+                SPARSE_WAND: 'sparse_float_vector'
+
+                default scalar index: 'id'
+                BITMAP: '*_1' all supported field names
+                INVERTED: 'array_float_1', 'array_double_1', 'float_2', 'double_2', 'bool_2', 'array_int8_2',
+                          'array_int16_2', 'array_int32_2', 'array_int64_2', 'array_varchar_2', 'array_bool_2',
+                          'array_float_2', 'array_double_2'
+                Trie: 'varchar_2'
+                STL_SORT: 'float_1', 'double_1', 'int8_2', 'int16_2', 'int32_2', 'int64_2'
+            3. insert 5 million data
+            4. flush collection
+            5. build indexes again using the same params
+            6. load collection
+            7. concurrent request:
+                - search
+                - query
+                - hybrid_search
+        """
+        dataset_size = parser_data_size("5m")
+
+        # set 34 field scalars, `id` is default primary key field
+        _other_fields = [f"{name}_{number}" for number in range(1, 3) for name in cdp.all_field_names]
+        # 3 extra vector fields, and `binary_vector` is default vector field
+        all_other_fields = ["float16_vector", "bfloat16_vector", "sparse_float_vector"] + _other_fields
+
+        concurrent_tasks = [
+            ConcurrentParams.params_search(
+                nq=1000, top_k=10, search_param={"nprobe": 16}, expr=Expr.GE('id', 100).value, output_fields=['*'],
+                timeout=None, check_task=CheckTasks.checkSearchOutput,
+                check_items={"output_fields": all_other_fields + ['id', 'binary_vector'], "nq": 1000}
+            ),
+            ConcurrentParams.params_query(
+                expr=f"{Expr.GT('id', -1)} && ", output_fields=['id', 'binary_vector', 'int64_1'], timeout=None,
+                random_data=True, random_count=10, random_range=[0, dataset_size], field_type="int64",
+                check_task=CheckTasks.checkQueryOutput
+            ),
+            ConcurrentParams.params_hybrid_search(
+                nq=10, top_k=10, output_fields=["*"], timeout=None,
+                reqs=[
+                    HybridSearchReqParams(anns_field="binary_vector", search_param={"nprobe": 128}, top_k=100,
+                                          expr=Expr.EQ(Expr.MOD('int64_1', 10).subset, 1).value),
+                    HybridSearchReqParams(anns_field="float16_vector", search_param={"nprobe": 64}, top_k=10,
+                                          expr=Expr.AND(Expr.GE(Expr.ARRAY_LENGTH('array_int16_1'), 5),
+                                                        Expr.array_contains_any('array_bool_1', [True])).value),
+                    HybridSearchReqParams(anns_field="bfloat16_vector", search_param={"ef": 32}, top_k=30,
+                                          expr=Expr.LE(Expr.MOD('int32_1', 100).subset, 50).value),
+                    HybridSearchReqParams(anns_field="sparse_float_vector", search_param={"drop_ratio_search": 0.1},
+                                          expr=Expr.AND(Expr.like('varchar_1', '1%').subset,
+                                                        Expr.EQ('bool_1', True).subset).value)
+                ],
+                rerank=HybridSearchRerankParams(RRFRanker=[]), check_task=CheckTasks.checkSearchOutput,
+                check_items={"output_fields": all_other_fields + ['id', 'binary_vector'], "nq": 10}
+            )
+        ]
+
+        default_case_params = ConcurrentParams().params_scene_concurrent(
+            concurrent_tasks, dataset_size=dataset_size, varchar_id=False, vector_field_name="binary_vector", dim=128,
+            dataset_name="local", ni_per=5000, sparse_range=[1, 100], max_length=10,
+            metric_type=pn.MetricsTypeName.Jaccard, other_fields=all_other_fields,
+            scalars_params=dict_merge(
+                cdp.DefaultScalarParams.array_max_capacity_list(9, [n for n in _other_fields if n.startswith('array')])
+            ),
+            vectors_index=dict_merge([
+                cdp.DefaultVectorIndexParams.IVF_SQ8('float16_vector'),
+                cdp.DefaultVectorIndexParams.HNSW('bfloat16_vector'),
+                cdp.DefaultVectorIndexParams.SPARSE_WAND('sparse_float_vector')
+            ]),
+            scalars_index=dict_merge([
+                cdp.DefaultScalarIndexParams.default_index('id'),
+                *cdp.DefaultScalarIndexParams.BITMAP_list([f'{n}_1' for n in cdp.all_bitmap_field_names]),
+                *cdp.DefaultScalarIndexParams.INVERTED_list(
+                    ['array_float_1', 'array_double_1', 'float_2', 'double_2', 'bool_2', 'array_int8_2',
+                     'array_int16_2', 'array_int32_2', 'array_int64_2', 'array_varchar_2', 'array_bool_2',
+                     'array_float_2', 'array_double_2']),
+                cdp.DefaultScalarIndexParams.Trie('varchar_2'),
+                *cdp.DefaultScalarIndexParams.STL_SORT_list(
+                    ['float_1', 'double_1', 'int8_2', 'int16_2', 'int32_2', 'int64_2']),
+            ]),
+            concurrent_number=[20, 50], during_time=1800, interval=20, **cdp.DefaultIndexParams.BIN_IVF_FLAT)
+
+        node_resources = [
+            NodeResource(nodes=[indexNode], replicas=4, cpu=4, mem=8),
+            NodeResource(nodes=[queryNode], replicas=1, cpu=16, mem=64)
+        ]
+
+        self.concurrency_template(
+            input_params=input_params, cpu=dp.default_cpu, mem=dp.default_mem, deploy_mode=deploy_mode,
+            old_version_format=self.get_report_version_format(False),
+            case_callable_obj=self.get_callable_object(ConcurrentClientBase().scene_concurrent_locust),
+            default_case_params=default_case_params, node_resources=node_resources)
+
+    @pytest.mark.parametrize("deploy_mode", [CLUSTER])
+    def test_bitmap_locust_pk_varchar_dql_cluster(self, input_params: InputParamsBase, deploy_mode):
+        """
+        concurrent test and calculation of RT and QPS
+
+        :purpose:  `primary key: VARCHAR`
+            1. building `BITMAP` index on all supported 12 scalar fields, hybrid index on VARCHAR primary key field
+            2. the other 22 scalar fields build `INVERTED`, `Trie`, `STL_SORT` indexes
+            3. 4 fields of different vector types
+            4. search for different expressions on BITMAP index fields
+
+        :test steps:
+            1. create collection with fields:
+                'binary_vector': 128dim
+                'float16_vector': 128dim
+                'bfloat16_vector': 128dim
+                'sparse_float_vector': sparse_range=[1, 100] <- the range of non-zero values of a sparse vector
+                'id': primary key type is VARCHAR
+
+                all scalar fields: varchar max_length=100, array max_capacity=9
+            2. build indexes:
+                BIN_IVF_FLAT: 'binary_vector'
+                IVF_SQ8: 'float16_vector'
+                HNSW: 'bfloat16_vector'
+                SPARSE_WAND: 'sparse_float_vector'
+
+                default scalar index: 'id'
+                BITMAP: '*_1' all supported field names
+                INVERTED: 'array_float_1', 'array_double_1', 'float_2', 'double_2', 'bool_2', 'array_int8_2',
+                          'array_int16_2', 'array_int32_2', 'array_int64_2', 'array_varchar_2', 'array_bool_2',
+                          'array_float_2', 'array_double_2'
+                Trie: 'varchar_2'
+                STL_SORT: 'float_1', 'double_1', 'int8_2', 'int16_2', 'int32_2', 'int64_2'
+            3. insert 5 million data
+                'id': [-1000, 1000)
+            4. flush collection
+            5. build indexes again using the same params
+            6. load collection
+            7. concurrent request:
+                - search
+                - query
+                - hybrid_search
+        """
+        dataset_size = parser_data_size("5m")
+
+        # set 34 field scalars, `id` is default primary key field
+        _other_fields = [f"{name}_{number}" for number in range(1, 3) for name in cdp.all_field_names]
+        # 3 extra vector fields, and `binary_vector` is default vector field
+        all_other_fields = ["float16_vector", "bfloat16_vector", "sparse_float_vector"] + _other_fields
+
+        # `id` field value range
+        id_range = SpecifyRange(-1000, 1000)
+
+        concurrent_tasks = [
+            ConcurrentParams.params_search(
+                nq=1000, top_k=10, search_param={"nprobe": 16}, expr=Expr.GE('id', '"100"').value, output_fields=['*'],
+                timeout=None, check_task=CheckTasks.checkSearchOutput,
+                check_items={"output_fields": all_other_fields + ['id', 'binary_vector'], "nq": 1000}
+            ),
+            ConcurrentParams.params_query(
+                expr=Expr.GT('id', '"-1"').value + " && ", output_fields=['id', 'binary_vector', 'int64_1'],
+                timeout=None, random_data=True, random_count=10, random_range=id_range.value, field_type="varchar",
+                check_task=CheckTasks.checkQueryOutput
+            ),
+            ConcurrentParams.params_hybrid_search(
+                nq=10, top_k=10, output_fields=["*"], timeout=None,
+                reqs=[
+                    HybridSearchReqParams(anns_field="binary_vector", search_param={"nprobe": 128}, top_k=100,
+                                          expr=Expr.EQ(Expr.MOD('int64_1', 10).subset, 1).value),
+                    HybridSearchReqParams(anns_field="float16_vector", search_param={"nprobe": 64}, top_k=10,
+                                          expr=Expr.AND(Expr.GE(Expr.ARRAY_LENGTH('array_int16_1'), 5),
+                                                        Expr.array_contains_any('array_bool_1', [True])).value),
+                    HybridSearchReqParams(anns_field="bfloat16_vector", search_param={"ef": 32}, top_k=30,
+                                          expr=Expr.LE(Expr.MOD('int32_1', 100).subset, 50).value),
+                    HybridSearchReqParams(anns_field="sparse_float_vector", search_param={"drop_ratio_search": 0.1},
+                                          expr=Expr.AND(Expr.like('varchar_1', '1%').subset,
+                                                        Expr.EQ('bool_1', True).subset).value)
+                ],
+                rerank=HybridSearchRerankParams(RRFRanker=[]), check_task=CheckTasks.checkSearchOutput,
+                check_items={"output_fields": all_other_fields + ['id', 'binary_vector'], "nq": 10}
+            )
+        ]
+
+        default_case_params = ConcurrentParams().params_scene_concurrent(
+            concurrent_tasks, dataset_size=dataset_size, varchar_id=True, vector_field_name="binary_vector", dim=128,
+            dataset_name="local", ni_per=5000, sparse_range=[1, 100], max_length=100, varchar_filled=True,
+            metric_type=pn.MetricsTypeName.Jaccard, other_fields=all_other_fields,
+            scalars_params=dict_merge([
+                *cdp.DefaultScalarParams.array_max_capacity_list(
+                    9, [n for n in _other_fields if n.startswith('array')]),
+                cdp.DefaultScalarParams.specify_scope('id', id_range)
+            ]),
+            vectors_index=dict_merge([
+                cdp.DefaultVectorIndexParams.IVF_SQ8('float16_vector'),
+                cdp.DefaultVectorIndexParams.HNSW('bfloat16_vector'),
+                cdp.DefaultVectorIndexParams.SPARSE_WAND('sparse_float_vector')
+            ]),
+            scalars_index=dict_merge([
+                cdp.DefaultScalarIndexParams.default_index('id'),
+                *cdp.DefaultScalarIndexParams.BITMAP_list([f'{n}_1' for n in cdp.all_bitmap_field_names]),
+                *cdp.DefaultScalarIndexParams.INVERTED_list(
+                    ['array_float_1', 'array_double_1', 'float_2', 'double_2', 'bool_2', 'array_int8_2',
+                     'array_int16_2', 'array_int32_2', 'array_int64_2', 'array_varchar_2', 'array_bool_2',
+                     'array_float_2', 'array_double_2']),
+                cdp.DefaultScalarIndexParams.Trie('varchar_2'),
+                *cdp.DefaultScalarIndexParams.STL_SORT_list(
+                    ['float_1', 'double_1', 'int8_2', 'int16_2', 'int32_2', 'int64_2']),
+            ]),
+            concurrent_number=[20, 50], during_time=1800, interval=20, **cdp.DefaultIndexParams.BIN_IVF_FLAT)
+
+        node_resources = [
+            NodeResource(nodes=[indexNode], replicas=4, cpu=4, mem=8),
+            NodeResource(nodes=[queryNode], replicas=1, cpu=16, mem=64)
+        ]
+
+        self.concurrency_template(
+            input_params=input_params, cpu=dp.default_cpu, mem=dp.default_mem, deploy_mode=deploy_mode,
+            old_version_format=self.get_report_version_format(False),
+            case_callable_obj=self.get_callable_object(ConcurrentClientBase().scene_concurrent_locust),
+            default_case_params=default_case_params, node_resources=node_resources)
+
+    @pytest.mark.parametrize("deploy_mode", [CLUSTER])
+    def test_bitmap_locust_shard16_dql_cluster(self, input_params: InputParamsBase, deploy_mode):
+        """
+        concurrent test and calculation of RT and QPS
+
+        :purpose:  `primary key: INT64`, shard_num=16
+            1. building `BITMAP` index on all supported 12 scalar fields, hybrid index on INT64 primary key field
+            2. the other 22 scalar fields build `INVERTED`, `Trie`, `STL_SORT` indexes
+            3. 2 fields of different vector types
+            4. search for different expressions on BITMAP index fields
+
+        :test steps:
+            1. create collection with fields:
+                'float_vector': 128dim
+                'sparse_float_vector': sparse_range=[1, 100] <- the range of non-zero values of a sparse vector
+                'id': primary key type is INT64
+
+                all scalar fields: varchar max_length=100, array max_capacity=11
+            2. build indexes:
+                IVF_SQ8: 'float_vector'
+                SPARSE_WAND: 'sparse_float_vector'
+
+                default scalar index: 'id'
+                BITMAP: '*_1' all supported field names
+                INVERTED: 'array_float_1', 'array_double_1', 'float_2', 'double_2', 'bool_2', 'array_int8_2',
+                          'array_int16_2', 'array_int32_2', 'array_int64_2', 'array_varchar_2', 'array_bool_2',
+                          'array_float_2', 'array_double_2'
+                Trie: 'varchar_2'
+                STL_SORT: 'float_1', 'double_1', 'int8_2', 'int16_2', 'int32_2', 'int64_2'
+            3. insert 5 million data
+            4. flush collection
+            5. build indexes again using the same params
+            6. load collection
+            7. concurrent request:
+                - search
+                - query
+                - hybrid_search
+        """
+        dataset_size = parser_data_size("5m")
+
+        # set 34 field scalars, `id` is default primary key field
+        _other_fields = [f"{name}_{number}" for number in range(1, 3) for name in cdp.all_field_names]
+        # 1 extra vector fields, and `binary_vector` is default vector field
+        all_other_fields = ["sparse_float_vector"] + _other_fields
+
+        concurrent_tasks = [
+            ConcurrentParams.params_search(
+                nq=1000, top_k=10, search_param={"nprobe": 16}, expr=Expr.GE('id', 100).value,
+                # output_fields=['*'],
+                timeout=None, check_task=CheckTasks.checkSearchOutput,
+                # check_items={"output_fields": all_other_fields + ['id', 'float_vector'], "nq": 1000}
+            ),
+            ConcurrentParams.params_query(
+                expr=Expr.GT('id', -1).value + " && ", timeout=None,
+                # output_fields=['id', 'float_vector', 'int64_1'],
+                random_data=True, random_count=10, random_range=[0, dataset_size], field_type="int64",
+                check_task=CheckTasks.checkQueryOutput
+            ),
+            ConcurrentParams.params_hybrid_search(
+                nq=10, top_k=10, timeout=None,
+                # output_fields=["*"],
+                reqs=[
+                    HybridSearchReqParams(anns_field="float_vector", search_param={"nprobe": 128}, top_k=100,
+                                          expr=Expr.LT(Expr.POW(9, 2).subset, 'float_1').value),
+                    HybridSearchReqParams(anns_field="float_vector", search_param={"nprobe": 128}, top_k=100,
+                                          expr=Expr.LE(Expr.DIV('int16_1', 100).subset, 100).value),
+                    HybridSearchReqParams(anns_field="float_vector", search_param={"nprobe": 128}, top_k=100,
+                                          expr=Expr.NOT(Expr.NE('int32_1', 'int16_1').subset).value),
+                    HybridSearchReqParams(anns_field="float_vector", search_param={"nprobe": 128}, top_k=100,
+                                          expr=Expr.Not(Expr.EQ('int64_1', 'int8_1').subset).value),
+                    HybridSearchReqParams(anns_field="float_vector", search_param={"nprobe": 128}, top_k=100,
+                                          expr=Expr.AND(Expr.exists("json_1['id']").subset,
+                                                        Expr.like('varchar_1', '1%').subset).value),
+                    HybridSearchReqParams(anns_field="float_vector", search_param={"nprobe": 128}, top_k=100,
+                                          expr=Expr.And(Expr.NOT(Expr.EXISTS("json_2['id']").subset),
+                                                        Expr.EQ('bool_1', "true").subset).value),
+                    HybridSearchReqParams(anns_field="float_vector", search_param={"nprobe": 128}, top_k=100,
+                                          expr=Expr.EQ(Expr.array_length('array_int8_1'), 11).value),
+                    HybridSearchReqParams(anns_field="float_vector", search_param={"nprobe": 128}, top_k=100,
+                                          expr=Expr.NE(Expr.ARRAY_LENGTH('array_int16_1'), 11).value),
+                    HybridSearchReqParams(anns_field="float_vector", search_param={"nprobe": 128}, top_k=100,
+                                          expr=Expr.OR(Expr.OR(Expr.array_contains_any('array_int32_1', [0]),
+                                                               Expr.array_contains('array_int32_1', 1)).subset,
+                                                       Expr.And(Expr.EQ('bool_1', "True").subset,
+                                                                Expr.EQ('bool_2', "TRUE").subset).subset).value),
+                    HybridSearchReqParams(anns_field="float_vector", search_param={"nprobe": 128}, top_k=100,
+                                          expr=Expr.Or(Expr.ARRAY_CONTAINS_ANY('array_int64_1', [-2500]),
+                                                       Expr.array_contains_all('array_int64_1', [-1, 1])).value),
+                    HybridSearchReqParams(anns_field="float_vector", search_param={"nprobe": 128}, top_k=100,
+                                          expr=Expr.OR(Expr.ARRAY_CONTAINS_ALL('array_varchar_1', '["-2", "-1"]'),
+                                                       Expr.ARRAY_CONTAINS('array_varchar_1', '"0"')).value),
+                    HybridSearchReqParams(anns_field="float_vector", search_param={"nprobe": 128}, top_k=100,
+                                          expr=Expr.EQ(Expr.array_length('array_bool_1'),
+                                                       Expr.DIV(Expr.MUL(11, 11).value, 11).subset).value),
+                    HybridSearchReqParams(anns_field="sparse_float_vector", search_param={"drop_ratio_search": 0.1},
+                                          top_k=30, expr=Expr.LE(Expr.MOD('int32_1', 100).subset, 50).value),
+                    HybridSearchReqParams(anns_field="sparse_float_vector", search_param={"drop_ratio_search": 0.1},
+                                          expr=Expr.AND(Expr.like('varchar_1', '1%').subset,
+                                                        Expr.EQ('bool_1', True).subset).value)
+                ],
+                rerank=HybridSearchRerankParams(RRFRanker=[]), check_task=CheckTasks.checkSearchOutput,
+                # check_items={"output_fields": all_other_fields + ['id', 'float_vector'], "nq": 10}
+            )
+        ]
+
+        default_case_params = ConcurrentParams().params_scene_concurrent(
+            concurrent_tasks, dataset_size=dataset_size, ni_per=5000, max_length=100, shards_num=16,
+            other_fields=all_other_fields,
+            scalars_params=dict_merge([
+                *cdp.DefaultScalarParams.array_max_capacity_list(
+                    11, [n for n in _other_fields if n.startswith('array')]),
+                *cdp.DefaultScalarParams.random_range_list(
+                    [f'{n}_1' for n in cdp.all_bitmap_field_names], specify_range=SpecifyRange(-2500, 2500),
+                    max_capacity=9)
+            ]),
+            vectors_index=cdp.DefaultVectorIndexParams.SPARSE_INVERTED_INDEX('sparse_float_vector'),
+            scalars_index=dict_merge([
+                *cdp.DefaultScalarIndexParams.BITMAP_list([f'{n}_1' for n in cdp.all_bitmap_field_names]),
+                *cdp.DefaultScalarIndexParams.INVERTED_list(
+                    ['array_float_1', 'array_double_1', 'float_2', 'double_2', 'bool_2', 'array_int8_2',
+                     'array_int16_2', 'array_int32_2', 'array_int64_2', 'array_varchar_2', 'array_bool_2',
+                     'array_float_2', 'array_double_2']),
+                cdp.DefaultScalarIndexParams.Trie('varchar_2'),
+                *cdp.DefaultScalarIndexParams.STL_SORT_list(
+                    ['float_1', 'double_1', 'int8_2', 'int16_2', 'int32_2', 'int64_2']),
+            ]),
+            concurrent_number=[1], during_time="3h", interval=20, **cdp.DefaultIndexParams.IVF_SQ8)
+
+        node_resources = [
+            NodeResource(nodes=[indexNode], replicas=4, cpu=4, mem=8),
+            NodeResource(nodes=[queryNode], replicas=2, cpu=16, mem=32)
+        ]
+
+        self.concurrency_template(
+            input_params=input_params, cpu=dp.default_cpu, mem=dp.default_mem, deploy_mode=deploy_mode,
+            old_version_format=self.get_report_version_format(False),
+            case_callable_obj=self.get_callable_object(ConcurrentClientBase().scene_concurrent_locust),
+            default_case_params=default_case_params, node_resources=node_resources)
+
+    @pytest.mark.parametrize("deploy_mode", [CLUSTER])
+    def test_bitmap_locust_shard1_dql_cluster(self, input_params: InputParamsBase, deploy_mode):
+        """
+        concurrent test and calculation of RT and QPS
+
+        :purpose:  `primary key: INT64`, shard_num=1
+            1. building `BITMAP` index on all supported 12 scalar fields, hybrid index on INT64 primary key field
+            2. the other 22 scalar fields build `INVERTED`, `Trie`, `STL_SORT` indexes
+            3. 2 fields of different vector types
+            4. search for different expressions on BITMAP index fields
+
+        :test steps:
+            1. create collection with fields:
+                'float_vector': 128dim
+                'sparse_float_vector': sparse_range=[1, 100] <- the range of non-zero values of a sparse vector
+                'id': primary key type is INT64
+
+                all scalar fields: varchar max_length=100, array max_capacity=11
+            2. build indexes:
+                IVF_SQ8: 'float_vector'
+                SPARSE_WAND: 'sparse_float_vector'
+
+                default scalar index: 'id'
+                BITMAP: '*_1' all supported field names
+                INVERTED: 'array_float_1', 'array_double_1', 'float_2', 'double_2', 'bool_2', 'array_int8_2',
+                          'array_int16_2', 'array_int32_2', 'array_int64_2', 'array_varchar_2', 'array_bool_2',
+                          'array_float_2', 'array_double_2'
+                Trie: 'varchar_2'
+                STL_SORT: 'float_1', 'double_1', 'int8_2', 'int16_2', 'int32_2', 'int64_2'
+            3. insert 5 million data
+            4. flush collection
+            5. build indexes again using the same params
+            6. load collection
+            7. concurrent request:
+                - search
+                - query
+                - hybrid_search
+        """
+        dataset_size = parser_data_size("5m")
+
+        # set 34 field scalars, `id` is default primary key field
+        _other_fields = [f"{name}_{number}" for number in range(1, 3) for name in cdp.all_field_names]
+        # 1 extra vector fields, and `binary_vector` is default vector field
+        all_other_fields = ["sparse_float_vector"] + _other_fields
+
+        concurrent_tasks = [
+            ConcurrentParams.params_search(
+                weight=1, nq=1000, top_k=10, search_param={"nprobe": 16}, expr=Expr.GE('id', 100).value,
+                # output_fields=['*'],
+                timeout=None, check_task=CheckTasks.checkSearchOutput,
+                # check_items={"output_fields": all_other_fields + ['id', 'float_vector'], "nq": 1000}
+            ),
+            ConcurrentParams.params_query(
+                expr=Expr.GT('id', -1).value + " && ",
+                # output_fields=['id', 'float_vector', 'int64_1'],
+                timeout=None, random_data=True, random_count=10, random_range=[0, dataset_size], field_type="int64",
+                check_task=CheckTasks.checkQueryOutput
+            ),
+            ConcurrentParams.params_hybrid_search(
+                weight=1, nq=10, top_k=10,
+                # output_fields=["*"],
+                timeout=None,
+                reqs=[
+                    HybridSearchReqParams(anns_field="float_vector", search_param={"nprobe": 128}, top_k=100,
+                                          expr=Expr.LT(Expr.POW(9, 2).subset, 'float_1').value),
+                    HybridSearchReqParams(anns_field="float_vector", search_param={"nprobe": 128}, top_k=100,
+                                          expr=Expr.LE(Expr.DIV('int16_1', 100).subset, 100).value),
+                    HybridSearchReqParams(anns_field="float_vector", search_param={"nprobe": 128}, top_k=100,
+                                          expr=Expr.NOT(Expr.NE('int32_1', 'int16_1').subset).value),
+                    HybridSearchReqParams(anns_field="float_vector", search_param={"nprobe": 128}, top_k=100,
+                                          expr=Expr.Not(Expr.EQ('int64_1', 'int8_1').subset).value),
+                    HybridSearchReqParams(anns_field="float_vector", search_param={"nprobe": 128}, top_k=100,
+                                          expr=Expr.AND(Expr.exists("json_1['id']").subset,
+                                                        Expr.like('varchar_1', '1%').subset).value),
+                    HybridSearchReqParams(anns_field="float_vector", search_param={"nprobe": 128}, top_k=100,
+                                          expr=Expr.And(Expr.NOT(Expr.EXISTS("json_2['id']").subset),
+                                                        Expr.EQ('bool_1', "true").subset).value),
+                    HybridSearchReqParams(anns_field="float_vector", search_param={"nprobe": 128}, top_k=100,
+                                          expr=Expr.EQ(Expr.array_length('array_int8_1'), 11).value),
+                    HybridSearchReqParams(anns_field="float_vector", search_param={"nprobe": 128}, top_k=100,
+                                          expr=Expr.NE(Expr.ARRAY_LENGTH('array_int16_1'), 11).value),
+                    HybridSearchReqParams(anns_field="float_vector", search_param={"nprobe": 128}, top_k=100,
+                                          expr=Expr.OR(Expr.OR(Expr.array_contains_any('array_int32_1', [0]),
+                                                               Expr.array_contains('array_int32_1', 1)).subset,
+                                                       Expr.And(Expr.EQ('bool_1', "True").subset,
+                                                                Expr.EQ('bool_2', "TRUE").subset).subset).value),
+                    HybridSearchReqParams(anns_field="float_vector", search_param={"nprobe": 128}, top_k=100,
+                                          expr=Expr.Or(Expr.ARRAY_CONTAINS_ANY('array_int64_1', [-2500]),
+                                                       Expr.array_contains_all('array_int64_1', [-1, 1])).value),
+                    HybridSearchReqParams(anns_field="float_vector", search_param={"nprobe": 128}, top_k=100,
+                                          expr=Expr.OR(Expr.ARRAY_CONTAINS_ALL('array_varchar_1', '["-2", "-1"]'),
+                                                       Expr.ARRAY_CONTAINS('array_varchar_1', '"0"')).value),
+                    HybridSearchReqParams(anns_field="float_vector", search_param={"nprobe": 128}, top_k=100,
+                                          expr=Expr.EQ(Expr.array_length('array_bool_1'),
+                                                       Expr.DIV(Expr.MUL(11, 11).value, 11).subset).value),
+                    HybridSearchReqParams(anns_field="sparse_float_vector", search_param={"drop_ratio_search": 0.1},
+                                          top_k=30, expr=Expr.LE(Expr.MOD('int32_1', 100).subset, 50).value),
+                    HybridSearchReqParams(anns_field="sparse_float_vector", search_param={"drop_ratio_search": 0.1},
+                                          expr=Expr.AND(Expr.like('varchar_1', '1%').subset,
+                                                        Expr.EQ('bool_1', True).subset).value)
+                ],
+                rerank=HybridSearchRerankParams(RRFRanker=[]), check_task=CheckTasks.checkSearchOutput,
+                # check_items={"output_fields": all_other_fields + ['id', 'float_vector'], "nq": 10}
+            )
+        ]
+
+        default_case_params = ConcurrentParams().params_scene_concurrent(
+            concurrent_tasks, dataset_size=dataset_size, ni_per=5000, max_length=100, shards_num=1, replica_number=2,
+            other_fields=all_other_fields,
+            scalars_params=dict_merge([
+                *cdp.DefaultScalarParams.array_max_capacity_list(
+                    11, [n for n in _other_fields if n.startswith('array')]),
+                *cdp.DefaultScalarParams.random_range_list(
+                    [f'{n}_1' for n in cdp.all_bitmap_field_names], specify_range=SpecifyRange(-2500, 2500),
+                    max_capacity=9)
+            ]),
+            vectors_index=cdp.DefaultVectorIndexParams.SPARSE_INVERTED_INDEX('sparse_float_vector'),
+            scalars_index=dict_merge([
+                *cdp.DefaultScalarIndexParams.BITMAP_list([f'{n}_1' for n in cdp.all_bitmap_field_names]),
+                *cdp.DefaultScalarIndexParams.INVERTED_list(
+                    ['array_float_1', 'array_double_1', 'float_2', 'double_2', 'bool_2', 'array_int8_2',
+                     'array_int16_2', 'array_int32_2', 'array_int64_2', 'array_varchar_2', 'array_bool_2',
+                     'array_float_2', 'array_double_2']),
+                cdp.DefaultScalarIndexParams.Trie('varchar_2'),
+                *cdp.DefaultScalarIndexParams.STL_SORT_list(
+                    ['float_1', 'double_1', 'int8_2', 'int16_2', 'int32_2', 'int64_2']),
+            ]),
+            concurrent_number=[1], during_time="3h", interval=20, **cdp.DefaultIndexParams.IVF_SQ8)
+
+        node_resources = [
+            NodeResource(nodes=[indexNode], replicas=4, cpu=8, mem=8),
+            NodeResource(nodes=[queryNode], replicas=2).custom_resource(limits_cpu=32, requests_cpu=8,
+                                                                        limits_mem=32, requests_mem=16)
+        ]
+
+        self.concurrency_template(
+            input_params=input_params, cpu=dp.default_cpu, mem=dp.default_mem, deploy_mode=deploy_mode,
+            old_version_format=self.get_report_version_format(False),
+            case_callable_obj=self.get_callable_object(ConcurrentClientBase().scene_concurrent_locust),
+            default_case_params=default_case_params, node_resources=node_resources)
+
+    @pytest.mark.parametrize("deploy_mode", [STANDALONE])
+    def test_bitmap_locust_dql_dml_standalone(self, input_params: InputParamsBase, deploy_mode):
+        """
+        concurrent test and calculation of RT and QPS
+
+        :purpose:  `primary key: INT64 autoID`
+            1. building `BITMAP` index on all supported 12 scalar fields
+            2. 2 fields of different vector types
+            3. verify DQL & DML requests
+
+        :test steps:
+            1. create collection with fields:
+                'float_vector': 128dim
+                'sparse_float_vector': sparse_range=[1, 100] <- the range of non-zero values of a sparse vector
+                'id': primary key type is INT64
+
+                all scalar fields: varchar max_length=100, array max_capacity=13
+            2. build indexes:
+                IVF_SQ8: 'float_vector'
+                SPARSE_WAND: 'sparse_float_vector'
+                BITMAP: all scalar fields
+            3. insert 2 million data
+            4. flush collection
+            5. build indexes again using the same params
+            6. load collection
+            7. concurrent request:
+                - search
+                - query
+                - hybrid_search
+                - load
+                - insert
+                - delete: delete all inserted data
+                - flush: ignore RateLimiter
+        """
+        dataset_size = parser_data_size("2m")
+
+        # set 13 field scalars, `id` is default primary key field
+        bitmap_fields = [f"{name}_1" for name in cdp.all_bitmap_field_names]
+        # 1 extra vector fields, and `float_vector` is default vector field
+        all_other_fields = ["sparse_float_vector"] + bitmap_fields
+
+        concurrent_tasks = [
+            ConcurrentParams.params_search(
+                nq=1000, top_k=10, search_param={"nprobe": 16}, expr=Expr.EQ('int8_1', 100).value,
+                output_fields=['id', 'float_vector', 'int64_1'], timeout=None, check_task=CheckTasks.checkSearchOutput,
+                check_items={"nq": 1000}
+            ),
+            ConcurrentParams.params_query(
+                expr=Expr.GT('int64_1', -1).value, output_fields=['*'], timeout=None, limit=10,
+                check_task=CheckTasks.checkQueryOutput, check_items={"expect_length": 10}
+            ),
+            ConcurrentParams.params_hybrid_search(
+                nq=10, top_k=10, output_fields=['*'], timeout=None,
+                reqs=[
+                    HybridSearchReqParams(
+                        anns_field="float_vector", search_param={"nprobe": 128}, top_k=100,
+                        expr=Expr.OR(Expr.OR(Expr.array_contains_any('array_int32_1', [0]),
+                                             Expr.array_contains('array_int64_1', 1)).subset,
+                                     Expr.And(Expr.like('varchar_1', '1%').subset,
+                                              Expr.EQ('bool_1', True).subset).subset).value),
+                    HybridSearchReqParams(
+                        anns_field="sparse_float_vector", search_param={"drop_ratio_search": 0.1},
+                        expr=Expr.AND(Expr.Not(Expr.EQ('int16_1', 'int8_1').subset),
+                                      Expr.ARRAY_CONTAINS_ANY('array_int64_1', [-1, 0, 1])).value)
+                ],
+                rerank=HybridSearchRerankParams(RRFRanker=[]), check_task=CheckTasks.checkSearchOutput,
+                check_items={"output_fields": all_other_fields + ['id', 'float_vector'], "nq": 10}
+            ),
+            ConcurrentParams.params_load(timeout=180),
+            ConcurrentParams.params_insert(nb=10, random_id=True, random_vector=True, start_id=dataset_size),
+            ConcurrentParams.params_delete(delete_length=10),
+            ConcurrentParams.params_flush(timeout=600, check_task=CheckTasks.checkIgnoreRateLimit)
+        ]
+
+        default_case_params = ConcurrentParams().params_scene_concurrent(
+            concurrent_tasks, dataset_size=dataset_size, ni_per=5000, max_length=100, shards_num=1,
+            auto_id=True, other_fields=all_other_fields,
+            scalars_params=dict_merge([
+                *cdp.DefaultScalarParams.array_max_capacity_list(
+                    13, [n for n in bitmap_fields if n.startswith('array')]),
+                *cdp.DefaultScalarParams.random_range_list(
+                    ["int8_1", "array_int8_1"], specify_range=SpecifyRange(-128, 128), max_capacity=13),
+                *cdp.DefaultScalarParams.random_range_list(
+                    ["int16_1", "array_int16_1"], specify_range=SpecifyRange(-200, 200), max_capacity=13),
+                *cdp.DefaultScalarParams.specify_scope_list(
+                    ["int32_1", "array_int32_1"], specify_range=SpecifyRange(-300, 300), max_capacity=13),
+                *cdp.DefaultScalarParams.fixed_value_range_list(
+                    ["int64_1", "array_int64_1"], specify_range=SpecifyRange(-400, 432), max_capacity=13),
+                *cdp.DefaultScalarParams.random_range_list(
+                    ["varchar_1", "array_varchar_1"], specify_range=SpecifyRange(-1500, 1500), max_capacity=13),
+            ]),
+            vectors_index=cdp.DefaultVectorIndexParams.SPARSE_INVERTED_INDEX('sparse_float_vector'),
+            scalars_index=dict_merge(cdp.DefaultScalarIndexParams.BITMAP_list(bitmap_fields)),
+            concurrent_number=[30], during_time="3h", interval=20, **cdp.DefaultIndexParams.IVF_SQ8)
+
+        self.concurrency_template(
+            input_params=input_params, cpu=16, mem=64, deploy_mode=deploy_mode,
+            old_version_format=self.get_report_version_format(False),
+            case_callable_obj=self.get_callable_object(ConcurrentClientBase().scene_concurrent_locust),
+            default_case_params=default_case_params)
+
+    @pytest.mark.parametrize("deploy_mode", [CLUSTER])
+    def test_bitmap_locust_dql_dml_cluster(self, input_params: InputParamsBase, deploy_mode):
+        """
+        concurrent test and calculation of RT and QPS
+
+        :purpose:  `primary key: INT64`
+            1. building `BITMAP` index on all supported 12 scalar fields, `INVERTED` index on pk field
+            2. 2 fields of different vector types
+            3. verify DQL & DML requests
+
+        :test steps:
+            1. create collection with fields:
+                'float_vector': 128dim
+                'float_vector_1': 768dim
+                'id': primary key type is INT64
+
+                all scalar fields: varchar max_length=100, array max_capacity=13
+            2. build indexes:
+                HNSW: 'float_vector'
+                IVF_SQ8: 'float_vector_1'
+
+                BITMAP: all scalar fields
+                INVERTED: 'id' primary key field
+            3. insert 2 million data
+            4. flush collection
+            5. build indexes again using the same params
+            6. load collection
+            7. concurrent request:
+                - search
+                - query
+                - hybrid_search
+                - load
+                - insert
+                - delete: delete data 90%
+                - flush: ignore RateLimiter
+        """
+        dataset_size = parser_data_size("2m")
+
+        # set 13 field scalars, `id` is default primary key field
+        bitmap_fields = [f"{name}_1" for name in cdp.all_bitmap_field_names]
+        # 1 extra vector fields, and `float_vector` is default vector field
+        all_other_fields = ["float_vector_1"] + bitmap_fields
+
+        concurrent_tasks = [
+            ConcurrentParams.params_search(
+                nq=1000, top_k=10, search_param={"nprobe": 16}, expr=Expr.EQ('int8_1', 100).value,
+                output_fields=['id', 'float_vector', 'int64_1'], timeout=None, check_task=CheckTasks.checkSearchOutput,
+                check_items={"nq": 1000}
+            ),
+            ConcurrentParams.params_query(
+                expr=Expr.GT('int64_1', -1).value, output_fields=['*'], timeout=None, limit=10,
+                check_task=CheckTasks.checkQueryOutput, check_items={"expect_length": 10}
+            ),
+            ConcurrentParams.params_hybrid_search(
+                nq=10, top_k=10, output_fields=['*'], timeout=None,
+                reqs=[
+                    HybridSearchReqParams(
+                        anns_field="float_vector", search_param={"ef": 32}, top_k=30,
+                        expr=Expr.OR(Expr.OR(Expr.array_contains_any('array_int32_1', [0]),
+                                             Expr.array_contains('array_int64_1', 1)).subset,
+                                     Expr.And(Expr.like('varchar_1', '1%').subset,
+                                              Expr.EQ('bool_1', True).subset).subset).value),
+                    HybridSearchReqParams(
+                        anns_field="float_vector_1", search_param={"nprobe": 64},
+                        expr=Expr.AND(Expr.Not(Expr.EQ('int16_1', 'int8_1').subset),
+                                      Expr.ARRAY_CONTAINS_ANY('array_int64_1', [-1, 0, 1])).value)
+                ],
+                rerank=HybridSearchRerankParams(RRFRanker=[]), check_task=CheckTasks.checkSearchOutput,
+                check_items={"output_fields": all_other_fields + ['id', 'float_vector'], "nq": 10}
+            ),
+            ConcurrentParams.params_load(timeout=180),
+            ConcurrentParams.params_insert(nb=10, random_id=True, random_vector=True, start_id=dataset_size),
+            ConcurrentParams.params_delete(delete_length=9),
+            ConcurrentParams.params_flush(timeout=600, check_task=CheckTasks.checkIgnoreRateLimit)
+        ]
+
+        default_case_params = ConcurrentParams().params_scene_concurrent(
+            concurrent_tasks, dataset_size=dataset_size, ni_per=5000, max_length=100, shards_num=1,
+            other_fields=all_other_fields,
+            scalars_params=dict_merge([
+                *cdp.DefaultScalarParams.laion2b_multi("float_vector_1"),
+                *cdp.DefaultScalarParams.array_max_capacity_list(
+                    13, [n for n in bitmap_fields if n.startswith('array')]),
+                *cdp.DefaultScalarParams.random_range_list(
+                    ["int8_1", "array_int8_1"], specify_range=SpecifyRange(-128, 128), max_capacity=13),
+                *cdp.DefaultScalarParams.random_range_list(
+                    ["int16_1", "array_int16_1"], specify_range=SpecifyRange(-200, 200), max_capacity=13),
+                *cdp.DefaultScalarParams.specify_scope_list(
+                    ["int32_1", "array_int32_1"], specify_range=SpecifyRange(-300, 300), max_capacity=13),
+                *cdp.DefaultScalarParams.fixed_value_range_list(
+                    ["int64_1", "array_int64_1"], specify_range=SpecifyRange(-400, 432), max_capacity=13),
+                *cdp.DefaultScalarParams.random_range_list(
+                    ["varchar_1", "array_varchar_1"], specify_range=SpecifyRange(-1500, 1500), max_capacity=13),
+            ]),
+            vectors_index=cdp.DefaultVectorIndexParams.IVF_SQ8('float_vector_1'),
+            scalars_index=dict_merge([
+                cdp.DefaultScalarIndexParams.INVERTED('id'),
+                *cdp.DefaultScalarIndexParams.BITMAP_list(bitmap_fields)
+            ]),
+            concurrent_number=[30], during_time="3h", interval=20, **cdp.DefaultIndexParams.HNSW)
+
+        node_resources = [
+            NodeResource(nodes=[indexNode], replicas=2, cpu=8, mem=8),
+            NodeResource(nodes=[queryNode], replicas=1).custom_resource(limits_cpu=16, limits_mem=64)
+        ]
+
+        self.concurrency_template(
+            input_params=input_params, cpu=dp.default_cpu, mem=dp.default_mem, deploy_mode=deploy_mode,
+            old_version_format=self.get_report_version_format(False),
+            case_callable_obj=self.get_callable_object(ConcurrentClientBase().scene_concurrent_locust),
+            default_case_params=default_case_params, node_resources=node_resources)
+
+    @pytest.mark.parametrize("deploy_mode", [STANDALONE])
+    def test_bitmap_locust_dql_dml_upsert_standalone(self, input_params: InputParamsBase, deploy_mode):
+        """
+        concurrent test and calculation of RT and QPS
+
+        :purpose:  `primary key: INT64`, shards_num=16
+            1. building `BITMAP` index on all supported 12 scalar fields
+            2. 2 fields of different vector types
+            3. verify DQL & DML(upsert) requests
+
+        :test steps:
+            1. create collection with fields:
+                'float_vector': 128dim
+                'sparse_float_vector': sparse_range=[1, 100] <- the range of non-zero values of a sparse vector
+                'id': primary key type is INT64
+
+                all scalar fields: varchar max_length=100, array max_capacity=13
+            2. build indexes:
+                IVF_SQ8: 'float_vector'
+                SPARSE_WAND: 'sparse_float_vector'
+
+                BITMAP: all scalar fields
+            3. insert 500k data
+            4. flush collection
+            5. build indexes again using the same params
+            6. load collection
+            7. concurrent request:
+                - search
+                - query
+                - hybrid_search
+                - load
+                - upsert: batch=10
+                - flush: ignore RateLimiter
+        """
+        dataset_size = parser_data_size("500k")
+
+        # set 13 field scalars, `id` is default primary key field
+        bitmap_fields = [f"{name}_1" for name in cdp.all_bitmap_field_names]
+        # 1 extra vector fields, and `float_vector` is default vector field
+        all_other_fields = ["sparse_float_vector"] + bitmap_fields
+
+        concurrent_tasks = [
+            ConcurrentParams.params_search(
+                nq=1000, top_k=10, search_param={"nprobe": 16}, expr=Expr.EQ('int8_1', 100).value,
+                output_fields=['id', 'float_vector', 'int64_1'], timeout=None, check_task=CheckTasks.checkSearchOutput,
+                check_items={"nq": 1000}
+            ),
+            ConcurrentParams.params_query(
+                expr=Expr.GT('int64_1', -1).value, output_fields=['*'],
+                timeout=None, limit=10, check_task=CheckTasks.checkQueryOutput, check_items={"expect_length": 10}
+            ),
+            ConcurrentParams.params_hybrid_search(
+                nq=10, top_k=10, output_fields=['*'], timeout=None,
+                reqs=[
+                    HybridSearchReqParams(
+                        anns_field="float_vector", search_param={"nprobe": 128}, top_k=100,
+                        expr=Expr.OR(Expr.OR(Expr.array_contains_any('array_int32_1', [0]),
+                                             Expr.array_contains('array_int64_1', 1)).subset,
+                                     Expr.And(Expr.like('varchar_1', '1%').subset,
+                                              Expr.EQ('bool_1', True).subset).subset).value),
+                    HybridSearchReqParams(
+                        anns_field="sparse_float_vector", search_param={"drop_ratio_search": 0.1},
+                        expr=Expr.AND(Expr.Not(Expr.EQ('int16_1', 'int8_1').subset),
+                                      Expr.ARRAY_CONTAINS_ANY('array_int64_1', [-1, 0, 1])).value)
+                ],
+                rerank=HybridSearchRerankParams(RRFRanker=[]), check_task=CheckTasks.checkSearchOutput,
+                check_items={"output_fields": all_other_fields + ['id', 'float_vector'], "nq": 10}
+            ),
+            ConcurrentParams.params_load(timeout=180),
+            ConcurrentParams.params_upsert(nb=10, random_id=True, random_vector=True, start_id=dataset_size),
+            ConcurrentParams.params_flush(timeout=600, check_task=CheckTasks.checkIgnoreRateLimit)
+        ]
+
+        default_case_params = ConcurrentParams().params_scene_concurrent(
+            concurrent_tasks, dataset_size=dataset_size, ni_per=5000, max_length=100, shards_num=16,
+            other_fields=all_other_fields,
+            scalars_params=dict_merge([
+                *cdp.DefaultScalarParams.array_max_capacity_list(
+                    13, [n for n in bitmap_fields if n.startswith('array')]),
+                *cdp.DefaultScalarParams.random_range_list(
+                    ["int8_1", "array_int8_1"], specify_range=SpecifyRange(-128, 128), max_capacity=13),
+                *cdp.DefaultScalarParams.random_range_list(
+                    ["int16_1", "array_int16_1"], specify_range=SpecifyRange(-200, 200), max_capacity=13),
+                *cdp.DefaultScalarParams.specify_scope_list(
+                    ["int32_1", "array_int32_1"], specify_range=SpecifyRange(-300, 300), max_capacity=13),
+                *cdp.DefaultScalarParams.fixed_value_range_list(
+                    ["int64_1", "array_int64_1"], specify_range=SpecifyRange(-400, 432), max_capacity=13),
+                *cdp.DefaultScalarParams.random_range_list(
+                    ["varchar_1", "array_varchar_1"], specify_range=SpecifyRange(-1500, 1500), max_capacity=13),
+            ]),
+            vectors_index=cdp.DefaultVectorIndexParams.SPARSE_INVERTED_INDEX('sparse_float_vector'),
+            scalars_index=dict_merge(cdp.DefaultScalarIndexParams.BITMAP_list(bitmap_fields)),
+            concurrent_number=[30], during_time="3h", interval=20, **cdp.DefaultIndexParams.IVF_SQ8)
+
+        self.concurrency_template(
+            input_params=input_params, cpu=16, mem=64, deploy_mode=deploy_mode,
+            old_version_format=self.get_report_version_format(False),
+            case_callable_obj=self.get_callable_object(ConcurrentClientBase().scene_concurrent_locust),
+            default_case_params=default_case_params)
+
+    @pytest.mark.parametrize("deploy_mode", [CLUSTER])
+    def test_bitmap_locust_dql_ddl_cluster(self, input_params: InputParamsBase, deploy_mode):
+        """
+        concurrent test and calculation of RT and QPS
+
+        :purpose:  `primary key: INT64`
+            1. building `BITMAP` index on all supported 12 scalar fields, `INVERTED` index on pk field
+            2. 2 fields of different vector types
+            3. verify DQL & DML requests
+
+        :test steps:
+            1. create collection with fields:
+                'float_vector': 128dim
+                'float_vector_1': 768dim
+                'id': primary key type is INT64
+
+                all scalar fields: varchar max_length=100, array max_capacity=13
+            2. build indexes:
+                HNSW: 'float_vector'
+                IVF_SQ8: 'float_vector_1'
+
+                BITMAP: all scalar fields
+                INVERTED: 'id' prmary key field
+            3. insert 5 million data
+            4. flush collection
+            5. build indexes again using the same params
+            6. load collection
+            7. concurrent request:
+                - search
+                - query
+                - hybrid_search
+                - scene_test
+                    (collection: create->insert->flush->index->drop)
+                - scene_search_test
+                    (collection: create->insert->flush->index->load->search->drop)
+                - scene_hybrid_search_test: 4 vector fields, 3 scalar fields
+                    (collection: create->insert->flush->index->load->hybrid_search->drop)
+        """
+        dataset_size = parser_data_size("5m")
+
+        # set 13 field scalars, `id` is default primary key field
+        bitmap_fields = [f"{name}_1" for name in cdp.all_bitmap_field_names]
+        # 1 extra vector fields, and `float_vector` is default vector field
+        all_other_fields = ["float_vector_1"] + bitmap_fields
+
+        concurrent_tasks = [
+            ConcurrentParams.params_search(
+                nq=1000, top_k=10, search_param={"nprobe": 16}, expr=Expr.EQ('int8_1', 100).value,
+                output_fields=['id', 'float_vector', 'int64_1'], timeout=None, check_task=CheckTasks.checkSearchOutput,
+                check_items={"nq": 1000}
+            ),
+            ConcurrentParams.params_query(
+                expr=Expr.GT('int64_1', -1).value, output_fields=['*'], timeout=None, limit=10,
+                check_task=CheckTasks.checkQueryOutput, check_items={"expect_length": 10}
+            ),
+            ConcurrentParams.params_hybrid_search(
+                nq=10, top_k=10, output_fields=['*'], timeout=None,
+                reqs=[
+                    HybridSearchReqParams(
+                        anns_field="float_vector", search_param={"ef": 32}, top_k=30,
+                        expr=Expr.OR(Expr.OR(Expr.array_contains_any('array_int32_1', [0]),
+                                             Expr.array_contains('array_int64_1', 1)).subset,
+                                     Expr.And(Expr.like('varchar_1', '1%').subset,
+                                              Expr.EQ('bool_1', True).subset).subset).value),
+                    HybridSearchReqParams(
+                        anns_field="float_vector_1", search_param={"nprobe": 64},
+                        expr=Expr.AND(Expr.Not(Expr.EQ('int16_1', 'int8_1').subset),
+                                      Expr.ARRAY_CONTAINS_ANY('array_int64_1', [-1, 0, 1])).value)
+                ],
+                rerank=HybridSearchRerankParams(RRFRanker=[]), check_task=CheckTasks.checkSearchOutput,
+                check_items={"output_fields": all_other_fields + ['id', 'float_vector'], "nq": 10}
+            ),
+            ConcurrentParams.params_scene_test(data_size=3000, nb=3000),
+            ConcurrentParams.params_scene_search_test(
+                data_size=3000, nb=3000, search_counts=10,
+                other_fields=["array_int64_1", "array_bool_1", "array_varchar_1"],
+                scalars_index=dict_merge(
+                    cdp.DefaultScalarIndexParams.BITMAP_list(["array_int64_1", "array_bool_1", "array_varchar_1"]))
+            ),
+            ConcurrentParams.params_scene_hybrid_search_test(
+                nq=1, top_k=1, output_fields=["*"], timeout=600,
+                reqs=[HybridSearchReqParams(anns_field="float_vector", search_param={"nprobe": 128}, top_k=100,
+                                            expr=Expr.EQ("bool_1", True).value),
+                      HybridSearchReqParams(anns_field="binary_vector_scene_hybrid_search_test_1",
+                                            search_param={"nprobe": 32}, top_k=10, expr=Expr.NE("bool_1", True).value),
+                      HybridSearchReqParams(anns_field="float16_vector_scene_hybrid_search_test_2",
+                                            search_param={"search_list": 30}, top_k=5,
+                                            expr=Expr.GE('int64_1', 1500).value),
+                      HybridSearchReqParams(anns_field="sparse_float_vector_scene_hybrid_search_test_3",
+                                            search_param={"drop_ratio_search": 0.1}, top_k=10,
+                                            expr=Expr.like('varchar_1', '1%').value)],
+                rerank=HybridSearchRerankParams(RRFRanker=[]),
+                data_size=3000, nb=3000, hybrid_search_counts=10,
+                other_fields=["binary_vector_scene_hybrid_search_test_1", "float16_vector_scene_hybrid_search_test_2",
+                              "sparse_float_vector_scene_hybrid_search_test_3", "int64_1", "bool_1", "varchar_1"],
+                scalars_params=dict_merge([
+                    cdp.DefaultScalarParams.binary("binary_vector_scene_hybrid_search_test_1"),
+                    cdp.DefaultScalarParams.local("float16_vector_scene_hybrid_search_test_2", 64)
+                ]),
+                scalars_index=dict_merge([
+                    cdp.DefaultScalarIndexParams.default_index("int64_1"),
+                    *cdp.DefaultScalarIndexParams.BITMAP_list(["bool_1", "varchar_1"])]),
+                vectors_index=dict_merge([
+                    cdp.DefaultVectorIndexParams.BIN_IVF_FLAT("binary_vector_scene_hybrid_search_test_1"),
+                    cdp.DefaultVectorIndexParams.DISKANN_IP("float16_vector_scene_hybrid_search_test_2"),
+                    cdp.DefaultVectorIndexParams.SPARSE_WAND("sparse_float_vector_scene_hybrid_search_test_3")])
+            )
+        ]
+
+        default_case_params = ConcurrentParams().params_scene_concurrent(
+            concurrent_tasks, dataset_size=dataset_size, ni_per=5000, max_length=100, shards_num=2,
+            other_fields=all_other_fields,
+            scalars_params=dict_merge([
+                *cdp.DefaultScalarParams.laion2b_multi("float_vector_1"),
+                *cdp.DefaultScalarParams.array_max_capacity_list(
+                    13, [n for n in bitmap_fields if n.startswith('array')]),
+                *cdp.DefaultScalarParams.random_range_list(
+                    ["int8_1", "array_int8_1"], specify_range=SpecifyRange(-128, 128), max_capacity=13),
+                *cdp.DefaultScalarParams.random_range_list(
+                    ["int16_1", "array_int16_1"], specify_range=SpecifyRange(-200, 200), max_capacity=13),
+                *cdp.DefaultScalarParams.specify_scope_list(
+                    ["int32_1", "array_int32_1"], specify_range=SpecifyRange(-300, 300), max_capacity=13),
+                *cdp.DefaultScalarParams.fixed_value_range_list(
+                    ["int64_1", "array_int64_1"], specify_range=SpecifyRange(-400, 432), max_capacity=13),
+                *cdp.DefaultScalarParams.random_range_list(
+                    ["varchar_1", "array_varchar_1"], specify_range=SpecifyRange(-1500, 1500), max_capacity=13),
+            ]),
+            vectors_index=cdp.DefaultVectorIndexParams.IVF_SQ8('float_vector_1'),
+            scalars_index=dict_merge([
+                cdp.DefaultScalarIndexParams.INVERTED('id'),
+                *cdp.DefaultScalarIndexParams.BITMAP_list(bitmap_fields)
+            ]),
+            concurrent_number=[30], during_time="3h", interval=20, **cdp.DefaultIndexParams.HNSW)
+
+        node_resources = [
+            NodeResource(nodes=[indexNode], replicas=2, cpu=8, mem=8),
+            NodeResource(nodes=[queryNode], replicas=2).custom_resource(limits_cpu=16, limits_mem=64)
+        ]
+
+        self.concurrency_template(
+            input_params=input_params, cpu=dp.default_cpu, mem=dp.default_mem, deploy_mode=deploy_mode,
+            old_version_format=self.get_report_version_format(False),
+            case_callable_obj=self.get_callable_object(ConcurrentClientBase().scene_concurrent_locust),
+            default_case_params=default_case_params, node_resources=node_resources)
+
+    @pytest.mark.parametrize("deploy_mode", [STANDALONE])
+    def test_bitmap_locust_dql_dml_partitions_cluster(self, input_params: InputParamsBase, deploy_mode):
+        """
+        concurrent test and calculation of RT and QPS
+
+        :purpose:  `primary key: INT64`, divided into 10 partitions
+            1. building `BITMAP` index on all supported 12 scalar fields
+            2. 2 fields of different vector types
+            3. load and search partial partitions & DQL requests
+
+        :test steps:
+            1. create collection with fields:
+                'float_vector': 128dim
+                'float_vector_1': 768dim
+                'id': primary key type is INT64
+
+                all scalar fields: varchar max_length=100, array max_capacity=13
+            2. build indexes:
+                IVF_SQ8: 'float_vector'
+                HNSW: 'float_vector_1'
+
+                BITMAP: all scalar fields
+            3. insert 5 million data
+            4. flush collection
+            5. build indexes again using the same params
+            6. load collection
+            7. concurrent request:
+                - scene_insert_partition
+                    (partition: create->insert->flush->release->drop)
+                - scene_test_partition
+                    (partition: create->insert->flush->index again->load->search->release->search failed->drop)
+                - scene_test_partition_hybrid_search
+                    (partition: create->insert->flush->index again->load->hybrid_search->release->hybrid_search failed->drop)
+                - search
+                - query
+                - hybrid_search
+        """
+        dataset_size = parser_data_size("5m")
+
+        # set 13 field scalars, `id` is default primary key field
+        bitmap_fields = [f"{name}_1" for name in cdp.all_bitmap_field_names]
+        # 1 extra vector fields, and `float_vector` is default vector field
+        all_other_fields = ["float_vector_1"] + bitmap_fields
+
+        # gen partition names
+        partition_names = [dv.default_partition_name]
+        partition_names.extend([f"{dv.partition_name_prefix}{i}" for i in range(1, 10)])
+
+        concurrent_tasks = [
+            ConcurrentParams.params_scene_insert_partition(data_size=3000, ni=1000, with_flush=True, timeout=600),
+            ConcurrentParams.params_scene_test_partition(
+                data_size=3000, ni=3000, search_param={"nprobe": 64}, limit=1, output_fields=["*"], timeout=600),
+            ConcurrentParams.params_scene_test_partition_hybrid_search(
+                data_size=3000, ni=3000, nq=1, top_k=1, output_fields=["*"], timeout=600,
+                reqs=[HybridSearchReqParams(anns_field="float_vector", search_param={"nprobe": 128}, top_k=100),
+                      HybridSearchReqParams(anns_field="float_vector_1", search_param={"ef": 64}, top_k=10)],
+                rerank=HybridSearchRerankParams(RRFRanker=[])
+            ),
+            ConcurrentParams.params_search(
+                nq=1000, top_k=10, search_param={"nprobe": 16}, expr=Expr.EQ('int8_1', 100).value,
+                partition_names=partition_names, output_fields=['id', 'float_vector', 'int64_1'], timeout=None,
+                check_task=CheckTasks.checkSearchOutput, check_items={"nq": 1000}
+            ),
+            ConcurrentParams.params_query(
+                expr=Expr.GT('int64_1', -1).value, output_fields=['*'], partition_names=partition_names,
+                timeout=None, limit=10, check_task=CheckTasks.checkQueryOutput, check_items={"expect_length": 10}
+            ),
+            ConcurrentParams.params_hybrid_search(
+                nq=10, top_k=10, output_fields=['*'], timeout=None, partition_names=partition_names,
+                reqs=[
+                    HybridSearchReqParams(
+                        anns_field="float_vector", search_param={"nprobe": 128}, top_k=100,
+                        expr=Expr.OR(Expr.OR(Expr.array_contains_any('array_int32_1', [0]),
+                                             Expr.array_contains('array_int64_1', 1)).subset,
+                                     Expr.And(Expr.like('varchar_1', '1%').subset,
+                                              Expr.EQ('bool_1', True).subset).subset).value),
+                    HybridSearchReqParams(
+                        anns_field="float_vector_1", search_param={"ef": 64},
+                        expr=Expr.AND(Expr.Not(Expr.EQ('int16_1', 'int8_1').subset),
+                                      Expr.ARRAY_CONTAINS_ANY('array_int64_1', [-1, 0, 1])).value)
+                ],
+                rerank=HybridSearchRerankParams(RRFRanker=[]), check_task=CheckTasks.checkSearchOutput,
+                check_items={"output_fields": all_other_fields + ['id', 'float_vector'], "nq": 10}
+            )
+        ]
+
+        default_case_params = ConcurrentParams().params_scene_concurrent(
+            concurrent_tasks, dataset_size=dataset_size, ni_per=5000, max_length=100, shards_num=16,
+            other_fields=all_other_fields,
+            extra_partitions=cdp.DefaultDatasetParams.extra_partitions(partitions=partition_names, data_repeated=False),
+            scalars_params=dict_merge([
+                *cdp.DefaultScalarParams.laion2b_multi("float_vector_1"),
+                *cdp.DefaultScalarParams.array_max_capacity_list(
+                    13, [n for n in bitmap_fields if n.startswith('array')]),
+                *cdp.DefaultScalarParams.random_range_list(
+                    ["int8_1", "array_int8_1"], specify_range=SpecifyRange(-128, 128), max_capacity=13),
+                *cdp.DefaultScalarParams.random_range_list(
+                    ["int16_1", "array_int16_1"], specify_range=SpecifyRange(-200, 200), max_capacity=13),
+                *cdp.DefaultScalarParams.specify_scope_list(
+                    ["int32_1", "array_int32_1"], specify_range=SpecifyRange(-300, 300), max_capacity=13),
+                *cdp.DefaultScalarParams.fixed_value_range_list(
+                    ["int64_1", "array_int64_1"], specify_range=SpecifyRange(-400, 432), max_capacity=13),
+                *cdp.DefaultScalarParams.random_range_list(
+                    ["varchar_1", "array_varchar_1"], specify_range=SpecifyRange(-1500, 1500), max_capacity=13),
+            ]),
+            vectors_index=cdp.DefaultVectorIndexParams.HNSW('float_vector_1'),
+            scalars_index=dict_merge(cdp.DefaultScalarIndexParams.BITMAP_list(bitmap_fields)),
+            concurrent_number=[30], during_time="3h", interval=20, **cdp.DefaultIndexParams.IVF_SQ8)
+
+        node_resources = [
+            NodeResource(nodes=[indexNode], replicas=2, cpu=8, mem=8),
+            NodeResource(nodes=[queryNode], replicas=2).custom_resource(limits_cpu=16, limits_mem=64)
+        ]
+
+        self.concurrency_template(
+            input_params=input_params, cpu=dp.default_cpu, mem=dp.default_mem, deploy_mode=deploy_mode,
+            old_version_format=self.get_report_version_format(False),
+            case_callable_obj=self.get_callable_object(ConcurrentClientBase().scene_concurrent_locust),
+            default_case_params=default_case_params, node_resources=node_resources)
+
+    @pytest.mark.parametrize("deploy_mode", [STANDALONE])
+    def test_bitmap_locust_dml_partitions_standalone(self, input_params: InputParamsBase, deploy_mode):
+        """
+        concurrent test and calculation of RT and QPS
+
+        :purpose:  `primary key: INT64`, divided into 10 partitions
+            1. building `BITMAP` index on all supported 12 scalar fields
+            2. 2 fields of different vector types
+            3. load and search partial partitions & DML(upsert) requests
+
+        :test steps:
+            1. create collection with fields:
+                'float_vector': 128dim
+                'float_vector_1': 768dim
+                'id': primary key type is INT64
+
+                all scalar fields: varchar max_length=100, array max_capacity=13
+            2. build indexes:
+                IVF_SQ8: 'float_vector'
+                HNSW: 'float_vector_1'
+
+                BITMAP: all scalar fields
+            3. insert 5 million data
+            4. flush collection
+            5. build indexes again using the same params
+            6. load collection
+            7. concurrent request:
+                - scene_insert_partition
+                    (partition: create->insert->flush->release->drop)
+                - scene_test_partition
+                    (partition: create->insert->flush->index again->load->search->release->search failed->drop)
+                - scene_test_partition_hybrid_search
+                    (partition: create->insert->flush->index again->load->hybrid_search->release->hybrid_search failed->drop)
+                - release_partitions: 10 prepared partitions
+                - upsert: batch=1
+        """
+        dataset_size = parser_data_size("5m")
+
+        # set 13 field scalars, `id` is default primary key field
+        bitmap_fields = [f"{name}_1" for name in cdp.all_bitmap_field_names]
+        # 1 extra vector fields, and `float_vector` is default vector field
+        all_other_fields = ["float_vector_1"] + bitmap_fields
+
+        # gen partition names
+        partition_names = [dv.default_partition_name]
+        partition_names.extend([f"{dv.partition_name_prefix}{i}" for i in range(1, 10)])
+
+        concurrent_tasks = [
+            ConcurrentParams.params_scene_insert_partition(data_size=3000, ni=1000, with_flush=True, timeout=600),
+            ConcurrentParams.params_scene_test_partition(
+                data_size=3000, ni=3000, search_param={"nprobe": 64}, limit=1, output_fields=["*"], timeout=600),
+            ConcurrentParams.params_scene_test_partition_hybrid_search(
+                data_size=3000, ni=3000, nq=1, top_k=1, output_fields=["*"], timeout=600,
+                reqs=[HybridSearchReqParams(anns_field="float_vector", search_param={"nprobe": 128}, top_k=100),
+                      HybridSearchReqParams(anns_field="float_vector_1", search_param={"ef": 64}, top_k=10)],
+                rerank=HybridSearchRerankParams(RRFRanker=[])
+            ),
+            ConcurrentParams.params_release_partitions(partitions=partition_names, timeout=180),
+            ConcurrentParams.params_upsert(nb=1, random_id=True, random_vector=True, start_id=dataset_size)
+        ]
+
+        default_case_params = ConcurrentParams().params_scene_concurrent(
+            concurrent_tasks, dataset_size=dataset_size, ni_per=5000, max_length=100, shards_num=16,
+            other_fields=all_other_fields,
+            extra_partitions=cdp.DefaultDatasetParams.extra_partitions(partitions=partition_names, data_repeated=False),
+            scalars_params=dict_merge([
+                *cdp.DefaultScalarParams.laion2b_multi("float_vector_1"),
+                *cdp.DefaultScalarParams.array_max_capacity_list(
+                    13, [n for n in bitmap_fields if n.startswith('array')]),
+                *cdp.DefaultScalarParams.random_range_list(
+                    ["int8_1", "array_int8_1"], specify_range=SpecifyRange(-128, 128), max_capacity=13),
+                *cdp.DefaultScalarParams.random_range_list(
+                    ["int16_1", "array_int16_1"], specify_range=SpecifyRange(-200, 200), max_capacity=13),
+                *cdp.DefaultScalarParams.specify_scope_list(
+                    ["int32_1", "array_int32_1"], specify_range=SpecifyRange(-300, 300), max_capacity=13),
+                *cdp.DefaultScalarParams.fixed_value_range_list(
+                    ["int64_1", "array_int64_1"], specify_range=SpecifyRange(-400, 432), max_capacity=13),
+                *cdp.DefaultScalarParams.random_range_list(
+                    ["varchar_1", "array_varchar_1"], specify_range=SpecifyRange(-1500, 1500), max_capacity=13),
+            ]),
+            vectors_index=cdp.DefaultVectorIndexParams.HNSW('float_vector_1'),
+            scalars_index=dict_merge(cdp.DefaultScalarIndexParams.BITMAP_list(bitmap_fields)),
+            concurrent_number=[30], during_time="6h", interval=20, **cdp.DefaultIndexParams.IVF_SQ8)
+
+        self.concurrency_template(
+            input_params=input_params, cpu=16, mem=64, deploy_mode=deploy_mode,
+            old_version_format=self.get_report_version_format(False),
+            case_callable_obj=self.get_callable_object(ConcurrentClientBase().scene_concurrent_locust),
+            default_case_params=default_case_params)
+
+    @pytest.mark.parametrize("deploy_mode", [CLUSTER])
+    def test_bitmap_locust_dql_dml_partition_key_cluster(self, input_params: InputParamsBase, deploy_mode):
+        """
+        concurrent test and calculation of RT and QPS
+
+        :purpose:  `partition_key on scalar int64_1 field`, shards_num=16
+            verify DQL & DML scenario,
+            which has 1 vector fields(IVF_SQ8) and building `BITMAP` index on all supported 12 scalar fields
+
+        :test steps:
+            1. create collection with fields:
+                'float_vector': 128dim
+
+                'int64_1': partition_key, num_partitions=1024
+                all scalar fields: varchar max_length=100, array max_capacity=13
+            2. build indexes:
+                IVF_SQ8: 'float_vector'
+
+                BITMAP: all scalar fields
+            3. insert 50 million data
+            4. flush collection
+            5. build indexes again using the same params
+            6. load collection
+                replica: 1
+            7. concurrent request:
+                - search
+                - query
+                - hybrid_search
+                - load
+                - insert
+                - delete: delete data 90%
+                - flush: ignore RateLimiter
+        """
+        dataset_size = parser_data_size("50m")
+
+        # set 13 field scalars, `id` is default primary key field
+        all_other_fields = [f"{name}_1" for name in cdp.all_bitmap_field_names]
+
+        concurrent_tasks = [
+            ConcurrentParams.params_search(
+                nq=1000, top_k=10, search_param={"nprobe": 16}, expr=Expr.EQ('int8_1', 100).value,
+                output_fields=['id', 'float_vector', 'int64_1'], timeout=None, check_task=CheckTasks.checkSearchOutput,
+                check_items={"nq": 1000}
+            ),
+            ConcurrentParams.params_query(
+                expr=Expr.GT('int64_1', -1).value, output_fields=['*'],
+                timeout=None, limit=10, check_task=CheckTasks.checkQueryOutput, check_items={"expect_length": 10}
+            ),
+            ConcurrentParams.params_hybrid_search(
+                nq=10, top_k=10, output_fields=['*'], timeout=None,
+                reqs=[
+                    HybridSearchReqParams(
+                        anns_field="float_vector", search_param={"nprobe": 32}, top_k=30,
+                        expr=Expr.OR(Expr.OR(Expr.array_contains_any('array_int32_1', [0]),
+                                             Expr.array_contains('array_int64_1', 1)).subset,
+                                     Expr.And(Expr.like('varchar_1', '1%').subset,
+                                              Expr.EQ('bool_1', True).subset).subset).value),
+                    HybridSearchReqParams(
+                        anns_field="float_vector", search_param={"nprobe": 64},
+                        expr=Expr.AND(Expr.Not(Expr.EQ('int16_1', 'int8_1').subset),
+                                      Expr.ARRAY_CONTAINS_ANY('array_int64_1', [-1, 0, 1])).value)
+                ],
+                rerank=HybridSearchRerankParams(RRFRanker=[]), check_task=CheckTasks.checkSearchOutput,
+                check_items={"output_fields": all_other_fields + ['id', 'float_vector'], "nq": 10}
+            ),
+            ConcurrentParams.params_load(timeout=180),
+            ConcurrentParams.params_insert(nb=10, random_id=True, random_vector=True, start_id=dataset_size),
+            ConcurrentParams.params_delete(delete_length=9),
+            ConcurrentParams.params_flush(timeout=600, check_task=CheckTasks.checkIgnoreRateLimit)
+        ]
+
+        default_case_params = ConcurrentParams().params_scene_concurrent(
+            concurrent_tasks, dataset_size=dataset_size, num_partitions=1024, max_length=512, shards_num=16,
+            other_fields=all_other_fields,
+            scalars_index=dict_merge(cdp.DefaultScalarIndexParams.BITMAP_list(all_other_fields)),
+            scalars_params=dict_merge([cdp.DefaultScalarParams.partition_key("int64_1")]),
+            ni_per=5000, concurrent_number=[50], during_time="6h", interval=20, **cdp.DefaultIndexParams.IVF_SQ8)
+
+        node_resources = [
+            NodeResource(nodes=[dataNode], replicas=10, cpu=4, mem=16),
+            NodeResource(nodes=[indexNode], replicas=4, cpu=4, mem=8),
+            NodeResource(nodes=[queryNode], replicas=5, cpu=8, mem=32)
+        ]
+
+        self.concurrency_template(
+            input_params=input_params, cpu=dp.min_cpu, mem=dp.min_mem, deploy_mode=deploy_mode,
+            old_version_format=self.get_report_version_format(False),
+            case_callable_obj=self.get_callable_object(ConcurrentClientBase().scene_concurrent_locust),
+            default_case_params=default_case_params, node_resources=node_resources)
+
+    @pytest.mark.parametrize("deploy_mode", [CLUSTER])
+    def test_bitmap_locust_dql_dml_partition_key_repeated_cluster(self, input_params: InputParamsBase, deploy_mode):
+        """
+        concurrent test and calculation of RT and QPS
+
+        :purpose:  `partition_key on scalar int64_1 field`, shards_num=16
+            verify DQL & DML scenario,
+            which has 1 vector fields(IVF_SQ8) and building `BITMAP` index on all supported 12 scalar fields
+
+        :test steps:
+            1. create collection with fields:
+                'float_vector': 128dim
+
+                'int64_1': partition_key, num_partitions=1024， data range: 0 ~ 9
+                all scalar fields: varchar max_length=100, array max_capacity=13
+            2. build indexes:
+                IVF_SQ8: 'float_vector'
+
+                BITMAP: all scalar fields
+            3. insert 5 million data
+            4. flush collection
+            5. build indexes again using the same params
+            6. load collection
+                replica: 1
+            7. concurrent request:
+                - search
+                - query
+                - hybrid_search
+                - load
+                - insert
+                - delete: delete all
+                - flush: ignore RateLimiter
+        """
+        dataset_size = parser_data_size("5m")
+
+        # set 13 field scalars, `id` is default primary key field
+        all_other_fields = [f"{name}_1" for name in cdp.all_bitmap_field_names]
+
+        concurrent_tasks = [
+            ConcurrentParams.params_search(
+                nq=1000, top_k=10, search_param={"nprobe": 16}, expr=Expr.EQ('int64_1', 1).value,
+                output_fields=['id', 'float_vector', 'int64_1'], timeout=None, check_task=CheckTasks.checkSearchOutput,
+                check_items={"nq": 10}
+            ),
+            ConcurrentParams.params_query(expr=Expr.EQ('int64_1', 9).value, output_fields=['count(*)'], timeout=None),
+            ConcurrentParams.params_hybrid_search(
+                nq=10, top_k=10, output_fields=['*'], timeout=None,
+                reqs=[
+                    HybridSearchReqParams(
+                        anns_field="float_vector", search_param={"nprobe": 32}, top_k=30,
+                        expr=Expr.OR(Expr.OR(Expr.array_contains_any('array_int32_1', [0]),
+                                             Expr.array_contains('array_int64_1', 1)).subset,
+                                     Expr.And(Expr.like('varchar_1', '1%').subset,
+                                              Expr.EQ('bool_1', True).subset).subset).value),
+                    HybridSearchReqParams(
+                        anns_field="float_vector", search_param={"nprobe": 64},
+                        expr=Expr.AND(Expr.Not(Expr.EQ('int16_1', 'int8_1').subset),
+                                      Expr.ARRAY_CONTAINS_ANY('array_int64_1', [-1, 0, 1])).value)
+                ],
+                rerank=HybridSearchRerankParams(RRFRanker=[]), check_task=CheckTasks.checkSearchOutput,
+                check_items={"output_fields": all_other_fields + ['id', 'float_vector'], "nq": 10}
+            ),
+            ConcurrentParams.params_load(timeout=180),
+            ConcurrentParams.params_insert(nb=10, random_id=False, random_vector=True, start_id=0),
+            ConcurrentParams.params_delete(delete_length=10),
+            ConcurrentParams.params_flush(timeout=600, check_task=CheckTasks.checkIgnoreRateLimit)
+        ]
+
+        default_case_params = ConcurrentParams().params_scene_concurrent(
+            concurrent_tasks, dataset_size=dataset_size, num_partitions=1024, max_length=512, shards_num=16,
+            other_fields=all_other_fields,
+            scalars_index=dict_merge(cdp.DefaultScalarIndexParams.BITMAP_list(all_other_fields)),
+            scalars_params=dict_merge([
+                cdp.DefaultScalarParams.partition_key("int64_1"),
+                *cdp.DefaultScalarParams.laion2b_multi("float_vector_1"),
+                *cdp.DefaultScalarParams.array_max_capacity_list(
+                    9, [n for n in all_other_fields if n.startswith('array')]),
+                cdp.DefaultScalarParams.random_range('int64_1', specify_range=SpecifyRange(0, 10)),
+                *cdp.DefaultScalarParams.random_range_list(
+                    ["int8_1", "array_int8_1"], specify_range=SpecifyRange(-128, 128), max_capacity=9),
+                *cdp.DefaultScalarParams.specify_scope_list(
+                    ["int32_1", "array_int32_1"], specify_range=SpecifyRange(-300, 300), max_capacity=9),
+                *cdp.DefaultScalarParams.fixed_value_range_list(
+                    ["int16_1", "array_int16_1", "array_int64_1"], specify_range=SpecifyRange(-400, 432),
+                    max_capacity=9),
+                *cdp.DefaultScalarParams.random_range_list(
+                    ["varchar_1", "array_varchar_1"], specify_range=SpecifyRange(-1500, 1500), max_capacity=9),
+            ]),
+            ni_per=5000, concurrent_number=[20], during_time="3h", interval=20, **cdp.DefaultIndexParams.IVF_SQ8)
+
+        node_resources = [
+            NodeResource(nodes=[dataNode], replicas=3, cpu=4, mem=8),
+            NodeResource(nodes=[indexNode], replicas=2, cpu=4, mem=8),
+            NodeResource(nodes=[queryNode], replicas=1, cpu=8, mem=64)
+        ]
+
+        self.concurrency_template(
+            input_params=input_params, cpu=dp.min_cpu, mem=dp.min_mem, deploy_mode=deploy_mode,
+            old_version_format=self.get_report_version_format(False),
+            case_callable_obj=self.get_callable_object(ConcurrentClientBase().scene_concurrent_locust),
+            default_case_params=default_case_params, node_resources=node_resources)
+
+    @pytest.mark.parametrize("deploy_mode", [CLUSTER])
+    def test_bitmap_locust_resource_groups_multi_scalar_cluster(self, input_params: InputParamsBase, deploy_mode):
+        """
+        concurrent test and calculation of RT and QPS
+
+        :purpose:  `primary key int64_1 field`
+            verify DQL scenario on RG & replicas scene
+            which has 2 vector fields(IVF_FLAT & SPARSE_WAND), building `BITMAP` index on all supported 12 scalar fields
+
+        :test steps:
+            1. create collection with fields:
+                'float_vector': 128dim
+                'sparse_float_vector_1': sparse_range=[1, 100] <- the range of non-zero values of a sparse vector
+
+                all scalar fields: varchar max_length=100, array max_capacity=13
+                    'int64_1': partition_key, num_partitions=1024， data range: 0 ~ 9
+            2. build indexes:
+                IVF_FLAT: 'float_vector'
+                SPARSE_WAND: 'sparse_float_vector_1'
+
+                BITMAP: all scalar fields
+            3. insert 10 million data
+            4. flush collection
+            5. build indexes again using the same params
+            6. load collection
+                replica: 2
+                resource groups: 2
+            7. concurrent request: <- concurrent_number=100
+                - search
+                - hybrid_search
+        """
+        dataset_size = parser_data_size("10m")
+
+        # set 13 field scalars, `id` is default primary key field
+        bitmap_fields = [f"{name}_1" for name in cdp.all_bitmap_field_names]
+        # 1 extra vector fields, and `float_vector` is default vector field
+        all_other_fields = ["sparse_float_vector_1"] + bitmap_fields
+
+        # replica and resource group
+        reset_rg, groups, replica_number, resource_groups = True, [1, 2], 2, 2
+
+        concurrent_tasks = [
+            ConcurrentParams.params_search(
+                nq=1000, top_k=1, search_param={"nprobe": 64}, timeout=600, check_task=CheckTasks.checkSearchOutput,
+                check_items={"nq": 1000}
+            ),
+            ConcurrentParams.params_hybrid_search(
+                nq=1, top_k=100, timeout=600, output_fields=["*"],
+                reqs=[
+                    HybridSearchReqParams(anns_field="float_vector", search_param={"nprobe": 128}, top_k=703,
+                                          expr='varchar_1 > "0" && int8_1 >= 50 && id > -1'),
+                    HybridSearchReqParams(anns_field="sparse_float_vector_1", search_param={"drop_ratio_search": 0.3},
+                                          top_k=57, expr=f'id < {int(dataset_size * 0.9)} && int8_1 >= 0')
+                ],
+                rerank=HybridSearchRerankParams(WeightedRanker=[0.85, 0.95]), check_task=CheckTasks.checkSearchOutput,
+                check_items={"output_fields": all_other_fields + ['id', 'float_vector'], "nq": 10}
+            )
+        ]
+
+        default_case_params = ConcurrentParams().params_scene_concurrent(
+            concurrent_tasks, concurrent_number=[100], during_time="6h", interval=20,
+            dataset_size=dataset_size, ni_per=10000, other_fields=all_other_fields,
+            scalars_params=dict_merge([
+                *cdp.DefaultScalarParams.array_max_capacity_list(
+                    9, [n for n in all_other_fields if n.startswith('array')]),
+                cdp.DefaultScalarParams.random_range('int64_1', specify_range=SpecifyRange(0, 10)),
+                *cdp.DefaultScalarParams.random_range_list(
+                    ["int8_1", "array_int8_1"], specify_range=SpecifyRange(-128, 128), max_capacity=9),
+                *cdp.DefaultScalarParams.specify_scope_list(
+                    ["int32_1", "array_int32_1"], specify_range=SpecifyRange(-300, 300), max_capacity=9),
+                *cdp.DefaultScalarParams.fixed_value_range_list(
+                    ["int16_1", "array_int16_1", "array_int64_1"], specify_range=SpecifyRange(-400, 432),
+                    max_capacity=9),
+                *cdp.DefaultScalarParams.random_range_list(
+                    ["varchar_1", "array_varchar_1"], specify_range=SpecifyRange(-1500, 1500), max_capacity=9),
+            ]),
+            vectors_index=cdp.DefaultVectorIndexParams.SPARSE_WAND("sparse_float_vector_1"),
+            scalars_index=dict_merge(cdp.DefaultScalarIndexParams.BITMAP_list(bitmap_fields)),
+            reset_rg=reset_rg, groups=groups, replica_number=replica_number, resource_groups=resource_groups,
+            **cdp.DefaultIndexParams.IVF_FLAT)
+
+        node_resources = [
+            NodeResource(nodes=[indexNode], replicas=2, cpu=4, mem=8),
+            NodeResource(nodes=[queryNode], replicas=3, cpu=8, mem=48)
+        ]
+
+        self.concurrency_template(
+            input_params=input_params, cpu=dp.default_cpu, mem=dp.default_mem, deploy_mode=deploy_mode,
+            old_version_format=self.get_report_version_format(False),
+            case_callable_obj=self.get_callable_object(ConcurrentClientBase().scene_concurrent_locust),
+            default_case_params=default_case_params, node_resources=node_resources)
+
+    @pytest.mark.parametrize("deploy_mode", [STANDALONE])
+    def test_bitmap_locust_hybrid_index_cluster(self, input_params: InputParamsBase, deploy_mode):
+        """
+        concurrent test and calculation of RT and QPS
+
+        :purpose:  `primary key: INT64`
+            1. building default index on all supported 16 scalar fields
+            2. load and search partial partitions & DQL requests
+
+        :test steps:
+            1. create collection with fields:
+                'float_vector': 128dim
+                'id': primary key type is INT64
+
+                all scalar fields: varchar max_length=100, array max_capacity=9
+            2. build indexes:
+                IVF_SQ8: 'float_vector'
+
+                default scalar index: all scalar fields
+            3. insert 6 million data
+            4. flush collection
+            5. build indexes again using the same params
+            6. load collection
+            7. concurrent request:
+                - scene_test_partition
+                    (partition: create->insert->flush->index again->load->search->release->search failed->drop)
+                - scene_test_partition_hybrid_search
+                    (partition: create->insert->flush->index again->load->hybrid_search->release->hybrid_search failed->drop)
+                - search
+                - query
+                - hybrid_search
+        """
+        dataset_size = parser_data_size("6m")
+
+        # set 17 field scalars, `id` is default primary key field
+        all_other_fields = [f"{name}_1" for name in cdp.all_field_names if name != 'json']
+
+        concurrent_tasks = [
+            ConcurrentParams.params_scene_test_partition(
+                data_size=3000, ni=3000, search_param={"nprobe": 64}, limit=1, output_fields=["*"], timeout=600
+            ),
+            ConcurrentParams.params_scene_test_partition_hybrid_search(
+                data_size=3000, ni=3000, nq=1, top_k=1, output_fields=["*"], timeout=600,
+                reqs=[HybridSearchReqParams(anns_field="float_vector", search_param={"nprobe": 128}, top_k=100),
+                      HybridSearchReqParams(anns_field="float_vector", search_param={"nprobe": 64}, top_k=10)],
+                rerank=HybridSearchRerankParams(RRFRanker=[])
+            ),
+            ConcurrentParams.params_search(
+                nq=1000, top_k=10, search_param={"nprobe": 16}, expr=Expr.EQ('int8_1', 100).value, timeout=None,
+                partition_names=[dv.default_partition_name], output_fields=['id', 'float_vector', 'int64_1'],
+                check_task=CheckTasks.checkSearchOutput, check_items={"nq": 1000}
+            ),
+            ConcurrentParams.params_query(
+                expr=Expr.GT('int64_1', -1).value, output_fields=['*'], partition_names=[dv.default_partition_name],
+                timeout=None, limit=10, check_task=CheckTasks.checkQueryOutput, check_items={"expect_length": 10}
+            ),
+            ConcurrentParams.params_hybrid_search(
+                nq=10, top_k=10, output_fields=['*'], timeout=None, partition_names=[dv.default_partition_name],
+                reqs=[
+                    HybridSearchReqParams(
+                        anns_field="float_vector", search_param={"nprobe": 128}, top_k=100,
+                        expr=Expr.OR(Expr.OR(Expr.array_contains_any('array_int32_1', [0]),
+                                             Expr.array_contains('array_int64_1', 1)).subset,
+                                     Expr.And(Expr.like('varchar_1', '1%').subset,
+                                              Expr.EQ('bool_1', True).subset).subset).value),
+                    HybridSearchReqParams(
+                        anns_field="float_vector", search_param={"nprobe": 64},
+                        expr=Expr.AND(Expr.Not(Expr.EQ('int16_1', 'int8_1').subset),
+                                      Expr.ARRAY_CONTAINS_ANY('array_int64_1', [-1, 0, 1])).value)
+                ],
+                rerank=HybridSearchRerankParams(RRFRanker=[]), check_task=CheckTasks.checkSearchOutput,
+                check_items={"output_fields": all_other_fields + ['id', 'float_vector'], "nq": 10}
+            )
+        ]
+
+        default_case_params = ConcurrentParams().params_scene_concurrent(
+            concurrent_tasks, dataset_size=dataset_size, ni_per=5000, max_length=100, shards_num=3,
+            other_fields=all_other_fields,
+            scalars_params=dict_merge([
+                *cdp.DefaultScalarParams.array_max_capacity_list(
+                    9, [n for n in all_other_fields if n.startswith('array')]),
+                *cdp.DefaultScalarParams.specify_scope_custom_size_list(
+                    fields=all_other_fields, specify_range=SpecifyRange(0, 5000), base_size=1000, max_capacity=9,
+                    custom_size={"101000": [i for i in range(0, 10)]})
+            ]),
+            scalars_index=dict_merge(cdp.DefaultScalarIndexParams.default_index_list(['id'] + all_other_fields)),
+            concurrent_number=[20], during_time="6h", interval=20, **cdp.DefaultIndexParams.IVF_SQ8)
+
+        node_resources = [
+            NodeResource(nodes=[indexNode], replicas=2, cpu=8, mem=8),
+            NodeResource(nodes=[queryNode], replicas=1).custom_resource(limits_cpu=16, limits_mem=64)
+        ]
+
+        self.concurrency_template(
+            input_params=input_params, cpu=dp.default_cpu, mem=dp.default_mem, deploy_mode=deploy_mode,
+            old_version_format=self.get_report_version_format(False),
+            case_callable_obj=self.get_callable_object(ConcurrentClientBase().scene_concurrent_locust),
+            default_case_params=default_case_params, node_resources=node_resources)
+
+    @pytest.mark.parametrize("deploy_mode", [CLUSTER])
+    def test_bitmap_locust_resource_groups_reload_cluster(self, input_params: InputParamsBase, deploy_mode):
+        """
+        concurrent test and calculation of RT and QPS
+
+        :purpose:  `primary key int64_1 field`
+            verify DQL scenario on RG & replicas scene
+            which has 2 vector fields(IVF_FLAT & SPARSE_WAND), building `BITMAP` index on all supported 12 scalar fields
+
+        :test steps:
+            1. create collection with fields:
+                'float_vector': 128dim
+                'sparse_float_vector_1': sparse_range=[1, 100] <- the range of non-zero values of a sparse vector
+
+                'int64_1': partition_key, num_partitions=1024， data range: 0 ~ 9
+                all scalar fields: varchar max_length=100, array max_capacity=13
+            2. build indexes:
+                IVF_FLAT: 'float_vector'
+                SPARSE_WAND: 'sparse_float_vector_1'
+
+                BITMAP: all scalar fields
+            3. insert 10 million data
+            4. flush collection
+            5. build indexes again using the same params
+            6. load collection
+                replica: 3
+                resource groups: 3
+            7. concurrent request: <- concurrent_number=1
+                - load_search_release
+                - load_hybrid_search_release
+        """
+        dataset_size = parser_data_size("20m")
+
+        # set 13 field scalars, `id` is default primary key field
+        bitmap_fields = [f"{name}_1" for name in cdp.all_bitmap_field_names]
+        # 1 extra vector fields, and `float_vector` is default vector field
+        all_other_fields = ["sparse_float_vector_1"] + bitmap_fields
+
+        # replica and resource group
+        reset_rg, groups, replica_number, resource_groups = True, [1, 1, 2], 3, 3
+
+        concurrent_tasks = [
+            ConcurrentParams.params_load_search_release(
+                weight=1, nq=1000, top_k=1, search_param={"nprobe": 64}, timeout=600, search_counts=100,
+                replica_number=replica_number, resource_groups=resource_groups),
+            ConcurrentParams.params_load_hybrid_search_release(
+                weight=1, nq=1, top_k=100, timeout=600, output_fields=["*"], hybrid_search_counts=100,
+                reqs=[
+                    HybridSearchReqParams(anns_field="float_vector", search_param={"nprobe": 128}, top_k=703,
+                                          expr='varchar_1 > "0" && int8_1 >= 50 && id > -1'),
+                    HybridSearchReqParams(anns_field="sparse_float_vector_1", search_param={"drop_ratio_search": 0.3},
+                                          top_k=57, expr=f'id < {int(dataset_size * 0.9)} && int8_1 >= 0')
+                ],
+                rerank=HybridSearchRerankParams(WeightedRanker=[0.85, 0.95]),
+                replica_number=replica_number, resource_groups=resource_groups
+            )
+        ]
+
+        default_case_params = ConcurrentParams().params_scene_concurrent(
+            concurrent_tasks, concurrent_number=[1], during_time="6h", interval=20,
+            dataset_size=dataset_size, ni_per=10000, other_fields=all_other_fields,
+            scalars_params=dict_merge([
+                *cdp.DefaultScalarParams.array_max_capacity_list(
+                    9, [n for n in all_other_fields if n.startswith('array')]),
+                cdp.DefaultScalarParams.random_range('int64_1', specify_range=SpecifyRange(0, 10)),
+                *cdp.DefaultScalarParams.random_range_list(
+                    ["int8_1", "array_int8_1"], specify_range=SpecifyRange(-128, 128), max_capacity=9),
+                *cdp.DefaultScalarParams.specify_scope_list(
+                    ["int32_1", "array_int32_1"], specify_range=SpecifyRange(-300, 300), max_capacity=9),
+                *cdp.DefaultScalarParams.fixed_value_range_list(
+                    ["int16_1", "array_int16_1", "array_int64_1"], specify_range=SpecifyRange(-400, 432),
+                    max_capacity=9),
+                *cdp.DefaultScalarParams.random_range_list(
+                    ["varchar_1", "array_varchar_1"], specify_range=SpecifyRange(-1500, 1500), max_capacity=9),
+            ]),
+            vectors_index=cdp.DefaultVectorIndexParams.SPARSE_WAND("sparse_float_vector_1"),
+            scalars_index=dict_merge(cdp.DefaultScalarIndexParams.BITMAP_list(bitmap_fields)),
+            reset_rg=reset_rg, groups=groups, replica_number=replica_number, resource_groups=resource_groups,
+            **cdp.DefaultIndexParams.IVF_FLAT)
+
+        node_resources = [
+            NodeResource(nodes=[queryNode], replicas=4, cpu=16, mem=32)
         ]
 
         self.concurrency_template(
