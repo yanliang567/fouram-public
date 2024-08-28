@@ -25,6 +25,16 @@ except ImportError as e:
     WeightedRanker = BaseWrapper
     AnnSearchRequest = BaseWrapper
 
+try:
+    from pymilvus.client.types import ExtraList
+except ImportError as e:
+    ExtraList = BaseWrapper
+
+try:
+    from pymilvus.exceptions import MilvusException
+except ImportError as e:
+    MilvusException = BaseWrapper
+
 
 class DataTypeWrapper(object):
     all_members = dict(DataTypeBase.__members__)

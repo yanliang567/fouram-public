@@ -193,6 +193,9 @@ class DatasetsName:
     Laion1bNolang = "laion1b_nolang"
     Laion2bMulti = "laion2b_multi"
 
+    # random algorithm
+    RandomAlgorithm = "random_algorithm"
+
 
 class MetricsTypeName:
     L2 = "L2"

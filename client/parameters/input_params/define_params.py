@@ -253,7 +253,7 @@ class DefaultScalarParams:
         return {
             field: {
                 "params": {"dim": 200},
-                "other_params": {"dataset": "text2img"}
+                "other_params": {"dataset": pn.DatasetsName.TEXT2IMG}
             }
         }
 
@@ -265,7 +265,7 @@ class DefaultScalarParams:
         return {
             field: {
                 "params": {"dim": 128},
-                "other_params": {"dataset": "sift"}
+                "other_params": {"dataset": pn.DatasetsName.SIFT}
             }
         }
 
@@ -284,7 +284,7 @@ class DefaultScalarParams:
         return {
             field: {
                 "params": {"dim": 512},
-                "other_params": {"dataset": "binary"}
+                "other_params": {"dataset": pn.DatasetsName.BINARY}
             }
         }
 
@@ -296,7 +296,7 @@ class DefaultScalarParams:
         return {
             field: {
                 "params": {"dim": 768},
-                "other_params": {"dataset": "laion2b_multi", "column_name": "float32_vector"}
+                "other_params": {"dataset": pn.DatasetsName.Laion2bMulti, "column_name": "float32_vector"}
             }
         }
 
@@ -373,7 +373,8 @@ class DefaultScalarParams:
             "specify_range": specify_range.value,
             "max_capacity": max_capacity
         }
-        return {field: {"other_params": {"dataset": "random_algorithm", "algorithm_params": algorithm_params}}}
+        return {field: {"other_params": {"dataset": pn.DatasetsName.RandomAlgorithm,
+                                         "algorithm_params": algorithm_params}}}
 
     @staticmethod
     def specify_scope_list(fields: List[str], specify_range: SpecifyRange = SpecifyRange(), max_capacity: int = 1):
@@ -398,7 +399,8 @@ class DefaultScalarParams:
             "specify_range": specify_range.value,
             "max_capacity": max_capacity
         }
-        return {field: {"other_params": {"dataset": "random_algorithm", "algorithm_params": algorithm_params}}}
+        return {field: {"other_params": {"dataset": pn.DatasetsName.RandomAlgorithm,
+                                         "algorithm_params": algorithm_params}}}
 
     @staticmethod
     def random_range_list(fields: List[str], specify_range: SpecifyRange = SpecifyRange(), max_capacity: int = 1):
@@ -426,7 +428,8 @@ class DefaultScalarParams:
             "batch": batch,
             "max_capacity": max_capacity
         }
-        return {field: {"other_params": {"dataset": "random_algorithm", "algorithm_params": algorithm_params}}}
+        return {field: {"other_params": {"dataset": pn.DatasetsName.RandomAlgorithm,
+                                         "algorithm_params": algorithm_params}}}
 
     @staticmethod
     def fixed_value_range_list(fields: List[str], specify_range: SpecifyRange = SpecifyRange(), batch: int = 50,
@@ -459,7 +462,8 @@ class DefaultScalarParams:
             "custom_size": custom_size,
             "max_capacity": max_capacity
         }
-        return {field: {"other_params": {"dataset": "random_algorithm", "algorithm_params": algorithm_params}}}
+        return {field: {"other_params": {"dataset": pn.DatasetsName.RandomAlgorithm,
+                                         "algorithm_params": algorithm_params}}}
 
     @staticmethod
     def specify_scope_custom_size_list(
@@ -495,7 +499,8 @@ class DefaultScalarParams:
             "custom_size": custom_size,
             "max_capacity": max_capacity
         }
-        return {field: {"other_params": {"dataset": "random_algorithm", "algorithm_params": algorithm_params}}}
+        return {field: {"other_params": {"dataset": pn.DatasetsName.RandomAlgorithm,
+                                         "algorithm_params": algorithm_params}}}
 
     @staticmethod
     def random_range_custom_size_list(

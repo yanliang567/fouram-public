@@ -1,8 +1,6 @@
 from typing import Union, List
 
-from pymilvus.exceptions import MilvusException
-from pymilvus.client.types import ExtraList
-
+from client.client_base import MilvusException, ExtraList
 from client.common.common_type import Error, CheckTasks, DefaultValue as dv
 import client.check.param_check as pc
 from client.check.exception_message import ServerExceptionsMessage
