@@ -447,6 +447,7 @@ class ConcurrentInputParamsQuery(DataClassBase):
     offset: Optional[int] = None
     limit: Optional[int] = None
     partition_names: Optional[list] = None
+    consistency_level: Optional[str] = None
     timeout: Optional[int] = DefaultValue.default_timeout
 
     # other params
@@ -469,6 +470,7 @@ class ConcurrentTaskQuery(DataClassBase):
     offset: Optional[int] = None
     limit: Optional[int] = None
     partition_names: Optional[list] = None
+    consistency_level: Optional[str] = None
     timeout: Optional[int] = DefaultValue.default_timeout
 
     # other params
@@ -499,6 +501,8 @@ class ConcurrentTaskQuery(DataClassBase):
         )
         if self.ignore_growing:
             self.obj_params["ignore_growing"] = self.ignore_growing
+        if isinstance(self.consistency_level, str) and self.consistency_level:
+            self.obj_params["consistency_level"] = self.consistency_level
 
         log.debug("[{0}] Init done, query obj_params:{1}".format("ConcurrentTaskQuery", self.obj_params))
 
@@ -1678,8 +1682,8 @@ class ConcurrentTasksParamsBase:
 
     @property
     def to_dict(self):
-        return asdict(self)
-        # return self.deal_vars(vars(self))
+        # return asdict(self)
+        return self.deal_vars(vars(self))
 
     @staticmethod
     def deal_vars(input_dict: dict):

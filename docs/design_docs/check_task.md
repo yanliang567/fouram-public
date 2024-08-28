@@ -5,7 +5,7 @@
 ```python
 search        = ["check_response", "check_error_response", "check_ignore_expected_errors", "check_search_output"]
 hybrid_search = ["check_response", "check_error_response", "check_ignore_expected_errors", "check_search_output"]
-query         = ["check_response", "check_error_response", "check_ignore_expected_errors", "check_query_output"]
+query         = ["check_response", "check_error_response", "check_ignore_expected_errors", "check_query_output", "check_query_output_count"]
 flush         = ["check_response", "check_error_response", "check_ignore_expected_errors", "check_ignore_rate_limit"]
 load          = ["check_response", "check_error_response", "check_ignore_expected_errors"]
 release       = ["check_response", "check_error_response", "check_ignore_expected_errors"]
@@ -141,4 +141,17 @@ check_items:
   output_fields: Optional[list]
   # check request nq == response nq
   nq: int = None
+```
+
+#### 7. `check_query_output_count`
+  - used for check `query` with `output_fields=['count(*)']`
+```yaml
+check_task: check_query_output_count
+# `check_items` must be pass in `query_count`
+# base check:
+#   1. request successful
+#   2. check query result: ["{'count(*)': <int number>}"]
+check_items:
+  # check `query_count` equal to query result 'count(*)'
+  query_count: int
 ```

@@ -26,6 +26,7 @@ class CheckTasks:
     checkIgnoreExpectedErrors = "check_ignore_expected_errors"
     checkQueryOutput = "check_query_output"
     checkSearchOutput = "check_search_output"
+    checkQueryOutputCount = "check_query_output_count"
 
     @staticmethod
     def all_tasks():

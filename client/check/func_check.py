@@ -11,7 +11,7 @@ from utils.util_log import log
 class InterfaceCheckTasks:
     search = CheckTasks.base_check(CheckTasks.checkSearchOutput)
     hybrid_search = CheckTasks.base_check(CheckTasks.checkSearchOutput)
-    query = CheckTasks.base_check(CheckTasks.checkQueryOutput)
+    query = CheckTasks.base_check(CheckTasks.checkQueryOutput, CheckTasks.checkQueryOutputCount)
     flush = CheckTasks.base_check(CheckTasks.checkIgnoreRateLimit)
     load = CheckTasks.base_check()
     release = CheckTasks.base_check()
@@ -83,6 +83,9 @@ class ResponseChecker:
 
         elif self.check_task == CheckTasks.checkSearchOutput:
             result = self.check_search_output(self.response, self.succ, self.check_items)
+
+        elif self.check_task == CheckTasks.checkQueryOutputCount:
+            result = self.check_query_output_count(self.response, self.succ, self.check_items)
 
         else:
             log.warning(
@@ -289,6 +292,36 @@ class ResponseChecker:
                     _result_check = False
                     log.error("[CheckFunc] Search `output_fields`:{0} != expected:{1}".format(o, set(output_fields)))
         return _result_check
+
+    def check_query_output_count(self, actual_res, actual_res_check, check_items: dict = {}):
+        """
+        check query `output_fields=['count(*)']`
+
+        :param actual_res: API response
+        :param actual_res_check: bool
+        :param check_items: dict
+                        query_count: Optional[int]
+        """
+        self.assert_success(actual_res_check, True)
+        check_items = check_items if isinstance(check_items, dict) else {}
+
+        # check query output_fields
+        output_fields = self.kwargs.get("output_fields", None)
+        if output_fields != ['count(*)']:
+            raise ValueError(
+                f"[CheckFunc] query `output_fields` {output_fields} != ['count(*)'], can not check count(*)")
+
+        # get query count number
+        query_count = actual_res[0]['count(*)']
+        expected_query_count = check_items.get("query_count", None)
+        if isinstance(expected_query_count, int):
+            assert int(query_count) == expected_query_count, f'{query_count} == {expected_query_count}'
+            log.debug(f"[CheckFunc] Check query count(*) done: {expected_query_count}")
+            return True
+
+        log.error(
+            f"[CheckFunc] Please pass `query_count` parameter under `check_items` to verify the result: {query_count}")
+        return False
 
     """ built-in methods """
 

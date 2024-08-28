@@ -157,7 +157,8 @@ class ConcurrentParams(CommonParams):
     @staticmethod
     def params_query(weight=1, ids: list = None, expr: str = None, output_fields: list = None,
                      ignore_growing: bool = False, offset: int = None, limit: int = None, partition_names: list = None,
-                     timeout: Optional[int] = 60, random_data: bool = False, random_count: int = 0,
+                     consistency_level: Optional[str] = None, timeout: Optional[int] = 60,
+                     random_data: bool = False, random_count: int = 0,
                      random_range: list = [0, 1], field_name: str = "id", field_type: str = "int64",
                      check_task: Optional[str] = CheckTasks.checkResponse, check_items: Union[dict, list] = None):
         """
@@ -168,6 +169,7 @@ class ConcurrentParams(CommonParams):
         offset: Optional[int] = None
         limit: Optional[int] = None
         partition_names: Optional[list] = None
+        consistency_level: Optional[str] = None
         timeout: Optional[int] = DefaultValue.default_timeout
 
         # other params
@@ -184,6 +186,7 @@ class ConcurrentParams(CommonParams):
         return {"type": "query", "weight": weight,
                 "params": {"ids": ids, "expr": expr, "output_fields": output_fields, "offset": offset, "limit": limit,
                            "ignore_growing": ignore_growing, "partition_names": partition_names, "timeout": timeout,
+                           "consistency_level": consistency_level,
                            "random_data": random_data, "random_count": random_count, "random_range": random_range,
                            "field_name": field_name, "field_type": field_type, "check_task": check_task,
                            "check_items": check_items}}

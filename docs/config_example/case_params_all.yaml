@@ -514,6 +514,7 @@ concurrent_tasks:
       offset: Optional[int] = None
       limit: Optional[int] = None
       partition_names: Optional[list] = None
+      consistency_level: Optional[str] = None
       timeout: Optional[int] = 60
 
       # other params
