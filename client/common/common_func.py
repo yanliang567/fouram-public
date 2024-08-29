@@ -1215,6 +1215,21 @@ def convert_to_list(data):
     return _data
 
 
+def least_common_multiple(args: List[int]):
+    def lcm(a: int, b: int):
+        return int(a * b / math.gcd(a, b))
+
+    if len(args) == 0:
+        return 0
+    elif len(args) == 1:
+        return args[0]
+    else:
+        _lcm = args[0]
+        for i in range(1, len(args)):
+            _lcm = lcm(_lcm, args[i])
+        return _lcm
+
+
 def gen_go_bench_json_file(prefix_file_path: str, retry_counts: int = 99999):
     file_path = prefix_file_path
     for i in range(retry_counts):

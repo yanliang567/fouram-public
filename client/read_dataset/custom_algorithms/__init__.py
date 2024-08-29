@@ -6,6 +6,7 @@ from client.read_dataset.custom_algorithms.random_algorithms import (
     AlgorithmFixedValueRange,
     AlgorithmSpecifyScopeCustomSize,
     AlgorithmRandomRangeCustomSize,
+    AlgorithmSpecifyScopeArray,
 )
 
 AlgorithmObjects = {
@@ -14,6 +15,7 @@ AlgorithmObjects = {
     pn.fixed_value_range: AlgorithmFixedValueRange,
     pn.specify_scope_custom_size: AlgorithmSpecifyScopeCustomSize,
     pn.random_range_custom_size: AlgorithmRandomRangeCustomSize,
+    pn.specify_scope_array: AlgorithmSpecifyScopeArray,
 }
 
 
@@ -34,4 +36,5 @@ __all__ = [
     AlgorithmFixedValueRange,
     AlgorithmSpecifyScopeCustomSize,
     AlgorithmRandomRangeCustomSize,
+    AlgorithmSpecifyScopeArray,
 ]

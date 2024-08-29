@@ -6,7 +6,7 @@ import pandas as pd
 from collections import Iterator
 
 from client.client_base import DataType
-from client.common.common_func import parser_data_size
+from client.common.common_func import parser_data_size, least_common_multiple
 from utils.util_log import log
 
 
@@ -56,6 +56,23 @@ class AlgorithmBase:
 
         log.debug(f"[AlgorithmBase] Parser `max_capacity` value: {_max_capacity}")
         return _max_capacity
+
+    @staticmethod
+    def parser_capacity_range(default_value: int = 1, **kwargs) -> List[int]:
+        # parser `capacity_range`
+        _capacity_range = kwargs.get("capacity_range", default_value)
+        if isinstance(_capacity_range, list):
+            if not (len(_capacity_range) == 2 and 0 <= _capacity_range[0] <= _capacity_range[1]):
+                msg = "[AlgorithmBase] Parser `{0}` failed: {1}, " + \
+                      "`{0}` must be len({2}) == 2 and 0 <= left value({3}) <= right value({4})"
+                raise ValueError(msg.format(
+                    "capacity_range", _capacity_range, len(_capacity_range), _capacity_range[0], _capacity_range[1]))
+        else:
+            raise ValueError("[AlgorithmBase] Parser `{0}` failed: {1}, `{0}` must be List[int], type:{2}".format(
+                "capacity_range", _capacity_range, type(_capacity_range)))
+
+        log.debug(f"[AlgorithmBase] Parser `capacity_range` value: {_capacity_range}")
+        return _capacity_range
 
     @staticmethod
     def parser_base_size(default_value: Union[int, str] = 1, **kwargs):
@@ -170,10 +187,10 @@ class AlgorithmSpecifyScope(AlgorithmBase):
             element_dtype=self._element_dtype, max_capacity=self._max_capacity)
 
         if len(self._default_base_value) == 0:
-            log.warning("[0] Algorithm `specify_scope` not support for field `{1}`".format(
+            log.warning("[{0}] Algorithm `specify_scope` not support for field `{1}`".format(
                 self._class_name, self._field_name))
 
-        log.debug("[0] Field `{1}` display default_base_value: {2}".format(
+        log.debug("[{0}] Field `{1}` display default_base_value: {2}".format(
             self._class_name, self._field_name, self._display_default_base_value(self._default_base_value)))
 
     def algorithm_get_data(self, data_length: int):
@@ -233,10 +250,10 @@ class AlgorithmRandomRange(AlgorithmBase):
             element_dtype=self._element_dtype, max_capacity=self._max_capacity)
 
         if len(self._default_base_value) == 0:
-            log.warning("[0] Algorithm `random_range` not support for field `{1}`".format(
+            log.warning("[{0}] Algorithm `random_range` not support for field `{1}`".format(
                 self._class_name, self._field_name))
 
-        log.debug("[0] Field `{1}` display default_base_value: {2}".format(
+        log.debug("[{0}] Field `{1}` display default_base_value: {2}".format(
             self._class_name, self._field_name, self._display_default_base_value(self._default_base_value)))
 
     def algorithm_get_data(self, data_length: int):
@@ -301,10 +318,10 @@ class AlgorithmFixedValueRange(AlgorithmBase):
             element_dtype=self._element_dtype, max_capacity=self._max_capacity)
 
         if len(self._default_base_value) == 0:
-            log.warning("[0] Algorithm `fixed_value_range` not support for field `{1}`".format(
+            log.warning("[{0}] Algorithm `fixed_value_range` not support for field `{1}`".format(
                 self._class_name, self._field_name))
 
-        log.debug("[0] Field `{1}` display default_base_value: {2}".format(
+        log.debug("[{0}] Field `{1}` display default_base_value: {2}".format(
             self._class_name, self._field_name, self._display_default_base_value(self._default_base_value)))
 
     def algorithm_get_data(self, data_length: int):
@@ -527,3 +544,69 @@ class AlgorithmRandomRangeCustomSize(AlgorithmBase):
         random.shuffle(_value)
         return self._data_type_conversion(data_list=_value, field_dtype=self._field_dtype,
                                           element_dtype=self._element_dtype, max_capacity=self._max_capacity)
+
+
+class AlgorithmSpecifyScopeArray(AlgorithmBase):
+    def __init__(self, field_name: str, field_dtype: DataType, element_dtype: DataType, **kwargs):
+        """
+        Algorithm name: specify_scope_array
+
+        Support data type: ARRAY(INT8, INT16, INT32, INT64, DOUBLE, FLOAT, VARCHAR)
+
+        Params:
+            specify_range: List<int>, e.g.: [ 1, 100 ] => 1 ~ 99
+            capacity_range: List<int> , e.g.: [ 1, 10 ] => 1 ~ 10 / [ 1, 1 ] => 1
+
+        Introduce:
+            Generate a list according to the `specify_range` value,
+            randomly select a number from capacity_range to indicate the number of elements to be selected from the list
+
+            e.g.:
+                specify_range: [0, 10]
+                capacity_range: [0, 2]
+            -> handling scalar value types: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] * least_common_multiple(len(specify_range), max(capacity_range))
+            -> scalar_values
+                array<int>: [[0, 9], [1], [8, 2], [], [1, 5], [7], ... <repeated>]
+                array<varchar>: [["0", "9"], ["1"], ["8", "2"], [], ["1", "5"], ["7"], ... <repeated>]
+                ...
+            -> get the specified length: scalar_values[:<insert batch size>]
+
+        Notice:
+            - `capacity_range` cannot be greater than `max_capacity` that you set
+        """
+        super().__init__()
+        self._class_name = "AlgorithmSpecifyScopeArray"
+
+        self._field_name = field_name
+        self._field_dtype = field_dtype
+        self._element_dtype = element_dtype
+        self._kwargs = kwargs
+
+        # parser params for `specify scope` algorithm
+        self._specify_range = self.parser_specify_range(**self._kwargs)
+        self._capacity_range = self.parser_capacity_range(**self._kwargs)
+
+        # generated data
+        self._default_base_value = []
+
+    def algorithm_init(self):
+        if self._field_dtype != DataType.ARRAY:
+            raise ValueError("[{0}] Algorithm only support `ARRAY` DataType".format(self._class_name))
+
+        self._default_base_value = self._data_type_conversion(
+            data_list=list(range(*self._specify_range)), field_dtype=self._element_dtype)
+
+        if len(self._default_base_value) == 0:
+            raise ValueError("[{0}] Algorithm `specify_scope` not support for field `{1}`".format(
+                self._class_name, self._field_name))
+        self._default_base_value = self._default_base_value * least_common_multiple([
+            self._capacity_range[1], len(self._default_base_value)])
+
+        log.debug(
+            "[{0}] Field `{1}` display len(default_base_value): {2}, default_base_value:{3}, capacity_range:{4}".format(
+                self._class_name, self._field_name, len(self._default_base_value),
+                self._display_default_base_value(self._default_base_value), self._capacity_range))
+
+    def algorithm_get_data(self, data_length: int):
+        return [random.sample(self._default_base_value, random.randint(*self._capacity_range)) for _ in
+                range(data_length)]

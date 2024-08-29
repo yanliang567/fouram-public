@@ -287,3 +287,53 @@ Notice:
        ----------------------------> <read batch_size and break the sequence>
     <Read element values from left to right in a loop until the specified batch size is reached.>
 ```
+
+#### 6. `specify_scope_array`
+
+**config example:**
+
+```yaml
+<dataset_params or param under concurrent_tasks>:
+  scalars_params:
+    array_varchar_1:
+      other_params:
+        dataset: random_algorithm
+        algorithm_params:
+          algorithm_name: specify_scope_array
+          specify_range: [ -100, 100 ]
+          capacity_range: [ 1, 1 ]
+    array_float_1:
+      other_params:
+        dataset: random_algorithm
+        algorithm_params:
+          algorithm_name: specify_scope_array
+          specify_range: [ 0, 100 ]
+          capacity_range: [ 5, 10 ]
+```
+
+```text
+Algorithm name: specify_scope_array
+
+Support data type: ARRAY(INT8, INT16, INT32, INT64, DOUBLE, FLOAT, VARCHAR)
+
+Params:
+    specify_range: List<int>, e.g.: [ 1, 100 ] => 1 ~ 99
+    capacity_range: List<int> , e.g.: [ 1, 10 ] => 1 ~ 10 / [ 1, 1 ] => 1
+
+Introduce:
+    Generate a list according to the `specify_range` value,
+    randomly select a number from capacity_range to indicate the number of elements to be selected from the list
+
+    e.g.:
+        specify_range: [0, 10]
+        capacity_range: [0, 2]
+    -> handling scalar value types: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] * least_common_multiple(len(specify_range), max(capacity_range))
+    -> scalar_values
+        array<int>: [[0, 9], [1], [8, 2], [], [1, 5], [7], ... <repeated>]
+        array<varchar>: [["0", "9"], ["1"], ["8", "2"], [], ["1", "5"], ["7"], ... <repeated>]
+        ...
+    -> get the specified length: scalar_values[:<insert batch size>]
+
+Notice:
+    - `capacity_range` cannot be greater than `max_capacity` that you set
+```

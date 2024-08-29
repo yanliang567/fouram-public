@@ -4974,7 +4974,7 @@ class TestFeatureCases(PerfTemplate):
                 check_items={"nq": 1000}
             ),
             ConcurrentParams.params_hybrid_search(
-                nq=1, top_k=100, timeout=600, output_fields=["*"],
+                nq=10, top_k=100, timeout=600, output_fields=["*"],
                 reqs=[
                     HybridSearchReqParams(anns_field="float_vector", search_param={"nprobe": 128}, top_k=703,
                                           expr='varchar_1 > "0" && int8_1 >= 50 && id > -1'),

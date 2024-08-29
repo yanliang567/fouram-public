@@ -155,6 +155,7 @@ random_range = "random_range"
 fixed_value_range = "fixed_value_range"
 specify_scope_custom_size = "specify_scope_custom_size"
 random_range_custom_size = "random_range_custom_size"
+specify_scope_array = "specify_scope_array"
 
 # data type name lower
 ARRAY = "array"
