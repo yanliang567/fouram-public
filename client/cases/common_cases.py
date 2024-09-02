@@ -281,6 +281,16 @@ class CommonCases(Base):
             search_params_list.append(s)
         return search_params_list
 
+    def parser_query_params(self):
+        query_params = copy.deepcopy(self.params_obj.query_params)
+        s_p = gen_combinations({pn.expr: query_params.pop(pn.expr, None)})
+
+        query_params_list = []
+        for s in s_p:
+            s.update(query_params)
+            query_params_list.append(s)
+        return query_params_list
+
     def search_param_analysis(self, _search_params: dict, default_field_name: str, metric_type: str,
                               sparse_range: list = dv.default_sparse_range):
         _params = copy.deepcopy(_search_params)
@@ -715,18 +725,21 @@ class Query(CommonCases):
                                show_db_user=self.params_obj.dataset_params.get(pn.show_db_user, False))
 
         # query
-        def run():
+        def run(run_query_params: dict):
             try:
-                self.prepare_query(self.params_obj.dataset_params[pn.req_run_counts], **self.params_obj.query_params)
+                self.prepare_query(self.params_obj.dataset_params[pn.req_run_counts], **run_query_params)
                 return self.case_report.to_dict(), True
             except Exception as e:
                 log.error("[Query] Query raise error: {}".format(e))
                 return {}, False
 
         params_list = []
-        p = CaseIterParams(callable_object=run, actual_params_used=input_params.params,
-                           case_type=self.__class__.__name__)
-        params_list.append(p)
+        for q in self.parser_query_params():
+            actual_params_used = copy.deepcopy(input_params.params)
+            actual_params_used[pn.query_params] = q
+            p = CaseIterParams(callable_object=run, object_args=[q],
+                               actual_params_used=actual_params_used, case_type=self.__class__.__name__)
+            params_list.append(p)
         yield params_list
 
         # clear env

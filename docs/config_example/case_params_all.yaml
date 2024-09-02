@@ -350,9 +350,10 @@ query_params:
   # `ids` will be converted to `expr`: "id in {ids}"
   # ids will overwrite expr after being set
   ids: [ 1, 2 ] / <list>
-  expr: "int64_1 > 10" / <str>
+  expr: "int64_1 > 10" / <str> / List<str>
   output_fields: [ "int64_1", "float_vector" ] / <list>
   ignore_growing: <bool>
+  limit: int
 
 database_user_params:
   # reset rbac before testing

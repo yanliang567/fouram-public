@@ -84,7 +84,8 @@ class ParamsFormat:
         },
         query_params: {
             output_fields: ([type(list()), type(None)], OPTION),
-            ignore_growing: ([type(bool())], OPTION)
+            ignore_growing: ([type(bool())], OPTION),
+            limit: ([type(int())], OPTION)
         },
         search_params: {
             expr: ([type(str()), type(list()), type(None)], OPTION),
@@ -164,7 +165,7 @@ class ParamsFormat:
 
     common_scene_query_expr = update_dict_value({
         dataset_params: {req_run_counts: ([type((int()))], MUST)},
-        query_params: {expr: ([type(str())], MUST)}
+        query_params: {expr: ([type(str()), type(list())], MUST)}
     }, common_scene_load)
 
     common_scene_search = update_dict_value({

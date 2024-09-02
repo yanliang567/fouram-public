@@ -655,6 +655,7 @@ class ConcurrentParams(CommonParams):
                                 other_fields=[], shards_num=2, varchar_id=None, auto_id=None, num_partitions=None,
                                 replica_number=None, resource_groups=None,
                                 reset_rg=False, groups=None, reset_rbac=False, reset_db=False,
+                                set_properties=None, alter_index=None,
                                 metric_type=pn.MetricsTypeName.L2, index_type=pn.IndexTypeName.HNSW,
                                 index_param={"M": 8, "efConstruction": 200}, concurrent_number=[20],
                                 during_time=120, interval=20, spawn_rate=None):
@@ -669,7 +670,7 @@ class ConcurrentParams(CommonParams):
             num_partitions=num_partitions,
             metric_type=metric_type, index_type=index_type, index_param=index_param, reset_rg=reset_rg,
             groups=groups, replica_number=replica_number, resource_groups=resource_groups,
-            reset_rbac=reset_rbac, reset_db=reset_db)
+            reset_rbac=reset_rbac, reset_db=reset_db, set_properties=set_properties, alter_index=alter_index)
         concurrent_default_params = self.concurrent_base(concurrent_number=concurrent_number, during_time=during_time,
                                                          interval=interval, concurrent_tasks=concurrent_tasks,
                                                          spawn_rate=spawn_rate)

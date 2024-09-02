@@ -2,6 +2,7 @@ from typing import Optional, Union, List, Dict
 from dataclasses import dataclass, field, asdict
 
 from client.parameters import params_name as pn
+from client.check.exception_message import ServerExceptionsMessage
 
 search_expr = ["{'float_1': {'GT': -1.0, 'LT': %s * 0.1}}" % pn.dataset_size,
                "{'float_1': {'GT': -1.0, 'LT': %s * 0.5}}" % pn.dataset_size,
@@ -778,3 +779,29 @@ class Expr:
     @staticmethod
     def ARRAY_LENGTH(name):
         return ExprBase(expr=f"ARRAY_LENGTH({name})")
+
+
+class CheckItems:
+    IgnoreFlushRateLimitAndTimeout = [{pn.message: ServerExceptionsMessage.RateLimitError},
+                                      {pn.message: ServerExceptionsMessage.FlushTimeout}]
+
+
+@dataclass
+class AlterIndex:
+    index_name: str
+    extra_params: dict
+
+    @property
+    def to_dict(self):
+        return vars(self)
+
+
+class DefaultAlterIndex:
+
+    @staticmethod
+    def index_offset_cache(name: str):
+        return AlterIndex(index_name=name, extra_params={'indexoffsetcache.enabled': True}).to_dict
+
+    @staticmethod
+    def list_index_offset_cache(names: list):
+        return [DefaultAlterIndex.index_offset_cache(n) for n in names]

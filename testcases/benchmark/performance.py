@@ -666,6 +666,14 @@ class TestPerformanceCases(PerfTemplate):
         self.serial_template(input_params=input_params, cpu=dp.default_cpu, mem=dp.default_mem, deploy_mode=CLUSTER,
                              case_callable_obj=Query().scene_query_ids)
 
+    def test_query_expr_custom_parameters(self, input_params: InputParamsBase):
+        """
+        :test steps:
+            1. insert and calculation of query time
+        """
+        self.serial_template(input_params=input_params, cpu=dp.default_cpu, mem=dp.default_mem, deploy_mode=CLUSTER,
+                             case_callable_obj=Query().scene_query_expr)
+
     @pytest.mark.query
     @pytest.mark.parametrize("deploy_mode", [STANDALONE])
     def test_query_by_ids_sift_standalone(self, input_params: InputParamsBase, deploy_mode):

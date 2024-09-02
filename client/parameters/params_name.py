@@ -99,6 +99,7 @@ nlist = "nlist"
 ids = "ids"
 expression = "expression"
 ignore_growing = "ignore_growing"
+limit = "limit"
 
 # search
 top_k = "top_k"
@@ -163,6 +164,10 @@ ARRAY = "array"
 # dataset config
 VECTOR = "vector"
 SCALAR = "scalar"
+
+# Error
+code = "code"
+message = "message"
 
 
 class AccDatasetsName:
@@ -245,4 +250,3 @@ class IndexTypeName:
     Trie = "Trie"
     INVERTED = "INVERTED"
     BITMAP = "BITMAP"
-
