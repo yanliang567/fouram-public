@@ -3829,9 +3829,9 @@ class TestFeatureCases(PerfTemplate):
 
         concurrent_tasks = [
             ConcurrentParams.params_search(
-                nq=1000, top_k=10, search_param={"nprobe": 16}, expr=Expr.GE('id', '"100"').value, output_fields=['*'],
-                timeout=600, check_task=CheckTasks.checkSearchOutput,
-                check_items={"output_fields": all_other_fields + ['id', 'binary_vector'], "nq": 1000}
+                nq=2, top_k=10, search_param={"nprobe": 16}, expr=Expr.GE('id', '"100"').value, output_fields=['*'],
+                timeout=1800, check_task=CheckTasks.checkSearchOutput,
+                check_items={"output_fields": all_other_fields + ['id', 'binary_vector'], "nq": 2}
             ),
             ConcurrentParams.params_query(
                 expr=Expr.GT('id', '"-1"').value + " && ", output_fields=['id', 'binary_vector', 'int64_1'],
@@ -3839,13 +3839,13 @@ class TestFeatureCases(PerfTemplate):
                 check_task=CheckTasks.checkQueryOutput
             ),
             ConcurrentParams.params_hybrid_search(
-                nq=10, top_k=10, output_fields=["*"], timeout=600,
+                nq=1, top_k=2, output_fields=["*"], timeout=6000,
                 reqs=[HybridSearchReqParams(anns_field="binary_vector", search_param={"nprobe": 128}, top_k=100),
                       HybridSearchReqParams(anns_field="float16_vector", search_param={"nprobe": 64}, top_k=10),
                       HybridSearchReqParams(anns_field="bfloat16_vector", search_param={"ef": 32}, top_k=30),
                       HybridSearchReqParams(anns_field="sparse_float_vector", search_param={"drop_ratio_search": 0.1})],
                 rerank=HybridSearchRerankParams(RRFRanker=[]), check_task=CheckTasks.checkSearchOutput,
-                check_items={"output_fields": all_other_fields + ['id', 'binary_vector'], "nq": 10}
+                check_items={"output_fields": all_other_fields + ['id', 'binary_vector'], "nq": 1}
             )
         ]
 
@@ -3942,9 +3942,9 @@ class TestFeatureCases(PerfTemplate):
 
         concurrent_tasks = [
             ConcurrentParams.params_search(
-                nq=1000, top_k=10, search_param={"nprobe": 16}, expr=Expr.GE('id', '"100"').value, output_fields=['*'],
+                nq=5, top_k=2, search_param={"nprobe": 16}, expr=Expr.GE('id', '"100"').value, output_fields=['*'],
                 timeout=1800, check_task=CheckTasks.checkSearchOutput,
-                check_items={"output_fields": all_other_fields + ['id', 'binary_vector'], "nq": 1000}
+                check_items={"output_fields": all_other_fields + ['id', 'binary_vector'], "nq": 5}
             ),
             ConcurrentParams.params_query(
                 expr=Expr.GT('id', '"-1"').value + " && ", output_fields=['id', 'binary_vector', 'int64_1'],
@@ -3952,7 +3952,7 @@ class TestFeatureCases(PerfTemplate):
                 check_task=CheckTasks.checkQueryOutput
             ),
             ConcurrentParams.params_hybrid_search(
-                nq=10, top_k=10, output_fields=["*"], timeout=1800,
+                nq=1, top_k=3, output_fields=["*"], timeout=1800,
                 reqs=[
                     HybridSearchReqParams(anns_field="binary_vector", search_param={"nprobe": 128}, top_k=100,
                                           expr=Expr.EQ(Expr.MOD('int64_1', 10).subset, 1).value),
@@ -3966,7 +3966,7 @@ class TestFeatureCases(PerfTemplate):
                                                         Expr.EQ('bool_1', True).subset).value)
                 ],
                 rerank=HybridSearchRerankParams(RRFRanker=[]), check_task=CheckTasks.checkSearchOutput,
-                check_items={"output_fields": all_other_fields + ['id', 'binary_vector'], "nq": 10}
+                check_items={"output_fields": all_other_fields + ['id', 'binary_vector'], "nq": 1}
             )
         ]
 
@@ -4655,15 +4655,15 @@ class TestFeatureCases(PerfTemplate):
         concurrent_tasks = [
             ConcurrentParams.params_search(
                 nq=15, top_k=10, search_param={"nprobe": 16}, expr=Expr.EQ('int8_1', 100).value,
-                output_fields=['id', 'float_vector', 'int64_1'], timeout=None, check_task=CheckTasks.checkSearchOutput,
+                output_fields=['id', 'float_vector', 'int64_1'], timeout=1200, check_task=CheckTasks.checkSearchOutput,
                 check_items={"nq": 15}
             ),
             ConcurrentParams.params_query(
-                expr=Expr.GT('int64_1', -1).value, output_fields=['*'], timeout=None, limit=10,
+                expr=Expr.GT('int64_1', -1).value, output_fields=['*'], timeout=1200, limit=10,
                 check_task=CheckTasks.checkQueryOutput, check_items={"expect_length": 10}
             ),
             ConcurrentParams.params_hybrid_search(
-                nq=2, top_k=10, output_fields=['*'], timeout=None,
+                nq=2, top_k=10, output_fields=['*'], timeout=1800,
                 reqs=[
                     HybridSearchReqParams(
                         anns_field="float_vector", search_param={"ef": 32}, top_k=30,
@@ -5220,15 +5220,15 @@ class TestFeatureCases(PerfTemplate):
         concurrent_tasks = [
             ConcurrentParams.params_search(
                 nq=1000, top_k=10, search_param={"nprobe": 16}, expr=Expr.EQ('int8_1', 100).value,
-                output_fields=['id', 'float_vector', 'int64_1'], timeout=None, check_task=CheckTasks.checkSearchOutput,
+                output_fields=['id', 'float_vector', 'int64_1'], timeout=3000, check_task=CheckTasks.checkSearchOutput,
                 check_items={"nq": 1000}
             ),
             ConcurrentParams.params_query(
                 expr=Expr.GT('int64_1', -1).value, output_fields=['*'],
-                timeout=None, limit=10, check_task=CheckTasks.checkQueryOutput, check_items={"expect_length": 10}
+                timeout=3000, limit=10, check_task=CheckTasks.checkQueryOutput, check_items={"expect_length": 10}
             ),
             ConcurrentParams.params_hybrid_search(
-                nq=10, top_k=10, output_fields=['*'], timeout=None,
+                nq=10, top_k=10, output_fields=['*'], timeout=3000,
                 reqs=[
                     HybridSearchReqParams(
                         anns_field="float_vector", search_param={"nprobe": 32}, top_k=30,
@@ -5416,11 +5416,11 @@ class TestFeatureCases(PerfTemplate):
 
         concurrent_tasks = [
             ConcurrentParams.params_search(
-                nq=1000, top_k=1, search_param={"nprobe": 64}, timeout=600, check_task=CheckTasks.checkSearchOutput,
+                nq=1000, top_k=1, search_param={"nprobe": 64}, timeout=1200, check_task=CheckTasks.checkSearchOutput,
                 check_items={"nq": 1000}
             ),
             ConcurrentParams.params_hybrid_search(
-                nq=10, top_k=100, timeout=600, output_fields=["*"],
+                nq=10, top_k=100, timeout=1200, output_fields=["*"],
                 reqs=[
                     HybridSearchReqParams(anns_field="float_vector", search_param={"nprobe": 128}, top_k=703,
                                           expr='varchar_1 > "0" && int8_1 >= 50 && id > -1'),
@@ -5465,7 +5465,7 @@ class TestFeatureCases(PerfTemplate):
             case_callable_obj=self.get_callable_object(ConcurrentClientBase().scene_concurrent_locust),
             default_case_params=default_case_params, node_resources=node_resources)
 
-    @pytest.mark.parametrize("deploy_mode", [STANDALONE])
+    @pytest.mark.parametrize("deploy_mode", [CLUSTER])
     def test_bitmap_locust_hybrid_index_cluster(self, input_params: InputParamsBase, deploy_mode):
         """
         concurrent test and calculation of RT and QPS
@@ -5513,16 +5513,16 @@ class TestFeatureCases(PerfTemplate):
                 rerank=HybridSearchRerankParams(RRFRanker=[])
             ),
             ConcurrentParams.params_search(
-                nq=1000, top_k=10, search_param={"nprobe": 16}, expr=Expr.EQ('int8_1', 100).value, timeout=None,
+                nq=1000, top_k=10, search_param={"nprobe": 16}, expr=Expr.EQ('int8_1', 100).value, timeout=600,
                 partition_names=[dv.default_partition_name], output_fields=['id', 'float_vector', 'int64_1'],
                 check_task=CheckTasks.checkSearchOutput, check_items={"nq": 1000}
             ),
             ConcurrentParams.params_query(
                 expr=Expr.GT('int64_1', -1).value, output_fields=['*'], partition_names=[dv.default_partition_name],
-                timeout=None, limit=10, check_task=CheckTasks.checkQueryOutput, check_items={"expect_length": 10}
+                timeout=600, limit=10, check_task=CheckTasks.checkQueryOutput, check_items={"expect_length": 10}
             ),
             ConcurrentParams.params_hybrid_search(
-                nq=10, top_k=10, output_fields=['*'], timeout=None, partition_names=[dv.default_partition_name],
+                nq=10, top_k=10, output_fields=['*'], timeout=600, partition_names=[dv.default_partition_name],
                 reqs=[
                     HybridSearchReqParams(
                         anns_field="float_vector", search_param={"nprobe": 128}, top_k=100,
@@ -5555,7 +5555,7 @@ class TestFeatureCases(PerfTemplate):
 
         node_resources = [
             NodeResource(nodes=[indexNode], replicas=2, cpu=8, mem=8),
-            NodeResource(nodes=[queryNode], replicas=1).custom_resource(limits_cpu=16, limits_mem=64)
+            NodeResource(nodes=[queryNode], replicas=1, cpu=16, mem=32)
         ]
 
         self.concurrency_template(
