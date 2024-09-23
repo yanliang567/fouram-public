@@ -680,6 +680,7 @@ class ConcurrentInputParamsInsert(DataClassBase):
     random_vector: Optional[bool] = False
     varchar_filled: Optional[bool] = False
     start_id: Optional[int] = 0
+    shuffle_id: Optional[bool] = False
 
     # check request result
     check_task: Optional[str] = CheckTasks.checkResponse
@@ -700,6 +701,7 @@ class ConcurrentTaskInsert(DataClassBase):
     random_vector: Optional[bool] = False
     varchar_filled: Optional[bool] = False
     start_id: Optional[int] = 0
+    shuffle_id: Optional[bool] = False
 
     _loop_ids = None
     fixed_ids = None
@@ -726,6 +728,11 @@ class ConcurrentTaskInsert(DataClassBase):
     def get_ids(self):
         if self.random_id:
             _ids = next(self._loop_ids)
+
+            # shuffle ids
+            if self.shuffle_id:
+                random.shuffle(_ids)
+
             concurrent_global_params.put_data_to_insert_queue(concurrent_global_params.concurrent_insert_ids, _ids)
             return _ids
         concurrent_global_params.put_data_to_insert_queue(
@@ -762,6 +769,7 @@ class ConcurrentTaskUpsert(DataClassBase):
     random_vector: Optional[bool] = False
     varchar_filled: Optional[bool] = False
     start_id: Optional[int] = 0
+    shuffle_id: Optional[bool] = False
 
     _loop_ids = None
     fixed_ids = None
@@ -788,6 +796,11 @@ class ConcurrentTaskUpsert(DataClassBase):
     def get_ids(self):
         if self.random_id:
             _ids = next(self._loop_ids)
+
+            # shuffle ids
+            if self.shuffle_id:
+                random.shuffle(_ids)
+
             concurrent_global_params.put_data_to_insert_queue(concurrent_global_params.concurrent_insert_ids, _ids)
             return _ids
         concurrent_global_params.put_data_to_insert_queue(

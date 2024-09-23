@@ -264,8 +264,9 @@ class ConcurrentParams(CommonParams):
 
     @staticmethod
     def params_insert(
-            weight=1, nb=1, timeout: Optional[int] = 30, random_id=False, random_vector=False, varchar_filled=False,
-            start_id=0, check_task: Optional[str] = CheckTasks.checkResponse, check_items: Union[dict, list] = None):
+            weight=1, nb=1, timeout: Optional[int] = 30,
+            random_id=False, random_vector=False, varchar_filled=False, start_id=0, shuffle_id=False,
+            check_task: Optional[str] = CheckTasks.checkResponse, check_items: Union[dict, list] = None):
         """
         nb: Optional[int] = 1  # number of batch insert
         timeout: Optional[int] = DefaultValue.default_timeout
@@ -275,6 +276,7 @@ class ConcurrentParams(CommonParams):
         random_vector: Optional[bool] = False
         varchar_filled: Optional[bool] = False
         start_id: Optional[int] = 0
+        shuffle_id: Optional[bool] = False
 
         # check request result
         check_task: Optional[str] = CheckTasks.checkResponse
@@ -282,12 +284,12 @@ class ConcurrentParams(CommonParams):
         """
         return {"type": "insert", "weight": weight,
                 "params": {"nb": nb, "timeout": timeout, "random_id": random_id, "random_vector": random_vector,
-                           "varchar_filled": varchar_filled, "start_id": start_id, "check_task": check_task,
-                           "check_items": check_items}}
+                           "varchar_filled": varchar_filled, "start_id": start_id, "shuffle_id": shuffle_id,
+                           "check_task": check_task, "check_items": check_items}}
 
     @staticmethod
     def params_upsert(weight=1, nb=1, timeout: Optional[int] = 30,
-                      random_id=False, random_vector=False, varchar_filled=False, start_id=0,
+                      random_id=False, random_vector=False, varchar_filled=False, start_id=0, shuffle_id=False,
                       check_task: Optional[str] = CheckTasks.checkResponse, check_items: Union[dict, list] = None):
         """
         nb: Optional[int] = 1  # number of batch insert
@@ -298,6 +300,7 @@ class ConcurrentParams(CommonParams):
         random_vector: Optional[bool] = False
         varchar_filled: Optional[bool] = False
         start_id: Optional[int] = 0
+        shuffle_id: Optional[bool] = False
 
         # check request result
         check_task: Optional[str] = CheckTasks.checkResponse
@@ -305,8 +308,8 @@ class ConcurrentParams(CommonParams):
         """
         return {"type": "upsert", "weight": weight,
                 "params": {"nb": nb, "timeout": timeout, "random_id": random_id, "random_vector": random_vector,
-                           "varchar_filled": varchar_filled, "start_id": start_id, "check_task": check_task,
-                           "check_items": check_items}}
+                           "varchar_filled": varchar_filled, "start_id": start_id, "shuffle_id": shuffle_id,
+                           "check_task": check_task, "check_items": check_items}}
 
     @staticmethod
     def params_delete(weight=1, expr: str = "", delete_length: int = 1, timeout: Optional[int] = 30,

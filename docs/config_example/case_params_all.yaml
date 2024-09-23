@@ -606,6 +606,7 @@ concurrent_tasks:
       # according to `dataset_params.varchar_filled`
       varchar_filled: Optional[bool] = False
       start_id: Optional[int] = 0 # number of start id
+      shuffle_id: Optional[bool] = False # shuffle ids after generating ids  (incrementally generated from `start_id`)
 
       # check request result
       # supports: `check_response`, `check_error_response`, `check_ignore_expected_errors`
@@ -625,6 +626,7 @@ concurrent_tasks:
       # according to `dataset_params.varchar_filled`
       varchar_filled: Optional[bool] = False
       start_id: Optional[int] = 0 # number of start id
+      shuffle_id: Optional[bool] = False # shuffle ids after generating ids  (incrementally generated from `start_id`)
 
       # check request result
       # supports: `check_response`, `check_error_response`, `check_ignore_expected_errors`
