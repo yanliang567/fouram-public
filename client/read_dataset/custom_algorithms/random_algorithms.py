@@ -79,7 +79,7 @@ class AlgorithmBase:
         # parser `base_size`
         _base_size = kwargs.get("base_size", default_value)
         parser_base_size = parser_data_size(_base_size)
-        if not isinstance(_base_size, int) or _base_size <= 0:
+        if not isinstance(parser_base_size, int) or parser_base_size <= 0:
             raise ValueError("[AlgorithmBase] Parser `{0}`:{1} failed: {2} ".format(
                 "base_size", _base_size, parser_base_size))
 
