@@ -253,7 +253,7 @@ class ResponseChecker:
             if isinstance(expect_output_fields, list):
                 # check output_fields
                 assert [True for i in all_keys if i != set(expect_output_fields)] == [], \
-                    f"all_keys: {0}, expect_output_fields".format(all_keys, expect_output_fields)
+                    "all_keys: {0}, expect_output_fields: {1}".format(all_keys, expect_output_fields)
 
             return True
 
