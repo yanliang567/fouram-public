@@ -405,21 +405,28 @@ class ConcurrentParams(CommonParams):
     @staticmethod
     def params_scene_test_partition(weight=1, data_size="3k", ni=3000, nq=1, search_param={"ef": 64}, limit=10,
                                     expr=None, output_fields=None, guarantee_timestamp=None,
-                                    timeout: Optional[int] = 120):
+                                    timeout: Optional[int] = 120, search_counts: Optional[int] = 1):
         """
+        # collection and insert
         data_size: total insert data_size data into partition
         ni: insert ni into the created partition per time
+
+        # search
+        nq: Optional[int] = 10
         search_param: search param
         limit: search limit
         expr: search expr
         output_fields: search output_fields
         guarantee_timestamp: guarantee_timestamp
         timeout: Optional[int] = 120, insert and search timeout
+
+        # other
+        search_counts: Optional[int] = 1
         """
         return {"type": "scene_test_partition", "weight": weight,
                 "params": {"data_size": data_size, "ni": ni, "nq": nq, "search_param": search_param, "limit": limit,
                            "expr": expr, "output_fields": output_fields, "guarantee_timestamp": guarantee_timestamp,
-                           "timeout": timeout}}
+                           "timeout": timeout, "search_counts": search_counts}}
 
     @staticmethod
     def params_scene_test_partition_hybrid_search(weight=1, nq=1, top_k=1,
@@ -427,7 +434,7 @@ class ConcurrentParams(CommonParams):
                                                   rerank: HybridSearchRerankParams = None,
                                                   output_fields: list = None, ignore_growing: bool = False,
                                                   guarantee_timestamp: int = None, timeout: Optional[int] = 60,
-                                                  random_data=True, data_size="3k", ni=3000):
+                                                  random_data=True, hybrid_search_counts=1, data_size="3k", ni=3000):
         """
         # hybrid_search
         reqs: list
@@ -440,6 +447,7 @@ class ConcurrentParams(CommonParams):
         timeout: Optional[int] = DefaultValue.default_timeout
 
         random_data: Optional[bool] = False
+        hybrid_search_counts: Optional[int] = 1
 
         # collection and insert
         data_size: Optional[int] = 3000
@@ -449,7 +457,7 @@ class ConcurrentParams(CommonParams):
                 "params": {"nq": nq, "top_k": top_k, "reqs": [i.obj_params for i in reqs], "rerank": rerank.obj_params,
                            "output_fields": output_fields, "ignore_growing": ignore_growing,
                            "guarantee_timestamp": guarantee_timestamp, "timeout": timeout, "random_data": random_data,
-                           "data_size": data_size, "ni": ni}}
+                           "hybrid_search_counts": hybrid_search_counts, "data_size": data_size, "ni": ni}}
 
     @staticmethod
     def params_iterate_search(weight=1, nq=1, top_k=1, search_param={"ef": 64}, guarantee_timestamp: int = None,

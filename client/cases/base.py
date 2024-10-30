@@ -851,8 +851,10 @@ class Base:
         :return: InterfaceResponse
         """
         partition_obj = partition_obj or self.partition_wrap
-        msg = "[Base] Params of search: nq:{0}, anns_field:{1}, param:{2}, limit:{3}, expr:\"{4}\", kwargs:{5}"
-        log.customize(log_level)(msg.format(check_vector_length(data), anns_field, param, limit, expr, kwargs))
+        msg = f"[Base] Params of partition:{partition_obj.name} " + \
+              "search: nq:{0}, anns_field:{1}, param:{2}, limit:{3}, expr:\"{4}\", kwargs:{5}".format(
+                  check_vector_length(data), anns_field, param, limit, expr, kwargs)
+        log.customize(log_level)(msg)
         return partition_obj.search(data, anns_field, param, limit, expr=expr, timeout=timeout, **kwargs)
 
     def hybrid_search_partition(self, reqs, rerank, limit, output_fields=None, partition_obj: callable = None,
@@ -1080,21 +1082,25 @@ class Base:
         self.load_partition(partition_obj, log_level=log_level)
 
         # search partition
-        data = gen_vectors(nb=params.nq, dim=params.dim, field_name=params.anns_field, sparse_range=params.sparse_range)
-        self.search_partition(data=data, anns_field=params.anns_field, param=params.search_param, limit=params.limit,
-                              partition_obj=partition_obj, check_task=CheckTasks.checkResponse, log_level=log_level,
-                              **params.search_obj_params)
+        search_results = [self.search_partition(
+            data=params.get_random_data, anns_field=params.anns_field, param=params.search_param, limit=params.limit,
+            partition_obj=partition_obj, check_task=CheckTasks.checkResponse, log_level=log_level,
+            **params.search_obj_params).check_result for _ in range(params.search_counts)]
 
         # release partition and search failed
         self.release_partition(partition_obj, log_level=log_level, timeout=params.timeout,
                                check_task=CheckTasks.checkResponse)
-        self.search_partition(data=data, anns_field=params.anns_field, param=params.search_param, limit=params.limit,
-                              partition_obj=partition_obj, check_task=CheckTasks.checkErrorResponse,
-                              check_items={dv.code: 65535, dv.message: f"not loaded"},
-                              log_level=log_level, **params.search_obj_params)
+        self.search_partition(
+            data=params.get_random_data, anns_field=params.anns_field, param=params.search_param, limit=params.limit,
+            partition_obj=partition_obj, check_task=CheckTasks.checkErrorResponse,
+            check_items={dv.code: 65535, dv.message: f"not loaded"}, log_level=log_level, **params.search_obj_params)
 
         # drop partition
         self.drop_partition(partition_obj, log_level=log_level)
+
+        if params.search_counts > sum(search_results):
+            raise Exception("[Base] Search of concurrent_scene_test_partition failed, please check.")
+
         return "[Base] concurrent_scene_test_partition finished."
 
     @func_time_catch()
@@ -1131,19 +1137,24 @@ class Base:
         self.load_partition(partition_obj, log_level=log_level, **params.obj_params)
 
         # hybrid_search partition
-        _reqs, _ = params.get_random_data()
-        self.hybrid_search_partition(reqs=_reqs, partition_obj=partition_obj, check_task=CheckTasks.checkResponse,
-                                     log_level=log_level, **params.search_obj_params)
+        hybrid_search_results = [self.hybrid_search_partition(
+            reqs=params.get_random_data()[0], partition_obj=partition_obj, check_task=CheckTasks.checkResponse,
+            log_level=log_level, **params.search_obj_params).check_result for _ in range(params.hybrid_search_counts)]
 
         # release partition and hybrid_search failed
         self.release_partition(partition_obj, log_level=log_level, check_task=CheckTasks.checkResponse,
                                **params.obj_params)
-        self.hybrid_search_partition(reqs=_reqs, partition_obj=partition_obj, check_task=CheckTasks.checkErrorResponse,
-                                     check_items={dv.code: 65535, dv.message: f"not loaded"},
-                                     log_level=log_level, **params.search_obj_params)
+        self.hybrid_search_partition(
+            reqs=params.get_random_data()[0], partition_obj=partition_obj, check_task=CheckTasks.checkErrorResponse,
+            check_items={dv.code: 65535, dv.message: f"not loaded"}, log_level=log_level, **params.search_obj_params)
 
         # drop partition
         self.drop_partition(partition_obj, log_level=log_level, **params.obj_params)
+
+        if params.hybrid_search_counts > sum(hybrid_search_results):
+            raise Exception(
+                "[Base] Hybrid_search of concurrent_scene_test_partition_hybrid_search failed, please check.")
+
         return "[Base] concurrent_scene_test_partition_hybrid_search finished."
 
     @func_time_catch()

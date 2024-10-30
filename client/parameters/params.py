@@ -1054,6 +1054,9 @@ class ConcurrentInputParamsSceneTestPartition(DataClassBase):
     guarantee_timestamp: Optional[int] = None
     timeout: Optional[int] = DefaultValue.default_timeout
 
+    # other
+    search_counts: Optional[int] = 1
+
 
 @dataclass
 class ConcurrentTaskSceneTestPartition(DataClassBase):
@@ -1075,6 +1078,9 @@ class ConcurrentTaskSceneTestPartition(DataClassBase):
     guarantee_timestamp: Optional[int] = None
     timeout: Optional[int] = DefaultValue.default_timeout
 
+    # other
+    search_counts: Optional[int] = 1
+
     @property
     def search_obj_params(self):
         return {
@@ -1083,6 +1089,10 @@ class ConcurrentTaskSceneTestPartition(DataClassBase):
             "guarantee_timestamp": self.guarantee_timestamp,
             "timeout": self.timeout
         }
+
+    @property
+    def get_random_data(self):
+        return gen_vectors(nb=self.nq, dim=self.dim, field_name=self.anns_field, sparse_range=self.sparse_range)
 
     @property
     def obj_params(self):
@@ -1102,6 +1112,7 @@ class ConcurrentInputParamsSceneTestPartitionHybridSearch(DataClassBase):
     timeout: Optional[int] = DefaultValue.default_timeout
 
     random_data: Optional[bool] = False
+    hybrid_search_counts: Optional[int] = 1
 
     # collection and insert
     data_size: Optional[int] = 3000
@@ -1125,6 +1136,7 @@ class ConcurrentTaskSceneTestPartitionHybridSearch(DataClassBase):
 
     # other params
     random_data: Optional[bool] = False
+    hybrid_search_counts: Optional[int] = 1
 
     # collection and insert
     data_size: Optional[int] = 3000

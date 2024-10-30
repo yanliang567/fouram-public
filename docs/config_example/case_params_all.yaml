@@ -717,6 +717,9 @@ concurrent_tasks:
       guarantee_timestamp: Optional[int] = None
       timeout: Optional[int] = 60
 
+      # other
+      search_counts: Optional[int] = 1  # Number of serial search
+
   - type: scene_test_partition_hybrid_search
     weight: 1
     params:
@@ -733,6 +736,7 @@ concurrent_tasks:
       timeout: Optional[int] = DefaultValue.default_timeout
 
       random_data: Optional[bool] = False
+      hybrid_search_counts: Optional[int] = 1  # Number of serial hybrid_search
 
       # collection and insert
       data_size: Optional[int] = 3000
