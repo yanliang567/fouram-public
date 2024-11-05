@@ -26,6 +26,7 @@ class DefaultIndexParams:
     HNSW = {pn.index_type: pn.IndexTypeName.HNSW, pn.index_param: {"M": 8, "efConstruction": 200}}
     DISKANN = {pn.index_type: pn.IndexTypeName.DISKANN, pn.index_param: {}}
     BIN_IVF_FLAT = {pn.index_type: pn.IndexTypeName.BIN_IVF_FLAT, pn.index_param: {"nlist": 2048}}
+    AUTOINDEX = {pn.index_type: pn.IndexTypeName.AUTOINDEX, pn.index_param: {}}
 
 
 class DefaultVectorIndexParams:

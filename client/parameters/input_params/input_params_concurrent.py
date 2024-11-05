@@ -158,8 +158,9 @@ class ConcurrentParams(CommonParams):
     def params_query(weight=1, ids: list = None, expr: str = None, output_fields: list = None,
                      ignore_growing: bool = False, offset: int = None, limit: int = None, partition_names: list = None,
                      consistency_level: Optional[str] = None, timeout: Optional[int] = 60,
-                     random_data: bool = False, random_count: int = 0,
-                     random_range: list = [0, 1], field_name: str = "id", field_type: str = "int64",
+                     random_data: bool = False, random_count: int = 0, random_range: Optional[list] = [0, 1],
+                     field_name: Optional[str] = "id", field_type: Optional[str] = "int64",
+                     custom_expr: Optional[str] = None, custom_range: Optional[list] = [0, 1],
                      check_task: Optional[str] = CheckTasks.checkResponse, check_items: Union[dict, list] = None):
         """
         ids: Optional[list] = None
@@ -179,6 +180,10 @@ class ConcurrentParams(CommonParams):
         field_name: Optional[str] = DefaultValue.default_query_field
         field_type: Optional[str] = DefaultValue.default_int64_field_name
 
+        # custom expr
+        custom_expr: Optional[str] = None
+        custom_range: Optional[list] = field(default_factory=lambda: [0, 1])
+
         # check request result
         check_task: Optional[str] = CheckTasks.checkResponse
         check_items: Union[dict, list] = field(default_factory=lambda: {})
@@ -188,8 +193,9 @@ class ConcurrentParams(CommonParams):
                            "ignore_growing": ignore_growing, "partition_names": partition_names, "timeout": timeout,
                            "consistency_level": consistency_level,
                            "random_data": random_data, "random_count": random_count, "random_range": random_range,
-                           "field_name": field_name, "field_type": field_type, "check_task": check_task,
-                           "check_items": check_items}}
+                           "field_name": field_name, "field_type": field_type,
+                           "custom_expr": custom_expr, "custom_range": custom_range,
+                           "check_task": check_task, "check_items": check_items}}
 
     @staticmethod
     def params_flush(weight=1, timeout: Optional[int] = 30, check_task: Optional[str] = CheckTasks.checkResponse,

@@ -4551,15 +4551,15 @@ class TestFeatureCases(PerfTemplate):
         concurrent_tasks = [
             ConcurrentParams.params_search(
                 nq=10, top_k=10, search_param={"nprobe": 16}, expr=Expr.EQ('int8_1', 100).value,
-                output_fields=['id', 'float_vector', 'int64_1'], timeout=60, check_task=CheckTasks.checkSearchOutput,
+                output_fields=['id', 'float_vector', 'int64_1'], timeout=30, check_task=CheckTasks.checkSearchOutput,
                 check_items={"nq": 10}
             ),
             ConcurrentParams.params_query(
-                expr=Expr.GT('int64_1', -1).value, output_fields=['*'], timeout=60, limit=10,
+                expr=Expr.GT('int64_1', -1).value, output_fields=['*'], timeout=30, limit=10,
                 check_task=CheckTasks.checkQueryOutput, check_items={"expect_length": 10}
             ),
             ConcurrentParams.params_hybrid_search(
-                nq=10, top_k=1, output_fields=['*'], timeout=120,
+                nq=10, top_k=1, output_fields=['*'], timeout=30,
                 reqs=[
                     HybridSearchReqParams(
                         anns_field="float_vector", search_param={"nprobe": 128}, top_k=100,
@@ -4576,7 +4576,7 @@ class TestFeatureCases(PerfTemplate):
                 check_items={"output_fields": all_other_fields + ['id', 'float_vector'], "nq": 10}
             ),
             ConcurrentParams.params_load(timeout=180),
-            ConcurrentParams.params_insert(nb=10, random_id=True, random_vector=True, start_id=dataset_size),
+            ConcurrentParams.params_insert(nb=10, random_id=False, random_vector=True, start_id=dataset_size),
             ConcurrentParams.params_delete(delete_length=10),
             ConcurrentParams.params_flush(timeout=600, check_task=CheckTasks.checkIgnoreExpectedErrors,
                                           check_items=CheckItems.IgnoreFlushRateLimitAndTimeout)
@@ -4601,10 +4601,11 @@ class TestFeatureCases(PerfTemplate):
             ]),
             vectors_index=cdp.DefaultVectorIndexParams.SPARSE_INVERTED_INDEX('sparse_float_vector'),
             scalars_index=dict_merge(cdp.DefaultScalarIndexParams.BITMAP_list(bitmap_fields)),
+            # alter_index=cdp.DefaultAlterIndex.list_index_offset_cache(['int16_1', 'int8_1']),
             concurrent_number=[20], during_time="3h", interval=20, **cdp.DefaultIndexParams.IVF_SQ8)
 
         self.concurrency_template(
-            input_params=input_params, cpu=16, mem=64, deploy_mode=deploy_mode,
+            input_params=input_params, cpu=8, mem=16, deploy_mode=deploy_mode,
             old_version_format=self.get_report_version_format(False),
             case_callable_obj=self.get_callable_object(ConcurrentClientBase().scene_concurrent_locust),
             default_case_params=default_case_params)
@@ -4655,15 +4656,15 @@ class TestFeatureCases(PerfTemplate):
         concurrent_tasks = [
             ConcurrentParams.params_search(
                 nq=15, top_k=10, search_param={"nprobe": 16}, expr=Expr.EQ('int8_1', 100).value,
-                output_fields=['id', 'float_vector', 'int64_1'], timeout=1200, check_task=CheckTasks.checkSearchOutput,
+                output_fields=['id', 'float_vector', 'int64_1'], timeout=30, check_task=CheckTasks.checkSearchOutput,
                 check_items={"nq": 15}
             ),
             ConcurrentParams.params_query(
-                expr=Expr.GT('int64_1', -1).value, output_fields=['*'], timeout=1200, limit=10,
+                expr=Expr.GT('int64_1', -1).value, output_fields=['*'], timeout=60, limit=10,
                 check_task=CheckTasks.checkQueryOutput, check_items={"expect_length": 10}
             ),
             ConcurrentParams.params_hybrid_search(
-                nq=2, top_k=10, output_fields=['*'], timeout=1800,
+                nq=2, top_k=10, output_fields=['*'], timeout=60,
                 reqs=[
                     HybridSearchReqParams(
                         anns_field="float_vector", search_param={"ef": 32}, top_k=30,
@@ -4680,7 +4681,7 @@ class TestFeatureCases(PerfTemplate):
                 check_items={"output_fields": all_other_fields + ['id', 'float_vector'], "nq": 2}
             ),
             ConcurrentParams.params_load(timeout=180),
-            ConcurrentParams.params_insert(nb=10, random_id=True, random_vector=True, start_id=dataset_size),
+            ConcurrentParams.params_insert(nb=10, random_id=False, random_vector=True, start_id=dataset_size),
             ConcurrentParams.params_delete(delete_length=9),
             ConcurrentParams.params_flush(timeout=600, check_task=CheckTasks.checkIgnoreExpectedErrors,
                                           check_items=CheckItems.IgnoreFlushRateLimitAndTimeout)
@@ -4712,8 +4713,9 @@ class TestFeatureCases(PerfTemplate):
             concurrent_number=[20], during_time="3h", interval=20, **cdp.DefaultIndexParams.HNSW)
 
         node_resources = [
-            NodeResource(nodes=[indexNode], replicas=2, cpu=8, mem=8),
-            NodeResource(nodes=[queryNode], replicas=1, cpu=16, mem=32)  # < 15G
+            NodeResource(nodes=[dataNode], replicas=1, cpu=2, mem=8),
+            NodeResource(nodes=[indexNode], replicas=2, cpu=4, mem=4),
+            NodeResource(nodes=[queryNode], replicas=1, cpu=8, mem=32)  # < 15G
         ]
 
         self.concurrency_template(
@@ -4766,15 +4768,15 @@ class TestFeatureCases(PerfTemplate):
         concurrent_tasks = [
             ConcurrentParams.params_search(
                 nq=8, top_k=10, search_param={"nprobe": 16}, expr=Expr.EQ('int8_1', 100).value,
-                output_fields=['id', 'float_vector', 'int64_1'], timeout=180, check_task=CheckTasks.checkSearchOutput,
+                output_fields=['id', 'float_vector', 'int64_1'], timeout=30, check_task=CheckTasks.checkSearchOutput,
                 check_items={"nq": 8}
             ),
             ConcurrentParams.params_query(
                 expr=Expr.GT('int64_1', -1).value, output_fields=['*'],
-                timeout=60, limit=10, check_task=CheckTasks.checkQueryOutput, check_items={"expect_length": 10}
+                timeout=30, limit=10, check_task=CheckTasks.checkQueryOutput, check_items={"expect_length": 10}
             ),
             ConcurrentParams.params_hybrid_search(
-                nq=3, top_k=5, output_fields=['*'], timeout=180,
+                nq=3, top_k=5, output_fields=['*'], timeout=30,
                 reqs=[
                     HybridSearchReqParams(
                         anns_field="float_vector", search_param={"nprobe": 128}, top_k=100,
@@ -4791,7 +4793,7 @@ class TestFeatureCases(PerfTemplate):
                 check_items={"output_fields": all_other_fields + ['id', 'float_vector'], "nq": 3}
             ),
             ConcurrentParams.params_load(timeout=180),
-            ConcurrentParams.params_upsert(nb=10, random_id=True, random_vector=True, start_id=dataset_size),
+            ConcurrentParams.params_upsert(nb=10, random_id=False, random_vector=True, start_id=dataset_size),
             ConcurrentParams.params_flush(timeout=600, check_task=CheckTasks.checkIgnoreExpectedErrors,
                                           check_items=CheckItems.IgnoreFlushRateLimitAndTimeout)
         ]
@@ -4819,7 +4821,7 @@ class TestFeatureCases(PerfTemplate):
 
         # 16C, 6G
         self.concurrency_template(
-            input_params=input_params, cpu=16, mem=16, deploy_mode=deploy_mode,
+            input_params=input_params, cpu=8, mem=8, deploy_mode=deploy_mode,
             old_version_format=self.get_report_version_format(False),
             case_callable_obj=self.get_callable_object(ConcurrentClientBase().scene_concurrent_locust),
             default_case_params=default_case_params)

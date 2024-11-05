@@ -64,14 +64,14 @@ class CliClient(BaseClient):
         res_cmd = CmdExe(_cmd).run_cmd()
         return self.release_name if return_release_name else res_cmd, {}
 
-    def upgrade(self, set_params="", release_name="", chart="", default_params=" --wait ", params=" --reuse-values ",
-                timeout=1800, return_release_name=True, **kwargs):
+    def upgrade(self, set_params="", release_name="", chart="", default_params=" --wait ",
+                params=" --reset-then-reuse-values ", timeout=1800, return_release_name=True, **kwargs):
         """
         :param set_params: image.all.pullPolicy=IfNotPresent,image.all.tag=v2.0.2
         :param release_name: less than 63 characters
         :param chart: name of helm chart or use local path of helm chart
         :param default_params: --wait
-        :param params: --reuse-values
+        :param params: --reset-then-reuse-values, deprecated: --reuse-values
         :param return_release_name: bool
         :param timeout: int
         :return: None

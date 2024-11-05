@@ -52,7 +52,7 @@ class TestConcurrentCases(PerfTemplate):
             input_params=input_params, cpu=dp.default_cpu, mem=dp.default_mem, old_version_format=False,
             case_callable_obj=ConcurrentClientBase().scene_concurrent_locust)
 
-    @pytest.mark.skip(reason="search can't pass parameter `output_fields` when it is IVF_SQ8 index")
+    # @pytest.mark.skip(reason="search can't pass parameter `output_fields` when it is IVF_SQ8 index")
     @pytest.mark.locust
     @pytest.mark.parametrize("deploy_mode", [STANDALONE])
     def test_concurrent_locust_ivf_sq8_query_standalone(self, input_params: InputParamsBase, deploy_mode):
@@ -71,7 +71,7 @@ class TestConcurrentCases(PerfTemplate):
             case_callable_obj=self.get_callable_object(ConcurrentClientBase().scene_concurrent_locust),
             default_case_params=default_case_params)
 
-    @pytest.mark.skip(reason="search can't pass parameter `output_fields` when it is IVF_SQ8 index")
+    # @pytest.mark.skip(reason="search can't pass parameter `output_fields` when it is IVF_SQ8 index")
     @pytest.mark.locust
     @pytest.mark.parametrize("deploy_mode", [CLUSTER])
     def test_concurrent_locust_ivf_sq8_query_cluster(self, input_params: InputParamsBase, deploy_mode):
@@ -1063,7 +1063,7 @@ class TestConcurrentCases(PerfTemplate):
             **cdp.DefaultIndexParams.IVF_SQ8)
 
         node_resources = [
-            NodeResource(nodes=[dataNode], replicas=1, mem=4),
+            NodeResource(nodes=[dataNode], replicas=1, mem=8),
             NodeResource(nodes=[indexNode], replicas=1, cpu=8, mem=16),
             NodeResource(nodes=[queryNode], replicas=6, cpu=8, mem=64),
         ]

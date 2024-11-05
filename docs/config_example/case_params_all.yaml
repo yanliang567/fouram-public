@@ -530,6 +530,10 @@ concurrent_tasks:
       # `field_type` only support "int64" and "varchar"
       field_type: Optional[str] = int64
 
+      # custom expr
+      custom_expr: Optional[str] = None
+      custom_range: Optional[list] = [ 0, 1 ]
+
       # check request result
       # supports: `check_response`, `check_error_response`, `check_ignore_expected_errors`
       check_task: Optional[str] = "check_response"

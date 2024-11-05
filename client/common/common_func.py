@@ -574,8 +574,10 @@ def gen_random_query_data(random_count: int, random_range: list, query_field_nam
     if len(random_range) != 2:
         raise ValueError(f"[gen_random_query_data] The length of random_range must be 2, not {len(random_range)}")
 
-    _query_field_type = "int" if query_field_type == dv.default_int64_field_name else "str"
-    _query_range = [eval(f"{_query_field_type}({random.randint(*random_range)})") for i in range(random_count)]
+    if query_field_type == dv.default_int64_field_name:
+        _query_range = [random.randint(*random_range) for _ in range(random_count)]
+    else:
+        _query_range = [str(random.randint(*random_range)) for _ in range(random_count)]
     return f"{query_field_name} in {_query_range}"
 
 

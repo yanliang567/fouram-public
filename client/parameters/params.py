@@ -7,7 +7,7 @@ from client.client_base import RRFRanker, WeightedRanker, AnnSearchRequest, Data
 from client.common.common_parser import ParserFieldsParams
 from client.common.common_func import (
     gen_combinations, update_dict_value, loop_ids, gen_vectors, get_default_field_name, check_vector_length,
-    parser_check_tasks
+    parser_check_tasks, gen_random_query_data
 )
 from client.common.common_type import concurrent_global_params, DefaultValue, CheckTasks
 from client.check.func_check import InterfaceCheckTasks
@@ -340,6 +340,8 @@ class ConcurrentGoBenchParamsSearch(DataClassBase):
     timeout: Optional[int] = DefaultValue.default_timeout
     expr: Optional[str] = ""
     output_fields: Optional[list] = field(default_factory=lambda: [])
+    partition_names: Optional[list] = None
+    random_data: Optional[bool] = False
 
 
 @dataclass
@@ -458,6 +460,10 @@ class ConcurrentInputParamsQuery(DataClassBase):
     field_name: Optional[str] = DefaultValue.default_query_field
     field_type: Optional[str] = DefaultValue.default_int64_field_name
 
+    # custom expr
+    custom_expr: Optional[str] = None
+    custom_range: Optional[list] = field(default_factory=lambda: [0, 1])
+
     # check request result
     check_task: Optional[str] = CheckTasks.checkResponse
     check_items: Union[dict, list] = field(default_factory=lambda: {})
@@ -481,12 +487,19 @@ class ConcurrentTaskQuery(DataClassBase):
     field_name: Optional[str] = DefaultValue.default_query_field
     field_type: Optional[str] = DefaultValue.default_int64_field_name
 
+    # custom expr
+    custom_expr: Optional[str] = None
+    custom_range: Optional[list] = field(default_factory=lambda: [0, 1])
+
     # save obj_params
     obj_params: Optional[dict] = None
 
     # check request result
     check_task: Optional[str] = CheckTasks.checkResponse
     check_items: Union[dict, list] = field(default_factory=lambda: {})
+
+    # other
+    _prepare_symbol: Optional[str] = " "
 
     def __post_init__(self):
         support_tasks = InterfaceCheckTasks.query
@@ -505,7 +518,25 @@ class ConcurrentTaskQuery(DataClassBase):
         if isinstance(self.consistency_level, str) and self.consistency_level:
             self.obj_params["consistency_level"] = self.consistency_level
 
+        # parser prepare_symbol
+        _expr = self.expr.strip()
+        if not (_expr == "" or _expr.endswith("&&") or _expr.endswith("||")):
+            self._prepare_symbol = " || "
+
         log.debug("[{0}] Init done, query obj_params:{1}".format("ConcurrentTaskQuery", self.obj_params))
+
+    @property
+    def query_expr(self):
+        _extra_expr = ""
+        if self.random_data:
+            _extra_expr += gen_random_query_data(
+                random_count=self.random_count, random_range=self.random_range,
+                query_field_name=self.field_name, query_field_type=self.field_type)
+        if self.custom_expr:
+            if _extra_expr != "":
+                _extra_expr += " || "
+            _extra_expr += self.custom_expr.format(random.randint(*self.custom_range))
+        return self.expr if _extra_expr == "" else self.expr + self._prepare_symbol + _extra_expr
 
 
 @dataclass
@@ -513,6 +544,35 @@ class ConcurrentGoBenchParamsQuery(DataClassBase):
     expr: Optional[str]
     timeout: Optional[int] = DefaultValue.default_timeout
     output_fields: Optional[list] = field(default_factory=lambda: [])
+    partition_names: Optional[list] = None
+    limit: Optional[int] = None
+
+    # other params
+    random_data: Optional[bool] = False
+    random_count: Optional[int] = 0
+    random_range: Optional[list] = field(default_factory=lambda: [0, 1])
+    field_name: Optional[str] = DefaultValue.default_query_field
+    field_type: Optional[str] = DefaultValue.default_int64_field_name
+
+    # custom expr
+    custom_expr: Optional[str] = None
+    custom_range: Optional[list] = field(default_factory=lambda: [0, 1])
+
+    def __post_init__(self):
+        _expr = self.expr.strip()
+        _prepare_symbol = " || " if not (_expr == "" or _expr.endswith("&&") or _expr.endswith("||")) else " "
+
+        if self.random_data or self.custom_expr:
+            self.expr += _prepare_symbol
+
+        # params reset
+        if not self.random_data:
+            self.random_count = None
+            self.random_range = None
+            self.field_name = None
+            self.field_type = None
+        if not self.custom_expr:
+            self.custom_range = None
 
 
 @dataclass

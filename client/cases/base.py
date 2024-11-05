@@ -884,16 +884,7 @@ class Base:
         return self.collection_wrap.hybrid_search(reqs=_reqs, **params.obj_params)
 
     def concurrent_query(self, params: ConcurrentTaskQuery):
-        _extra_expr = ""
-        if params.random_data:
-            _symbol, _expr = " ", params.expr.strip()
-            if not (_expr == "" or _expr.endswith("&&") or _expr.endswith("||")):
-                _symbol = " || "
-
-            _extra_expr += _symbol + gen_random_query_data(
-                random_count=params.random_count, random_range=params.random_range,
-                query_field_name=params.field_name, query_field_type=params.field_type)
-        return self.collection_wrap.query(expr=params.expr + _extra_expr, **params.obj_params)
+        return self.collection_wrap.query(expr=params.query_expr, **params.obj_params)
 
     def concurrent_flush(self, params: ConcurrentTaskFlush):
         return self.collection_wrap.flush(**params.obj_params)
@@ -1099,7 +1090,8 @@ class Base:
         self.drop_partition(partition_obj, log_level=log_level)
 
         if params.search_counts > sum(search_results):
-            raise Exception("[Base] Search of concurrent_scene_test_partition failed, please check.")
+            msg = f"{[partition_name]}: {params.search_counts} > {sum(search_results)}"
+            raise Exception(f"[Base] Search of concurrent_scene_test_partition failed: {msg}, please check.")
 
         return "[Base] concurrent_scene_test_partition finished."
 
@@ -1152,8 +1144,9 @@ class Base:
         self.drop_partition(partition_obj, log_level=log_level, **params.obj_params)
 
         if params.hybrid_search_counts > sum(hybrid_search_results):
+            msg = f"{partition_name}: {params.hybrid_search_counts} > {sum(hybrid_search_results)}"
             raise Exception(
-                "[Base] Hybrid_search of concurrent_scene_test_partition_hybrid_search failed, please check.")
+                f"[Base] Hybrid_search of concurrent_scene_test_partition_hybrid_search failed: {msg}, please check.")
 
         return "[Base] concurrent_scene_test_partition_hybrid_search finished."
 
@@ -1353,7 +1346,8 @@ class Base:
             self.remove_connect(alias=connect_using, log_level=log_level)
 
         if params.search_counts > sum(search_results):
-            raise Exception("[Base] Search of concurrent_scene_search_test failed, please check.")
+            msg = f"{collection_name}: {params.search_counts} > {sum(search_results)}"
+            raise Exception(f"[Base] Search of concurrent_scene_search_test failed: {msg}, please check.")
 
         return "[Base] concurrent_scene_search_test finished."
 
@@ -1461,6 +1455,8 @@ class Base:
             self.remove_connect(alias=connect_using, log_level=log_level)
 
         if params.hybrid_search_counts > sum(hybrid_search_results):
-            raise Exception("[Base] Hybrid_search of concurrent_scene_hybrid_search_test failed, please check.")
+            msg = f"{collection_name}: {params.hybrid_search_counts} > {sum(hybrid_search_results)}"
+            raise Exception(
+                f"[Base] Hybrid_search of concurrent_scene_hybrid_search_test failed: {msg}, please check.")
 
         return "[Base] concurrent_scene_hybrid_search_test finished."

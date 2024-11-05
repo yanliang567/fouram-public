@@ -25,6 +25,7 @@ from client.parameters.input_params import (
 )
 from client.parameters import params_name as pn
 import client.parameters.input_params.define_params as cdp
+from client.common.common_type import DefaultValue as dv
 from deploy.commons.common_params import (
     CLUSTER, STANDALONE, queryNode, dataNode, indexNode, proxy, kafka, pulsar, ClassID)
 from deploy.configs.default_configs import NodeResource, SetDependence
@@ -893,6 +894,7 @@ class TestGoBenchCases(PerfTemplate):
             3. check test result and report
             4. clean env"""
 
+    #  `scene_go_search` is deprecated, use `scene_go_bench` instead
     def test_go_bench_custom_parameters(self, input_params: InputParamsBase):
         """
         :test steps:
@@ -959,7 +961,8 @@ class TestGoBenchCases(PerfTemplate):
                 expr=eval("{'float_1': {'GT': -1.0, 'LT': parser_data_size(data_size) * 0.5}}"),
                 output_fields=["float_1", "float_vector"]),
             ConcurrentParams.params_query(
-                weight=1, expr="0 <= id <= 20 && 10.0 <= float_1 <= 30.0", output_fields=["float_1", "float_vector"])
+                weight=1, expr="0 <= id <= 20 && 10.0 <= float_1 <= 30.0", output_fields=["float_1", "float_vector"]
+            )
         ]
         default_case_params = ConcurrentParams().params_scene_concurrent(
             concurrent_tasks, concurrent_number=[20, 50], during_time="30m", interval=20, dataset_size=data_size,
@@ -984,7 +987,9 @@ class TestGoBenchCases(PerfTemplate):
                 expr=eval("{'float_1': {'GT': -1.0, 'LT': parser_data_size(data_size) * 0.5}}"),
                 output_fields=["float_1", "float_vector"]),
             ConcurrentParams.params_query(
-                weight=1, expr="0 <= id <= 20 && 10.0 <= float_1 <= 30.0", output_fields=["float_1", "float_vector"])]
+                weight=1, expr="0 <= id <= 20 && 10.0 <= float_1 <= 30.0", output_fields=["float_1", "float_vector"]
+            )
+        ]
         default_case_params = ConcurrentParams().params_scene_concurrent(
             concurrent_tasks, concurrent_number=[20, 50], during_time="30m", interval=20, dataset_size=data_size,
             other_fields=["float_1"], **cdp.DefaultIndexParams.HNSW)
@@ -992,3 +997,93 @@ class TestGoBenchCases(PerfTemplate):
         self.concurrency_template(
             input_params=input_params, cpu=dp.default_cpu, mem=dp.default_mem, deploy_mode=deploy_mode,
             case_callable_obj=GoBenchCases().scene_go_bench, default_case_params=default_case_params, sync_report=True)
+
+    @pytest.mark.parametrize("deploy_mode", [get_class_key_name(ClassID, ClassID.class1cu)])
+    def test_concurrent_go_bench_auto_index_dql_filter(self, input_params: InputParamsBase, deploy_mode):
+        """
+        :test steps:
+            1. concurrent test and calculation of RT and QPS
+        """
+        data_size = "1m"
+
+        # gen partition names
+        partition_names = [dv.default_partition_name]
+        partition_names.extend([f"{dv.partition_name_prefix}{i}" for i in range(1, 10)])
+
+        concurrent_tasks = [
+            ConcurrentParams.params_search(
+                weight=3, nq=10, top_k=10, search_param={"level": 1}, partition_names=partition_names,
+                expr=eval("{'float_1': {'GT': -1.0, 'LT': parser_data_size(data_size) * 0.5}}"),
+                output_fields=["float_1", "float_vector"], random_data=True),
+            ConcurrentParams.params_query(
+                weight=1, partition_names=partition_names, limit=100, output_fields=["float_1", "float_vector"],
+                expr="0 <= id <= 20 && 10.0 <= float_1 <= 30.0",
+                random_data=True, random_count=10, random_range=[0, parser_data_size(data_size)],
+                custom_expr="{0} < id < {0} + 1000", custom_range=[0, parser_data_size(data_size) - 5000]
+            )
+        ]
+        default_case_params = ConcurrentParams().params_scene_concurrent(
+            concurrent_tasks, concurrent_number=[20, 50], during_time="30m", interval=20, dataset_size=data_size,
+            extra_partitions=cdp.DefaultDatasetParams.extra_partitions(partitions=partition_names, data_repeated=False),
+            other_fields=["float_1"], **cdp.DefaultIndexParams.AUTOINDEX)
+
+        self.concurrency_template(
+            input_params=input_params, cpu=dp.default_cpu, mem=dp.default_mem, deploy_mode=deploy_mode,
+            case_callable_obj=GoBenchCases().scene_go_bench, default_case_params=default_case_params, sync_report=True)
+
+    @pytest.mark.go
+    @pytest.mark.parametrize("deploy_mode", [STANDALONE])
+    def test_concurrent_go_bench_hnsw_dql_filter_standalone(self, input_params: InputParamsBase, deploy_mode):
+        """
+        :test steps:
+            1. concurrent test and calculation of RT and QPS
+        """
+        data_size = "1m"
+
+        # gen partition names
+        partition_names = [dv.default_partition_name]
+        partition_names.extend([f"{dv.partition_name_prefix}{i}" for i in range(1, 10)])
+
+        concurrent_tasks = [
+            ConcurrentParams.params_search(
+                weight=3, nq=10, top_k=10, search_param={"ef": 32}, partition_names=partition_names,
+                expr=eval("{'float_1': {'GT': -1.0, 'LT': parser_data_size(data_size) * 0.5}}"),
+                output_fields=["float_1", "float_vector"], random_data=True),
+            ConcurrentParams.params_query(
+                weight=1, partition_names=partition_names, limit=100, output_fields=["float_1", "float_vector"],
+                expr="0 <= id <= 20 && 10.0 <= float_1 <= 30.0",
+                random_data=True, random_count=10, random_range=[0, parser_data_size(data_size)],
+                custom_expr="{0} < id < {0} + 1000", custom_range=[0, parser_data_size(data_size) - 5000]
+            )
+        ]
+        default_case_params = ConcurrentParams().params_scene_concurrent(
+            concurrent_tasks, concurrent_number=[20, 50], during_time="30m", interval=20, dataset_size=data_size,
+            extra_partitions=cdp.DefaultDatasetParams.extra_partitions(partitions=partition_names, data_repeated=False),
+            other_fields=["float_1"], **cdp.DefaultIndexParams.HNSW)
+
+        self.concurrency_template(
+            input_params=input_params, cpu=dp.default_cpu, mem=dp.default_mem, deploy_mode=deploy_mode,
+            case_callable_obj=GoBenchCases().scene_go_bench, default_case_params=default_case_params, sync_report=True)
+
+    @pytest.mark.go
+    @pytest.mark.parametrize("deploy_mode", [CLUSTER])
+    def test_concurrent_go_bench_ivf_sq8_search_cluster(self, input_params: InputParamsBase, deploy_mode):
+        """
+        :test steps:
+            1. concurrent test and calculation of RT and QPS
+        """
+        default_case_params = ConcurrentParams().params_scene_concurrent(
+            [ConcurrentParams.params_search(nq=10000, top_k=10, search_param={"nprobe": 16}, timeout=180)],
+            concurrent_number=[100], during_time=1800, interval=20, **cdp.DefaultIndexParams.IVF_SQ8)
+
+        node_resources = [
+            NodeResource(nodes=[proxy], cpu=1, mem=3),
+            NodeResource(nodes=[indexNode], cpu=4, mem=4),
+            NodeResource(nodes=[queryNode], cpu=10, mem=16)
+        ]
+
+        self.concurrency_template(
+            input_params=input_params, cpu=dp.min_cpu, mem=dp.min_mem, deploy_mode=deploy_mode,
+            old_version_format=self.get_report_version_format(False),
+            case_callable_obj=GoBenchCases().scene_go_bench, default_case_params=default_case_params,
+            node_resources=node_resources, sync_report=True)
