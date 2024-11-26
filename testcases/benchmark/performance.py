@@ -1033,7 +1033,7 @@ class TestGoBenchCases(PerfTemplate):
 
     @pytest.mark.go
     @pytest.mark.parametrize("deploy_mode", [STANDALONE])
-    def test_concurrent_go_bench_hnsw_dql_filter_standalone(self, input_params: InputParamsBase, deploy_mode):
+    def test_concurrent_go_bench_hnsw_dql_filter_random_standalone(self, input_params: InputParamsBase, deploy_mode):
         """
         :test steps:
             1. concurrent test and calculation of RT and QPS

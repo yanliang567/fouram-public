@@ -18,7 +18,7 @@ class DefaultParams:
     default_cpu = 8
     min_cpu = 2
     default_mem = 16
-    min_mem = 2
+    min_mem = 8
     default_resource_group = DEFAULT_RESOURCE_GROUP
 
 

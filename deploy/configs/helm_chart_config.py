@@ -1,7 +1,7 @@
 from deploy.configs.base_config import BaseConfig
 from deploy.commons.common_func import get_latest_tag, get_image_tag, update_dict_value
 from deploy.commons.common_params import (
-    IDC_NAS_URL, dataNode, queryNode, indexNode, all_pods, minio, etcd, pulsar, kafka, standalone, DefaultRepository,
+    IDC_NAS_URL, dataNode, queryNode, indexNode, all_pods, minio, etcd, pulsarv3, kafka, standalone, DefaultRepository,
     ephemeral_storage, STANDALONE, CLUSTER)
 
 from utils.util_log import log
@@ -35,7 +35,7 @@ class HelmConfig(BaseConfig):
         self.etcd_node_selector = self.set_etcd_node_selector(self.escape)
 
         # pulsar local-path
-        self.pulsar_local_path = {pulsar: self.pulsar_dict}
+        self.pulsar_local_path = {pulsarv3: self.pulsar_dict}
 
         # kafka local-path
         self.kafka_local_path = {kafka: self.kafka_dict}
@@ -61,7 +61,7 @@ class HelmConfig(BaseConfig):
         return {"cluster": {"enabled": False},
                 "etcd": {"replicaCount": 1},
                 "minio": {"mode": "standalone"},
-                "pulsar": {"enabled": False}} if cluster is False else {"cluster": {"enabled": True}}
+                "pulsarv3": {"enabled": False}} if cluster is False else {"cluster": {"enabled": True}}
 
     def get_deploy_mode(self, deploy_mode):
         if deploy_mode == STANDALONE:
@@ -101,8 +101,8 @@ class HelmConfig(BaseConfig):
     @staticmethod
     def set_mq(_pulsar: bool = False, _kafka: bool = False):
         if _pulsar + _kafka == 1:
-            return {"pulsar": {"enabled": _pulsar}, "kafka": {"enabled": _kafka}}
-        log.error(f"[HelmConfig] Can not support all mqs or none, pulsar:{_pulsar}, kafka:{_kafka}")
+            return {"pulsarv3": {"enabled": _pulsar}, "kafka": {"enabled": _kafka}}
+        log.error(f"[HelmConfig] Can not support all mqs or none, pulsarv3:{_pulsar}, kafka:{_kafka}")
         # use default mq
         return {}
 

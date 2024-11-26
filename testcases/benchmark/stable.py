@@ -66,7 +66,7 @@ class TestConcurrentCases(PerfTemplate):
             concurrent_number=[100], during_time=600, interval=20, **cdp.DefaultIndexParams.IVF_SQ8)
 
         self.concurrency_template(
-            input_params=input_params, cpu=6, mem=6, deploy_mode=deploy_mode,
+            input_params=input_params, cpu=6, mem=dp.min_mem, deploy_mode=deploy_mode,
             old_version_format=self.get_report_version_format(False),
             case_callable_obj=self.get_callable_object(ConcurrentClientBase().scene_concurrent_locust),
             default_case_params=default_case_params)
@@ -85,7 +85,7 @@ class TestConcurrentCases(PerfTemplate):
             concurrent_number=[100], during_time=600, interval=20, **cdp.DefaultIndexParams.IVF_SQ8)
 
         node_resources = [
-            NodeResource(nodes=[indexNode], cpu=4, mem=4),
+            NodeResource(nodes=[indexNode], cpu=4),
             NodeResource(nodes=[queryNode], mem=4)
         ]
 
@@ -107,7 +107,7 @@ class TestConcurrentCases(PerfTemplate):
             concurrent_number=[100], during_time=1800, interval=20, **cdp.DefaultIndexParams.IVF_SQ8)
 
         self.concurrency_template(
-            input_params=input_params, cpu=6, mem=6, deploy_mode=deploy_mode,
+            input_params=input_params, cpu=6, mem=dp.min_mem, deploy_mode=deploy_mode,
             old_version_format=self.get_report_version_format(False),
             case_callable_obj=self.get_callable_object(ConcurrentClientBase().scene_concurrent_locust),
             default_case_params=default_case_params)
@@ -124,7 +124,7 @@ class TestConcurrentCases(PerfTemplate):
             concurrent_number=[100], during_time=1800, interval=20, **cdp.DefaultIndexParams.IVF_SQ8)
 
         node_resources = [
-            NodeResource(nodes=[indexNode], cpu=4, mem=4),
+            NodeResource(nodes=[indexNode], cpu=4),
             NodeResource(nodes=[queryNode], cpu=10, mem=4)
         ]
 
@@ -185,7 +185,7 @@ class TestConcurrentCases(PerfTemplate):
             concurrent_number=[1000], during_time=1800, interval=20, **cdp.DefaultIndexParams.IVF_SQ8)
 
         self.concurrency_template(
-            input_params=input_params, cpu=10, mem=6, deploy_mode=deploy_mode,
+            input_params=input_params, cpu=10, mem=dp.min_mem, deploy_mode=deploy_mode,
             old_version_format=self.get_report_version_format(False),
             case_callable_obj=self.get_callable_object(ConcurrentClientBase().scene_concurrent_locust),
             default_case_params=default_case_params)
@@ -202,7 +202,7 @@ class TestConcurrentCases(PerfTemplate):
             concurrent_number=[1000], during_time=1800, interval=20, **cdp.DefaultIndexParams.IVF_SQ8)
 
         node_resources = [
-            NodeResource(nodes=[indexNode], cpu=4, mem=4),
+            NodeResource(nodes=[indexNode], cpu=4),
             NodeResource(nodes=[queryNode], cpu=10, mem=4)
         ]
 
@@ -349,7 +349,7 @@ class TestConcurrentCases(PerfTemplate):
         ]
 
         self.concurrency_template(
-            input_params=input_params, cpu=dp.min_cpu, mem=4, deploy_mode=deploy_mode,
+            input_params=input_params, cpu=dp.min_cpu, mem=dp.min_mem, deploy_mode=deploy_mode,
             old_version_format=self.get_report_version_format(False),
             case_callable_obj=self.get_callable_object(ConcurrentClientBase().scene_concurrent_locust),
             default_case_params=default_case_params, node_resources=node_resources)
@@ -484,7 +484,7 @@ class TestConcurrentCases(PerfTemplate):
             other_fields=["float_1"], **cdp.DefaultIndexParams.HNSW)
 
         self.concurrency_template(
-            input_params=input_params, cpu=dp.default_cpu, mem=8, deploy_mode=deploy_mode,
+            input_params=input_params, cpu=dp.default_cpu, mem=dp.min_mem, deploy_mode=deploy_mode,
             old_version_format=self.get_report_version_format(False),
             case_callable_obj=self.get_callable_object(ConcurrentClientBase().scene_concurrent_locust),
             default_case_params=default_case_params)
@@ -511,7 +511,7 @@ class TestConcurrentCases(PerfTemplate):
             other_fields=["float_1"], **cdp.DefaultIndexParams.HNSW)
 
         node_resources = [
-            NodeResource(nodes=[indexNode], mem=4),
+            NodeResource(nodes=[indexNode], mem=8),
             NodeResource(nodes=[queryNode], cpu=8, mem=4)
         ]
 
@@ -543,7 +543,7 @@ class TestConcurrentCases(PerfTemplate):
             other_fields=["float_1"], **cdp.DefaultIndexParams.DISKANN)
 
         self.concurrency_template(
-            input_params=input_params, cpu=4, mem=6, deploy_mode=deploy_mode,
+            input_params=input_params, cpu=4, mem=dp.min_mem, deploy_mode=deploy_mode,
             old_version_format=self.get_report_version_format(False),
             case_callable_obj=self.get_callable_object(ConcurrentClientBase().scene_concurrent_locust),
             default_case_params=default_case_params)
@@ -570,7 +570,7 @@ class TestConcurrentCases(PerfTemplate):
             other_fields=["float_1"], **cdp.DefaultIndexParams.DISKANN)
 
         node_resources = [
-            NodeResource(nodes=[indexNode], mem=4),
+            NodeResource(nodes=[indexNode], mem=8),
             NodeResource(nodes=[queryNode], cpu=4, mem=4)
         ]
 
@@ -638,7 +638,7 @@ class TestConcurrentCases(PerfTemplate):
         ]
 
         self.concurrency_template(
-            input_params=input_params, cpu=dp.min_cpu, mem=4, deploy_mode=deploy_mode,
+            input_params=input_params, cpu=dp.min_cpu, mem=dp.min_mem, deploy_mode=deploy_mode,
             old_version_format=self.get_report_version_format(False),
             case_callable_obj=self.get_callable_object(ConcurrentClientBase().scene_concurrent_locust),
             default_case_params=default_case_params, node_resources=node_resources)
@@ -1034,7 +1034,7 @@ class TestConcurrentCases(PerfTemplate):
 
         node_resources = [
             NodeResource(nodes=[dataNode], replicas=2),
-            NodeResource(nodes=[indexNode], replicas=4, cpu=6, mem=4),
+            NodeResource(nodes=[indexNode], replicas=4, cpu=6, mem=8),
             NodeResource(nodes=[queryNode], replicas=6).custom_resource(limits_cpu=16, requests_cpu=8,
                                                                         limits_mem=32, requests_mem=16)
         ]
@@ -1119,7 +1119,7 @@ class TestConcurrentCases(PerfTemplate):
             other_fields=["float_1"], replica_number=replica_number, **cdp.DefaultIndexParams.IVF_SQ8_2048)
 
         node_resources = [
-            NodeResource(nodes=[dataNode], replicas=1, mem=4),
+            NodeResource(nodes=[dataNode], replicas=1, mem=8),
             NodeResource(nodes=[indexNode], replicas=1, cpu=8, mem=16),
             NodeResource(nodes=[queryNode], replicas=2, cpu=4, mem=64),
         ]
@@ -1152,7 +1152,7 @@ class TestConcurrentCases(PerfTemplate):
             other_fields=["float_1"], **cdp.DefaultIndexParams.IVF_SQ8_2048)
 
         node_resources = [
-            NodeResource(nodes=[dataNode], replicas=1, mem=4),
+            NodeResource(nodes=[dataNode], replicas=1, mem=8),
             NodeResource(nodes=[indexNode], replicas=1, cpu=8, mem=16),
             NodeResource(nodes=[queryNode], replicas=1, cpu=8, mem=64),
         ]
@@ -1187,7 +1187,7 @@ class TestConcurrentCases(PerfTemplate):
             other_fields=["float_1"], **cdp.DefaultIndexParams.IVF_SQ8_2048)
 
         node_resources = [
-            NodeResource(nodes=[dataNode], replicas=1, mem=4),
+            NodeResource(nodes=[dataNode], replicas=1, mem=8),
             NodeResource(nodes=[indexNode], replicas=1, cpu=8, mem=16),
             NodeResource(nodes=[queryNode], replicas=1, cpu=8, mem=64),
         ]
@@ -1221,7 +1221,7 @@ class TestConcurrentCases(PerfTemplate):
             other_fields=["float_1"], **cdp.DefaultIndexParams.HNSW)
 
         node_resources = [
-            NodeResource(nodes=[dataNode], replicas=1, mem=4),
+            NodeResource(nodes=[dataNode], replicas=1, mem=8),
             NodeResource(nodes=[indexNode], replicas=1, cpu=8, mem=16),
             NodeResource(nodes=[queryNode], replicas=2, cpu=4, mem=64),
         ]
@@ -1255,7 +1255,7 @@ class TestConcurrentCases(PerfTemplate):
             other_fields=["float_1"], **cdp.DefaultIndexParams.HNSW)
 
         node_resources = [
-            NodeResource(nodes=[dataNode], replicas=1, mem=4),
+            NodeResource(nodes=[dataNode], replicas=1, mem=8),
             NodeResource(nodes=[indexNode], replicas=1, cpu=8, mem=16),
             NodeResource(nodes=[queryNode], replicas=2, cpu=4, mem=64),
         ]
@@ -1317,7 +1317,7 @@ class TestConcurrentCases(PerfTemplate):
             other_fields=["float_1"], **cdp.DefaultIndexParams.DISKANN)
 
         node_resources = [
-            NodeResource(nodes=[dataNode], replicas=1, mem=4),
+            NodeResource(nodes=[dataNode], replicas=1, mem=8),
             NodeResource(nodes=[queryNode, indexNode],
                          replicas=1).custom_resource(limits_cpu=8, requests_cpu=8, limits_mem=32, requests_mem=32)
         ]
@@ -1352,7 +1352,7 @@ class TestConcurrentCases(PerfTemplate):
             other_fields=["float_1"], **cdp.DefaultIndexParams.DISKANN)
 
         node_resources = [
-            NodeResource(nodes=[dataNode], replicas=1, mem=4),
+            NodeResource(nodes=[dataNode], replicas=1, mem=8),
             NodeResource(nodes=[queryNode, indexNode],
                          replicas=1).custom_resource(limits_cpu=8, requests_cpu=8, limits_mem=32, requests_mem=32)
         ]

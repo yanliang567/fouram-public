@@ -1392,7 +1392,7 @@ class TestFeatureCases(PerfTemplate):
             concurrent_number=20, during_time="5h", interval=20, **cdp.DefaultIndexParams.IVF_FLAT)
 
         node_resources = [
-            NodeResource(nodes=[indexNode], cpu=8),
+            NodeResource(nodes=[indexNode], cpu=8, mem=8),
             NodeResource(nodes=[queryNode], replicas=2, cpu=16, mem=16)
         ]
 
@@ -3233,7 +3233,7 @@ class TestFeatureCases(PerfTemplate):
         ]
 
         self.concurrency_template(
-            input_params=input_params, cpu=dp.min_cpu, mem=4, deploy_mode=deploy_mode,
+            input_params=input_params, cpu=dp.min_cpu, mem=dp.min_mem, deploy_mode=deploy_mode,
             old_version_format=self.get_report_version_format(False),
             case_callable_obj=self.get_callable_object(ConcurrentClientBase().scene_concurrent_locust),
             default_case_params=default_case_params, node_resources=node_resources)
@@ -3306,7 +3306,7 @@ class TestFeatureCases(PerfTemplate):
         ]
 
         self.concurrency_template(
-            input_params=input_params, cpu=dp.min_cpu, mem=4, deploy_mode=deploy_mode,
+            input_params=input_params, cpu=dp.min_cpu, mem=dp.min_mem, deploy_mode=deploy_mode,
             old_version_format=self.get_report_version_format(False),
             case_callable_obj=self.get_callable_object(ConcurrentClientBase().scene_concurrent_locust),
             default_case_params=default_case_params, node_resources=node_resources)
@@ -4714,7 +4714,7 @@ class TestFeatureCases(PerfTemplate):
 
         node_resources = [
             NodeResource(nodes=[dataNode], replicas=1, cpu=2, mem=8),
-            NodeResource(nodes=[indexNode], replicas=2, cpu=4, mem=4),
+            NodeResource(nodes=[indexNode], replicas=2, cpu=4, mem=8),
             NodeResource(nodes=[queryNode], replicas=1, cpu=8, mem=32)  # < 15G
         ]
 
