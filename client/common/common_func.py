@@ -4,6 +4,7 @@ import json
 import math
 import copy
 import string
+import re
 from ml_dtypes import bfloat16
 import numpy as np
 import pandas as pd
@@ -1190,6 +1191,16 @@ def run_go_bench_process(params: list):
     return process.communicate()[1].decode('utf-8')
 
 
+def parser_go_bench_result(process_result: str):
+    log.debug("[parser_go_bench_result] Process result: {0}".format(process_result))
+    re_result = re.search(r'\{\n\s+"response([\s\S]*)concurrency_type([\s\S]*)goBench([\s\S]*)\n\}', process_result)
+    if re_result:
+        parser_result = json.loads(re_result.group(0))
+        log.debug(f"[parser_go_bench_result] Parser result: {parser_result}, rex result: {re_result}")
+        return parser_result
+    raise ValueError("[parser_go_bench_result] Can't parser content: {0}".format(process_result))
+
+
 def check_params_exist(target: dict, keys: list):
     k = target.keys()
     for i in keys:
@@ -1320,7 +1331,8 @@ def go_bench(go_benchmark: str, uri: str, collection_name: str, index_type: str,
     log.info("[go_bench] Params of go_benchmark: {}".format(go_search_params))
     process_result = run_go_bench_process(params=go_search_params)
     try:
-        result = json.loads(process_result)
+        # result = json.loads(process_result)
+        result = parser_go_bench_result(process_result)
     except ValueError:
         log.error("[go_bench] The type of go_benchmark response is not a json: {}".format(process_result))
         return {"response": False}
@@ -1377,7 +1389,8 @@ def go_bench_refine(go_benchmark: str, uri: str, case_params: dict, log_path: st
     log.info("[go_bench_refine] Params of go_benchmark: {}".format(go_bench_params))
     process_result = run_go_bench_process(params=go_bench_params)
     try:
-        result = json.loads(process_result)
+        # result = json.loads(process_result)
+        result = parser_go_bench_result(process_result)
     except ValueError:
         log.error("[go_bench_refine] The type of go_benchmark response is not a json: {}".format(process_result))
         return {"response": False}
