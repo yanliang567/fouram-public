@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 import h5py
 import subprocess
-from typing import Optional, List, Union
+from typing import Optional, List, Union, Iterable, Iterator, Dict
 from sklearn import preprocessing
 import pyarrow.parquet as pq
 from itertools import product, zip_longest
@@ -49,10 +49,28 @@ def field_type() -> dict:
     return data_types
 
 
+def get_fields_type(fields: List[str]) -> Dict[str, DataType.element_type]:
+    field_types = FieldTypes.to_dict
+
+    res, no_types = {}, []
+    for name in fields:
+        for _field in field_types.keys():
+            if name.startswith(_field.lower()):
+                res[name] = field_types[_field]
+                break
+        if name not in res.keys():
+            no_types.append(name)
+
+    if no_types:
+        raise ValueError(f"[get_fields_type] Unable to get field type: {no_types}, please check!")
+
+    return res
+
+
 def get_field_dtype(field_name: str, primary_key_varchar_id: bool = False):
     if str(field_name) == "id":
         return DataType.VARCHAR if primary_key_varchar_id else DataType.INT64, None
-    for _field, _dtype in field_type().items():
+    for _field, _dtype in FieldTypes.to_dict.items():
         if str(field_name).startswith(_field.lower()):
             return _dtype, None if _dtype != getattr(DataType, "ARRAY", -1) else get_array_element_type(field_name)[1]
     raise ValueError(f"[get_field_dtype] Can't parser field's data type: {field_name}")
@@ -61,7 +79,7 @@ def get_field_dtype(field_name: str, primary_key_varchar_id: bool = False):
 def get_array_element_type(data_type: str):
     if hasattr(DataType, "ARRAY") and data_type.startswith(pn.ARRAY):
         element_type = data_type.lstrip(pn.ARRAY).lstrip("_")
-        for _field in field_type().keys():
+        for _field in FieldTypes.to_dict.keys():
             if element_type.startswith(_field.lower()):
                 return _field, eval(f"DataType.{_field}")
         raise ValueError(f"[get_array_data_type] Can't find element type:{element_type} for array:{data_type}")
@@ -69,7 +87,7 @@ def get_array_element_type(data_type: str):
 
 
 def gen_field_schema(name: str, dtype=None, description=dv.default_desc, is_primary=False, scalars_params={}, **kwargs):
-    field_types = field_type()
+    field_types = FieldTypes.to_dict
     if dtype is None:
         for _field in field_types.keys():
             if name.startswith(_field.lower()):
@@ -411,7 +429,8 @@ def gen_values(data_type, vectors, ids, varchar_filled=False, field: dict = {}, 
     return values
 
 
-def gen_entities(info, vectors=None, ids=None, varchar_filled=False, insert_scalars_params={}, anns_field: str = None):
+def gen_entities(info, vectors=None, ids=None, varchar_filled=False, insert_scalars_params={}, anns_field: str = None,
+                 data_organization: str = None, dynamic_fields: list = [], dynamic_fields_schema: dict = {}):
     """
     insert_scalars_params = {<field name>: {"default_value": [], other_params: {}}...}
     """
@@ -422,14 +441,34 @@ def gen_entities(info, vectors=None, ids=None, varchar_filled=False, insert_scal
         log.error("[gen_entities] fields not in info, please check: {}".format(info))
         return {}
 
-    entities = []
+    entities = {}
     for field in info["fields"]:
         if not (field["name"] == "id" and info["auto_id"]):
-            entities.append(gen_values(
-                field["type"], vectors, ids, varchar_filled, field, **insert_scalars_params.get(field["name"], {}),
-                anns_field_bool=(field["name"] == anns_field))
-            )
-    return entities
+            entities.update({
+                field["name"]: gen_values(
+                    field["type"], vectors, ids, varchar_filled, field, **insert_scalars_params.get(field["name"], {}),
+                    anns_field_bool=(field["name"] == anns_field))
+            })
+
+    for dynamic_field in dynamic_fields:
+        f = dynamic_fields_schema.get(dynamic_field, None)
+        if not (isinstance(f, dict) and f):
+            raise ValueError(f"[gen_entities] Can't get dynamic field: {dynamic_field} schema: {dynamic_fields_schema}")
+
+        entities.update({dynamic_field: gen_values(
+            f["type"], vectors, ids, varchar_filled, f, **insert_scalars_params.get(dynamic_field, {}),
+            anns_field_bool=(dynamic_field == anns_field))
+        })
+
+    if data_organization in [None, "", "column_insert"]:
+        return list(entities.values())
+    elif data_organization in ["row_insert"]:
+        return gen_combinations_data(entities)
+    elif data_organization in ["data_frame"]:
+        return pd.DataFrame(entities)
+    else:
+        all_org = [None, "", "column_insert", "row_insert", "data_frame"]
+        raise ValueError(f"[gen_entities] Can't parser data organization: {data_organization}, only support: {all_org}")
 
 
 def handle_bfloat16_type(data):
@@ -507,6 +546,35 @@ def gen_combinations(args):
         return [dict(x) for x in product(*flat)]
     else:
         raise TypeError("[gen_combinations] No args handling exists for %s" % type(args).__name__)
+
+
+def convert_to_iterable(data) -> Iterable:
+    if isinstance(data, (list, pd.Series, np.ndarray, csr_matrix, Iterator)):
+        return data
+    log.warning(f"[convert_to_iterable] Can't convert data to iterable list: {data}, type: {type(data)}")
+    return data
+
+
+def gen_combinations_data(kwargs: dict):
+    """
+    {
+        'id': [1, 2, 3],
+        'vector': [[1.0, 2.0, 3.0], [2.0, 4.0, 6.0], [10.0, 11.0, 12.0]]
+    }
+    ->
+    [
+        {'id': 1, 'vector': [1.0, 2.0, 3.0]},
+        {'id': 2, 'vector': [2.0, 4.0, 6.0]},
+        {'id': 3, 'vector': [10.0, 11.0, 12.0]}
+    ]
+    """
+    try:
+        flat = []
+        for k, v in kwargs.items():
+            flat.append([(k, el) for el in convert_to_iterable(v)])
+        return [dict(x) for x in zip(*flat)]
+    except Exception as e:
+        raise ValueError(f"[gen_combinations_data] Combinations data failed, data: {kwargs}, error: {e}")
 
 
 def compare_expr(left, comp, right):
@@ -1404,3 +1472,17 @@ def go_bench_refine(go_benchmark: str, uri: str, case_params: dict, log_path: st
 
     log.error("[go_bench_refine] The `response` field is not included in the result:{0}".format(result))
     return {"response": False}
+
+
+class FieldTypesBase:
+    def __init__(self):
+        self._field_type = field_type()
+
+    @property
+    def to_dict(self) -> dict:
+        return copy.deepcopy(self._field_type)
+
+
+""" Singleton Pattern """
+
+FieldTypes = FieldTypesBase()

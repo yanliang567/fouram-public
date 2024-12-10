@@ -62,9 +62,14 @@ class CommonCases(Base):
     def prepare_collection(self, metric_type, vector_type, prepare, rebuild_index=False, prepare_clean=True):
         vector_default_field_name = get_default_field_name(
             vector_type, self.params_obj.dataset_params.get(pn.vector_field_name, ""))
-        scalars_params = ParserFieldsParams(self.params_obj.dataset_params, self.params_obj.collection_params,
-                                            main_field_name=vector_default_field_name).get_scalar_other_params
+        all_fields_params = ParserFieldsParams(self.params_obj.dataset_params, self.params_obj.collection_params,
+                                               main_field_name=vector_default_field_name)
+        scalars_params = all_fields_params.get_scalar_other_params
+        dynamic_fields_schema = all_fields_params.gen_dynamic_fields_schema
+
         varchar_id = self.params_obj.collection_params.get(pn.varchar_id, False)
+        data_organization = self.params_obj.common_params.get(pn.data_organization, None)
+        dynamic_fields = self.params_obj.collection_params.get(pn.dynamic_fields, [])
 
         self.clean_all_rbac(reset_rbac=self.params_obj.database_user_params.get(pn.reset_rbac, False))
         self.connect()
@@ -116,14 +121,18 @@ class CommonCases(Base):
                         source_vectors=self.dataset_train, size=p.data_size,
                         ni=self.params_obj.dataset_params[pn.ni_per], scalars_params=scalars_params,
                         input_obj=insert_obj, partition_name=p.partition_name, anns_field=vector_default_field_name,
-                        custom_api_insert=custom_api_insert, varchar_id=varchar_id))
+                        custom_api_insert=custom_api_insert, varchar_id=varchar_id, data_organization=data_organization,
+                        dynamic_fields=dynamic_fields, dynamic_fields_schema=dynamic_fields_schema
+                    ))
                 self.case_report.add_attr(**deal_insert_result(inert_time, acc=True))
 
             else:
                 res_insert = self.ann_insert(
                     source_vectors=self.dataset_train, ni=self.params_obj.dataset_params[pn.ni_per],
                     scalars_params=scalars_params, anns_field=vector_default_field_name,
-                    custom_api_insert=custom_api_insert, varchar_id=varchar_id)
+                    custom_api_insert=custom_api_insert, varchar_id=varchar_id, data_organization=data_organization,
+                    dynamic_fields=dynamic_fields, dynamic_fields_schema=dynamic_fields_schema
+                )
                 self.case_report.add_attr(**res_insert)
 
             if self.params_obj.flush_params.get(pn.prepare_flush, True):

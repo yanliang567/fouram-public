@@ -259,7 +259,7 @@ class Base:
 
     def create_collection(self, collection_name="", vector_field_name="", schema=None, other_fields=[], shards_num=2,
                           collection_obj: callable = None, log_level=LogLevel.INFO, varchar_id=False, scalars_params={},
-                          auto_id=False, **kwargs):
+                          auto_id=False, dynamic_fields: list = [], **kwargs):
         """ Create a collection with default schema """
         schema = gen_collection_schema(
             vector_field_name=vector_field_name, other_fields=other_fields, varchar_id=varchar_id, auto_id=auto_id,
@@ -351,14 +351,17 @@ class Base:
 
     def insert_batch(self, vectors, ids, data_size, varchar_filled=False, collection_obj: callable = None,
                      collection_schema=None, log_level=LogLevel.INFO, insert_scalars_params={}, anns_field: str = None,
-                     custom_api_insert: Union[pn.insert, pn.upsert] = pn.insert, **kwargs):
+                     custom_api_insert: Union[pn.insert, pn.upsert] = pn.insert, data_organization=None,
+                     dynamic_fields: list = [], dynamic_fields_schema: dict = {}, **kwargs):
         if self.collection_schema is None and collection_schema is None:
             self.get_collection_schema()
             collection_schema = self.collection_schema
         else:
             collection_schema = collection_schema or self.collection_schema
 
-        entities = gen_entities(collection_schema, vectors, ids, varchar_filled, insert_scalars_params, anns_field)
+        entities = gen_entities(collection_schema, vectors, ids, varchar_filled, insert_scalars_params, anns_field,
+                                data_organization=data_organization, dynamic_fields=dynamic_fields,
+                                dynamic_fields_schema=dynamic_fields_schema)
 
         log.customize(log_level)(
             f"[Base] Start {custom_api_insert}ing, ids: {ids[0]} - {ids[-1]}, data size: {data_size}")

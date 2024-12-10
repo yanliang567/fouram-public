@@ -38,6 +38,7 @@ except ImportError as e:
 
 class DataTypeWrapper(object):
     all_members = dict(DataTypeBase.__members__)
+    element_type = DataTypeBase
 
     def __init__(self):
         self._set_members()

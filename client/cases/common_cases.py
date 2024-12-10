@@ -77,12 +77,15 @@ class CommonCases(Base):
         log.info("[CommonCases] Prepare collection {0} done.".format(self.collection_wrap.name))
 
     def prepare_insert(self, data_type, dim, size, ni, varchar_filled=False, vector_field_name: str = None,
-                       sparse_range: list = dv.default_sparse_range, scalars_params: dict = {}):
+                       sparse_range: list = dv.default_sparse_range, scalars_params: dict = {},
+                       dynamic_fields_schema: dict = {}):
         varchar_filled = self.params_obj.dataset_params.get(pn.varchar_filled, varchar_filled)
         custom_api_insert = dacite.from_dict(
             data_class=CustomAPIInsert, data=self.params_obj.common_params.get(pn.custom_api, {})).api
         data_size = self.params_obj.dataset_params.get(pn.dataset_size, 0)
         varchar_id = self.params_obj.collection_params.get(pn.varchar_id, False)
+        data_organization = self.params_obj.common_params.get(pn.data_organization, None)
+        dynamic_fields = self.params_obj.collection_params.get(pn.dynamic_fields, [])
 
         # insert to partitions
         extra_partitions = self.params_obj.dataset_params.get(pn.extra_partitions, None)
@@ -110,7 +113,9 @@ class CommonCases(Base):
                     data_type=data_type, dim=dim, size=p.data_size, ni=ni, varchar_filled=varchar_filled,
                     scalars_params=scalars_params, column_name=self.params_obj.dataset_params.get(pn.column_name, ""),
                     input_obj=insert_obj, partition_name=p.partition_name, anns_field=vector_field_name,
-                    sparse_range=sparse_range, custom_api_insert=custom_api_insert, varchar_id=varchar_id
+                    sparse_range=sparse_range, custom_api_insert=custom_api_insert, varchar_id=varchar_id,
+                    data_organization=data_organization, dynamic_fields=dynamic_fields,
+                    dynamic_fields_schema=dynamic_fields_schema
                 ))
             self.case_report.add_attr(**deal_insert_result(inert_time))
 
@@ -119,7 +124,8 @@ class CommonCases(Base):
                 data_type=data_type, dim=dim, size=size, ni=ni, varchar_filled=varchar_filled,
                 scalars_params=scalars_params, column_name=self.params_obj.dataset_params.get(pn.column_name, ""),
                 anns_field=vector_field_name, sparse_range=sparse_range, custom_api_insert=custom_api_insert,
-                varchar_id=varchar_id
+                varchar_id=varchar_id, data_organization=data_organization, dynamic_fields=dynamic_fields,
+                dynamic_fields_schema=dynamic_fields_schema
             )
             self.case_report.add_attr(**res_insert)
 
@@ -493,7 +499,8 @@ class InsertBatch(CommonCases):
                                     dim=self.params_obj.dataset_params[pn.dim],
                                     size=self.params_obj.dataset_params[pn.dataset_size], ni=ni,
                                     vector_field_name=vector_default_field_name,
-                                    sparse_range=sparse_range, scalars_params=all_fields_params.get_scalar_other_params
+                                    sparse_range=sparse_range, scalars_params=all_fields_params.get_scalar_other_params,
+                                    dynamic_fields_schema=all_fields_params.gen_dynamic_fields_schema
                                     )
                 self.count_entities()
                 return self.case_report.to_dict(), True
@@ -558,7 +565,8 @@ class BuildIndex(CommonCases):
                                 size=self.params_obj.dataset_params[pn.dataset_size],
                                 ni=self.params_obj.dataset_params[pn.ni_per],
                                 vector_field_name=vector_default_field_name,
-                                sparse_range=sparse_range, scalars_params=all_fields_params.get_scalar_other_params
+                                sparse_range=sparse_range, scalars_params=all_fields_params.get_scalar_other_params,
+                                dynamic_fields_schema=all_fields_params.gen_dynamic_fields_schema
                                 )
         self.prepare_flush()
         self.count_entities()
@@ -631,7 +639,8 @@ class Load(CommonCases):
                                 size=self.params_obj.dataset_params[pn.dataset_size],
                                 ni=self.params_obj.dataset_params[pn.ni_per],
                                 vector_field_name=vector_default_field_name,
-                                sparse_range=sparse_range, scalars_params=all_fields_params.get_scalar_other_params
+                                sparse_range=sparse_range, scalars_params=all_fields_params.get_scalar_other_params,
+                                dynamic_fields_schema=all_fields_params.gen_dynamic_fields_schema
                                 )
 
         self.prepare_flush()
@@ -707,7 +716,8 @@ class Query(CommonCases):
                                 size=self.params_obj.dataset_params[pn.dataset_size],
                                 ni=self.params_obj.dataset_params[pn.ni_per],
                                 vector_field_name=vector_default_field_name,
-                                sparse_range=sparse_range, scalars_params=all_fields_params.get_scalar_other_params
+                                sparse_range=sparse_range, scalars_params=all_fields_params.get_scalar_other_params,
+                                dynamic_fields_schema=all_fields_params.gen_dynamic_fields_schema
                                 )
 
         self.prepare_flush()
@@ -806,7 +816,8 @@ class Search(CommonCases):
                                 size=self.params_obj.dataset_params[pn.dataset_size],
                                 ni=self.params_obj.dataset_params[pn.ni_per],
                                 vector_field_name=vector_default_field_name,
-                                sparse_range=sparse_range, scalars_params=all_fields_params.get_scalar_other_params
+                                sparse_range=sparse_range, scalars_params=all_fields_params.get_scalar_other_params,
+                                dynamic_fields_schema=all_fields_params.gen_dynamic_fields_schema
                                 )
             self.prepare_flush()
             self.prepare_index(vector_field_name=vector_default_field_name,
@@ -913,7 +924,8 @@ class SearchRecall(CommonCases):
                                 size=self.params_obj.dataset_params[pn.dataset_size],
                                 ni=self.params_obj.dataset_params[pn.ni_per],
                                 vector_field_name=vector_default_field_name,
-                                sparse_range=sparse_range, scalars_params=all_fields_params.get_scalar_other_params
+                                sparse_range=sparse_range, scalars_params=all_fields_params.get_scalar_other_params,
+                                dynamic_fields_schema=all_fields_params.gen_dynamic_fields_schema
                                 )
             self.prepare_flush()
             self.prepare_index(vector_field_name=vector_default_field_name,
@@ -1024,7 +1036,8 @@ class HybridSearch(CommonCases):
                                 size=self.params_obj.dataset_params[pn.dataset_size],
                                 ni=self.params_obj.dataset_params[pn.ni_per],
                                 vector_field_name=vector_default_field_name,
-                                sparse_range=sparse_range, scalars_params=all_fields_params.get_scalar_other_params
+                                sparse_range=sparse_range, scalars_params=all_fields_params.get_scalar_other_params,
+                                dynamic_fields_schema=all_fields_params.gen_dynamic_fields_schema
                                 )
             self.prepare_flush()
             self.prepare_index(vector_field_name=vector_default_field_name,

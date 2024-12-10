@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from client.read_dataset.read_entry import ReadEntry
 from client.parameters import params_name as pn
 from client.common.common_type import DefaultValue as dv
+from client.client_base import DataType
 
 from commons.common_params import EnvVariable
 from configs.config_info import config_info
@@ -13,7 +14,7 @@ from utils.util_log import log
 
 from client.common.common_func import (
     update_dict_value, parser_time, parser_data_size, loop_gen_scalar_files, gen_insert_scalars_params, loop_gen_files,
-    check_sparse_range, handle_special_file_data_type, gen_vectors
+    check_sparse_range, handle_special_file_data_type, gen_vectors, FieldTypes, get_fields_type
 )
 
 
@@ -327,6 +328,30 @@ class FieldsParamsBase:
         return vars(self)
 
 
+@dataclass
+class DynamicFieldParams:
+    dim: int = dv.default_dim
+    max_length: int = dv.default_max_length
+    max_capacity: int = dv.default_array_max_capacity
+
+    @property
+    def to_dict(self):
+        return vars(self)
+
+
+@dataclass
+class DynamicFieldSchema:
+    name: str
+    type: DataType.element_type
+    params: DynamicFieldParams
+
+    @property
+    def to_dict(self):
+        res = vars(self)
+        res["params"] = self.params.to_dict
+        return res
+
+
 class FieldsParamsEntry:
 
     def __init__(self):
@@ -385,6 +410,22 @@ class ParserFieldsParams:
     def _get_attr(self, k: str):
         return self.fields_params_entry.get_attr(k)
 
+    def _get_scalar_fields(self):
+        _other, _dynamic = [self._collection_params.get(n, []) for n in [pn.other_fields, pn.dynamic_fields]]
+
+        not_string_names = [n for n in _other + _dynamic if not isinstance(n, str)]
+        if not_string_names:
+            raise ValueError(
+                "[ParserFieldsParams] The field names must be string type:{0}, `other_fields`:{1}, `dynamic_fields`:{2}".format(
+                    not_string_names, _other, _dynamic))
+
+        if list(set(_other) & set(_dynamic)):
+            raise ValueError(
+                "[ParserFieldsParams] Field for `other_fields` and `dynamic_fields` are not unique: {0}, params: {1}".format(
+                    list(set(_other) & set(_dynamic)), self._collection_params))
+
+        return _other + _dynamic
+
     def _parser_params(self):
         try:
             # get main `dim`
@@ -402,12 +443,11 @@ class ParserFieldsParams:
             self._set_main_attr(m)
             self._recover_attr(self._main_field_name, m)
 
-            # set other fields from `collection_params.other_fields`
-            for f in self._collection_params.get(pn.other_fields, []):
-                if isinstance(f, str):
-                    self._set_attr(f, {"dim": main_dim,
-                                       "sparse_range": main_sparse_range,
-                                       "varchar_filled": main_varchar_filled})
+            # set other fields from `collection_params.other_fields` and `collection_params.dynamic_fields`
+            for f in self._get_scalar_fields():
+                self._set_attr(f, {"dim": main_dim,
+                                   "sparse_range": main_sparse_range,
+                                   "varchar_filled": main_varchar_filled})
 
             # parser metric type
             for k1, v1 in self._dataset_params.get(pn.vectors_index, {}).items():
@@ -420,7 +460,7 @@ class ParserFieldsParams:
                     _other_params = v.get("other_params", {})
                     _p = {i: _other_params.get(i) for i in
                           ["dataset", "column_name", "varchar_filled", "dim", "sparse_range", "algorithm_params"] if
-                          _other_params.get(i, None)}
+                          i in _other_params.keys()}
 
                     # set dim, `other_params.dim` > `params.dim` > `dataset_params.dim`
                     _p["dim"] = _p.get("dim", v.get("params", {}).get("dim", main_dim))
@@ -436,6 +476,33 @@ class ParserFieldsParams:
 
     def get_fields_params(self, _field_name: str) -> FieldsParamsBase:
         return self._get_attr(_field_name)
+
+    @property
+    def gen_dynamic_fields_schema(self):
+        _dynamic_fields = self._collection_params.get(pn.dynamic_fields, [])
+        if not _dynamic_fields:
+            log.debug(f"[ParserFieldsParams] Collection params have no dynamic fields: {self._collection_params}.")
+            return {}
+
+        _scalar_params = self._dataset_params.get(pn.scalars_params, {})
+        dynamic_fields_schema, _max_length = {}, self._dataset_params.get(pn.max_length, dv.default_max_length)
+
+        for name, _type in get_fields_type(_dynamic_fields).items():
+            filed_params = _scalar_params.get(name, {}).get("params", {})
+
+            dynamic_fields_schema.update({
+                name: DynamicFieldSchema(
+                    name=name, type=_type,
+                    params=DynamicFieldParams(
+                        dim=filed_params.get(pn.dim, self.fields_params_entry.get_attr(name).dim),
+                        max_length=filed_params.get(pn.max_length, _max_length),
+                        max_capacity=filed_params.get("max_capacity", dv.default_array_max_capacity)
+                    )
+                ).to_dict
+            })
+
+        log.debug(f"[ParserFieldsParams] Gen dynamic fields:{_dynamic_fields} schema:{dynamic_fields_schema}")
+        return dynamic_fields_schema
 
     @property
     def get_scalar_other_params(self):

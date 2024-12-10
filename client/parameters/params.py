@@ -68,6 +68,7 @@ class ParamsFormat:
             other_fields: ([type(list())], OPTION),
             shards_num: ([type(int())], OPTION),
             enable_dynamic_field: ([type(bool())], OPTION),
+            dynamic_fields: ([type(list())], OPTION),
             varchar_id: ([type(bool())], OPTION),
             collection_name: ([type(str())], OPTION),
             auto_id: ([type(bool())], OPTION),
@@ -115,7 +116,8 @@ class ParamsFormat:
             alter_index: ([type(dict()), type(list()), type(None)], OPTION),
             custom_api: {
                 prepare_insert_api: ([type(str()), type(None)], OPTION)
-            }
+            },
+            data_organization: ([type(str()), type(None)], OPTION)
         }
     }
 

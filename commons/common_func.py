@@ -210,14 +210,26 @@ def truncated_output(context, row_length=300, func_name: str = ""):
     if func_name in ["Collection.insert", "Collection.upsert"]:
         _data = context[0]
         if isinstance(_data, list) and _data:
-            _fields, _length, content = len(_data), None, ""
+            _fields, _length, content = None, None, ""
             if isinstance(_data[0], list):
-                _length = len(_data[0])
-            elif isinstance(getattr(_data[0], "shape", None), list) and getattr(_data[0], "shape", None):
-                _length = getattr(_data[0], "shape", None)[0]
+                _fields, _length, content = len(_data), len(_data[0]), ""
 
-            for i in _data:
-                content += f"[ `type{type(i[0])}, dtype<{getattr(i[0], 'dtype', '')}>` {str(i[0]):.24s} ... ], "
+                for i in _data:
+                    content += f"[ `type{type(i[0])}, dtype<{getattr(i[0], 'dtype', '')}>` {str(i[0]):.24s} ... ], "
+
+            elif isinstance(getattr(_data[0], "shape", None), list) and getattr(_data[0], "shape", None):
+                _fields, _length, content = len(_data), getattr(_data[0], "shape", None)[0], ""
+
+                for i in _data:
+                    content += f"[ `type{type(i[0])}, dtype<{getattr(i[0], 'dtype', '')}>` {str(i[0]):.24s} ... ], "
+
+            elif isinstance(_data[0], dict):
+                _fields, _length, content = set([len(i) for i in _data]), len(_data), ""
+
+                for k, v in _data[0].items():
+                    content += f" `name<{k}>: type{type(v)}, dtype<{getattr(v, 'dtype', '')}>` {str(v):.24s}, "
+                content = "{ %s } ...  " % content
+
             return f"<{func_name} fields: {_fields}, length: {_length}, content: [ {content[:-2]} ]>, {context[1:]}"
 
     _str = str(context)

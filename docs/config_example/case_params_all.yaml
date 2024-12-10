@@ -23,7 +23,7 @@ dataset_params:
   # dataset names currently support:
   # random: `local`
   #      1. vector will automatically generate corresponding data based on the `dataset_params.vector_field_name` prefix
-  #      2. if the prefix is not "binary_vector", "float_vector", "float16_vector", "bfloat16_vector", "sparse_float_vector" type data will be generated
+  #      2. if the prefix is not "binary_vector", "float_vector", "float16_vector", "bfloat16_vector", "sparse_float_vector" type data will not be generated
   # npy: `deep`, `sift`, `text2img`, `laion`, `embed`, `gist`, `glove`, `binary`, `random`, `laion1b_float16`, `laion1b_bfloat16`
   # parquet: `cohere10m_parquet`, `laion1b_nolang`, `laion2b_multi`
   # csr: `sparse_full`
@@ -82,7 +82,9 @@ dataset_params:
 
   # parameters required to create scalars: {<field_name>: {<params>: {}, <other_params>: {} }}
   scalars_params:
-    # `params` for creating collection
+    # `params`
+    #   - for creating collection -> only for fields on `collection_params.other_fields` !!!
+    #   - for generating data -> only for fields on `collection_params.dynamic_fields` !!!
     # `other_params` for inserting values
     # `dim` under `other_params` is used to generate random vector which will be covered by `params.dim`
 
@@ -221,6 +223,23 @@ dataset_params:
           max_capacity: 50 # must be <= `dataset_params.scalars_params.array_int64_2.params.max_capacity`
           specify_range: [ 1, 100 ]
           batch: 25
+    # The parameter settings for dynamic fields are the same as for other fields,
+    # the only difference is that the dynamic fields are not set when creating a collection.
+    # The parameters under `params` are used to generate the schema of dynamic field.
+    int64_dynamic:
+      other_params:
+        dataset: laion2b_int64
+    varchar_dynamic:
+      params:
+        max_length: 65535
+      other_params:
+        dataset: laion2b_url
+    array_varchar_dynamic:
+      params:
+        max_length: 2
+        max_capacity: 5
+      other_params:
+        varchar_filled: false
 
   # list resource groups after preparing data
   show_resource_groups: False / <bool>
@@ -255,8 +274,17 @@ collection_params:
   # the default pk is `int64`, you can set `true` to set the primary key column to `varchar` type
   # parameters of the `varchar` pk column can be set in `dataset_params.scalars_params.id`
   varchar_id: false / <bool>
-  enable_dynamic_field: false / <bool>
   num_partitions: 64 / <int>
+
+  enable_dynamic_field: false / <bool>
+  # The supported data types are the same as `collection_params.other_fields`
+  # The fields set here will be written to the collection as dynamic fields
+  # The field names in `collection_params.other_fields` and `collection_params.dynamic_fields` must be unique
+  # Notice: if you want to add dynamic fields, please set the following params at the same time !!!
+  #    - collection_params.enable_dynamic_field: true
+  #    - common_params.data_organization: row_insert
+  # create dynamic fields: <List[<field name>...]>
+  dynamic_fields: [ "bool_dynamic", "int64_dynamic", "varchar_dynamic", "array_varchar_dynamic", "json_dynamic" ]
 
 flush_params:
   # after inserting data, whether to call `flush`, `false` can create growing data
@@ -401,6 +429,13 @@ common_params:
     # customize the interface for writing data during the preparation phase
     # only support `upsert` and `insert`, default value is `insert`
     prepare_insert_api: upsert / insert / str / None
+
+  # Data organization format for inserted / upserted data during the preparation phase
+  # Support values: None, "", "column_insert", "row_insert", "data_frame"
+  #   - None, "", "column_insert": [[<value1> ... ], [<value2> ... ]] -> not support dynamic fields
+  #   - "row_insert": [{<key1>: <value1>, <key2>: <value2>}, {<key1>: <value1'>, <key2>: <value2'>}, ... ]
+  #   - "data_frame": pandas.DataFrame({<key1>: [<value1> ... ], <key2>: [<value2> ... ]}) -> not support "float16_vector", "bfloat16_vector", dynamic fields
+  data_organization: None / <str>
 
 # the parameters of each case are different, please pass them according to actual use.
 # refer to `GetParamObj` in the file `fouram/client/parameters/functional_params.py` to map parameter objects.
