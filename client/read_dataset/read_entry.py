@@ -7,7 +7,7 @@ from client.parameters import params_name as pn
 class ReadEntry:
     """ read entry client """
 
-    def __init__(self, dataset_type: Union[pn.NUMPY, pn.PARQUET, pn.CSR, pn.RandomAlgorithm],
+    def __init__(self, dataset_type: Union[pn.NUMPY, pn.PARQUET, pn.CSR, pn.JSON, pn.RandomAlgorithm],
                  iter_file: iter, column_name: str = "", allow_pickle: bool = False, dataset_name: str = None,
                  field_name: str = "", algorithm_params: dict = {}, dataset_size=0, varchar_id: bool = False, **kwargs):
         self.obj = get_client_obj(name=dataset_type)(

@@ -73,7 +73,7 @@ dataset_params:
   # `scalars_index` supports list or dict, create index on the already created scalar column
   #   - list: <List[<scalar field name>...]>
   #   - dict: <Dict[{<scalar field name>: {<index_type>: "INVERTED"}}, <scalar field name>: {}}, ...]>
-#  scalars_index: ["int64_1", "float_1", "json_1", "varchar_1", "varchar_2", "array_varchar_1", "array_int64_1"]
+#  scalars_index: ["int64_1", "float_1", "json_1", "json_2", "varchar_1", "varchar_2", "array_varchar_1", "array_int64_1"]
   scalars_index:
     # create scalars index params
     varchar_1:
@@ -180,6 +180,9 @@ dataset_params:
     json_1:
       other_params:
         dataset: laion2b_json
+    json_2:
+      other_params:
+        dataset: cleaned_github_archive_json
     varchar_1:
       params:
         is_partition_key: true
@@ -207,9 +210,9 @@ dataset_params:
         varchar_filled: false
         # the generated <int> data will be converted into <str>
         dataset: random_algorithm
-          algorithm_params:
-            algorithm_name: specify_scope
-            specify_range: [ 1, 100 ]
+        algorithm_params:
+          algorithm_name: specify_scope
+          specify_range: [ 1, 100 ]
     array_int64_1:
       params:
         max_capacity: 9999
@@ -269,7 +272,7 @@ collection_params:
   auto_id: false / <bool>
   # create scalars: <List[<scalar field name>...]>
   # Notice: scalars are created here so that operations on scalar can take effect.
-  other_fields: [ "int64_1", "float_1", "json_1", "varchar_1", "varchar_2", "array_varchar_1", "array_int64_1" ]
+  other_fields: [ "int64_1", "float_1", "json_1", "json_2", "varchar_1", "varchar_2", "array_varchar_1", "array_int64_1" ]
   shards_num: 2 / <int>
   # the default pk is `int64`, you can set `true` to set the primary key column to `varchar` type
   # parameters of the `varchar` pk column can be set in `dataset_params.scalars_params.id`

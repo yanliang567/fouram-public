@@ -150,6 +150,7 @@ distances = "distances"
 NUMPY = "npy"
 PARQUET = "parquet"
 CSR = "csr"
+JSON = "json"
 RandomAlgorithm = "random_algorithm"
 
 # random_algorithm func names

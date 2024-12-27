@@ -260,6 +260,11 @@ def gen_data_file_name(file_id, dataset_name: str, dim=dv.default_dim):
         file_name = "%s_%sd_%05d.%s" % (dv.FILE_PREFIX, str(dim), int(file_id), _dataset_type)
     elif _dataset_type == pn.CSR:
         file_name = "%s_%05d.%s" % (dv.FILE_PREFIX, int(file_id), _dataset_type)
+    elif _dataset_type == pn.JSON:
+        if config_info.dataset_config.data_type(dataset_name) == pn.SCALAR:
+            file_name = "%s_%05d.%s" % (dv.SCALAR_FILE_PREFIX, int(file_id), _dataset_type)
+        else:
+            raise ValueError(f"[gen_data_file_name] Dataset non-scalar {dataset_name} datatype not supported.")
     else:
         raise ValueError(f"[gen_data_file_name] Dataset not supported: {dataset_name}")
 
@@ -776,6 +781,19 @@ def read_parquet_file(file_name: str, column: str):
             log.error(f"[read_parquet_file] Can not read parquet file: {e}")
         return file_list
     msg = "[read_parquet_file] Can not read parquet file, please check."
+    log.error(msg)
+    return []
+
+
+def read_json_strings_file(file_name):
+    file_dicts = []
+    if check_file_exist(file_name):
+        with open(file_name) as f:
+            for line in f:
+                row_dict = json.loads(line)
+                file_dicts.append(row_dict)
+        return file_dicts
+    msg = f"[read_json_strings_file] Can not read json file {file_name}, please check."
     log.error(msg)
     return []
 
