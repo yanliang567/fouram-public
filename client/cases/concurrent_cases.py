@@ -371,9 +371,14 @@ class ConcurrentClientBase(CommonCases):
                            "vector_field_name": _p.anns_field})
             return ConcurrentTaskSceneTest(**result)
 
-        elif req_type in [pn.flush, pn.load, pn.release, pn.delete, "debug"]:
+        elif req_type in [pn.flush, pn.load, pn.release, "debug"]:
             return eval(
                 "ConcurrentTask{0}(**ConcurrentInputParams{0}(**req_params).to_dict)".format(req_type.capitalize()))
+
+        elif req_type == pn.delete:
+            p = ConcurrentInputParamsDelete(**req_params).to_dict
+            p.update({"varchar_id": self.params_obj.collection_params.get(pn.varchar_id, False)})
+            return ConcurrentTaskDelete(**p)
 
         elif req_type == pn.release_partitions:
             return ConcurrentTaskReleasePartitions(**ConcurrentInputParamsReleasePartitions(**req_params).to_dict)
@@ -383,7 +388,8 @@ class ConcurrentClientBase(CommonCases):
             params.update({"dim": self.params_obj.dataset_params[pn.dim],
                            "sparse_range": sparse_range,
                            "scalars_params": all_fields_params.get_scalar_other_params_no_dataset,
-                           "anns_field": vector_field_name})
+                           "anns_field": vector_field_name,
+                           "varchar_id": self.params_obj.collection_params.get(pn.varchar_id, False)})
             _p = ConcurrentTaskSceneInsertDeleteFlush(**params)
             _p.set_params()
             return _p

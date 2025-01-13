@@ -886,8 +886,6 @@ class ConcurrentInputParamsDelete(DataClassBase):
     delete_length: Optional[int] = 1
     timeout: Optional[int] = DefaultValue.default_timeout
 
-    field_type: Optional[str] = "int"
-
     # check request result
     check_task: Optional[str] = CheckTasks.checkResponse
     check_items: Union[dict, list] = field(default_factory=lambda: {})
@@ -899,7 +897,7 @@ class ConcurrentTaskDelete(DataClassBase):
     delete_length: Optional[int] = 1
     timeout: Optional[int] = DefaultValue.default_timeout
 
-    field_type: Optional[str] = "int"
+    varchar_id: Optional[bool] = False
 
     # check request result
     check_task: Optional[str] = CheckTasks.checkResponse
@@ -912,9 +910,6 @@ class ConcurrentTaskDelete(DataClassBase):
                 "[{0}] Check task:`{1}` can't be used in `{2}` concurrent request, only supports:{3}".format(
                     "ConcurrentTaskDelete", self.check_task, "delete", support_tasks))
 
-        if self.field_type not in ["int", "str"]:
-            raise ValueError(f"[ConcurrentTaskDelete] `field_type`:{self.field_type} only support: 'int', 'str'")
-
         log.debug("[ConcurrentTaskDelete] Init done.")
 
     @property
@@ -923,7 +918,7 @@ class ConcurrentTaskDelete(DataClassBase):
             return self.expr
 
         _id = self.get_ids
-        if self.field_type == "str":
+        if self.varchar_id:
             _id = [str(i) for i in _id]
         return "id in {}".format(_id)
 
@@ -1034,6 +1029,7 @@ class ConcurrentTaskSceneInsertDeleteFlush(DataClassBase):
     _loop_ids = None
     fixed_ids = None
     fixed_vectors = None
+    varchar_id: Optional[bool] = False
 
     # check request result
     check_tasks: Optional[dict] = field(default_factory=lambda: {})
@@ -1084,8 +1080,12 @@ class ConcurrentTaskSceneInsertDeleteFlush(DataClassBase):
 
     @property
     def get_delete_ids(self):
-        return concurrent_global_params.get_data_from_insert_queue(
+        _ids = concurrent_global_params.get_data_from_insert_queue(
             concurrent_global_params.concurrent_insert_delete_flush, self.delete_length)
+
+        if self.varchar_id:
+            _ids = [str(i) for i in _ids]
+        return _ids
 
 
 @dataclass

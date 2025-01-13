@@ -686,10 +686,6 @@ concurrent_tasks:
       delete_length: Optional[int] = 1
       timeout: Optional[int] = 60
 
-      # `field_type` for delete `delete_length`
-      # only support 'int' and 'str', default value is 'int'
-      field_type: Optional[str] = int
-
       # check request result
       # supports: `check_response`, `check_error_response`, `check_ignore_expected_errors`
       check_task: Optional[str] = "check_response"
