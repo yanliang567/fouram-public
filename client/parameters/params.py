@@ -886,6 +886,8 @@ class ConcurrentInputParamsDelete(DataClassBase):
     delete_length: Optional[int] = 1
     timeout: Optional[int] = DefaultValue.default_timeout
 
+    field_type: Optional[str] = "int"
+
     # check request result
     check_task: Optional[str] = CheckTasks.checkResponse
     check_items: Union[dict, list] = field(default_factory=lambda: {})
@@ -897,6 +899,8 @@ class ConcurrentTaskDelete(DataClassBase):
     delete_length: Optional[int] = 1
     timeout: Optional[int] = DefaultValue.default_timeout
 
+    field_type: Optional[str] = "int"
+
     # check request result
     check_task: Optional[str] = CheckTasks.checkResponse
     check_items: Union[dict, list] = field(default_factory=lambda: {})
@@ -907,13 +911,21 @@ class ConcurrentTaskDelete(DataClassBase):
             raise ValueError(
                 "[{0}] Check task:`{1}` can't be used in `{2}` concurrent request, only supports:{3}".format(
                     "ConcurrentTaskDelete", self.check_task, "delete", support_tasks))
+
+        if self.field_type not in ["int", "str"]:
+            raise ValueError(f"[ConcurrentTaskDelete] `field_type`:{self.field_type} only support: 'int', 'str'")
+
         log.debug("[ConcurrentTaskDelete] Init done.")
 
     @property
     def get_expr(self):
         if self.expr:
             return self.expr
-        return "id in {}".format(self.get_ids)
+
+        _id = self.get_ids
+        if self.field_type == "str":
+            _id = [str(i) for i in _id]
+        return "id in {}".format(_id)
 
     @property
     def get_ids(self):
