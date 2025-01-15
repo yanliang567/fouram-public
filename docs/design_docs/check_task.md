@@ -18,24 +18,24 @@ delete        = ["check_response", "check_error_response", "check_ignore_expecte
 
 ```yaml
 concurrent_tasks:
-  - type: <request type>
-    weight: 1
-    params:
+- type: <request type>
+  weight: 1
+  params:
+    ...
+    check_task: <check task for the request>
+    check_items: <check items for check task>
+- type: <multi-request type>
+  weight: 1
+  params:
+    ...
+    check_tasks: # <multiple check tasks, composed of a single request check task>
+      <request type 1>:
+        check_task: <check task for the request>
+        check_items: <check items for check task>
       ...
-      check_task: <check task for the request>
-      check_items: <check items for check task>
-  - type: <multi-request type>
-    weight: 1
-    params:
-      ...
-      check_tasks: # <multiple check tasks, composed of a single request check task>
-        <request type 1>:
-          check_task: <check task for the request>
-          check_items: <check items for check task>
-        ...
-        <request type 2>:
-          check_task: <check task for the request>
-          check_items: <check items for check task>
+      <request type 2>:
+        check_task: <check task for the request>
+        check_items: <check items for check task>
 ```
 
 #### 1. `check_response`
@@ -93,10 +93,10 @@ check_items:
 # example 4
 check_task: check_ignore_expected_errors
 check_items: 
-  - code: int
-    message: str
-  - code: int
-  - message: str
+- code: int
+  message: str
+- code: int
+- message: str
 ```
 
 #### 4. `check_ignore_rate_limit`

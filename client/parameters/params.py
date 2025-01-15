@@ -737,6 +737,10 @@ class ConcurrentInputParamsInsert(DataClassBase):
     nb: Optional[int] = 1  # number of batch insert
     timeout: Optional[int] = DefaultValue.default_timeout
 
+    data_organization: Optional[str] = None
+    # dynamic fields for inserting
+    dynamic_fields: Optional[list] = field(default_factory=lambda: [])
+
     # random id or vectors
     random_id: Optional[bool] = False
     random_vector: Optional[bool] = False
@@ -757,6 +761,11 @@ class ConcurrentTaskInsert(DataClassBase):
     nb: Optional[int] = 1
     timeout: Optional[int] = DefaultValue.default_timeout
     anns_field: Optional[str] = None
+
+    data_organization: Optional[str] = None
+    # dynamic fields for inserting
+    dynamic_fields: Optional[list] = field(default_factory=lambda: [])
+    dynamic_fields_schema: Optional[dict] = field(default_factory=lambda: {})
 
     # random id or vectors
     random_id: Optional[bool] = False
@@ -825,6 +834,11 @@ class ConcurrentTaskUpsert(DataClassBase):
     nb: Optional[int] = 1
     timeout: Optional[int] = DefaultValue.default_timeout
     anns_field: Optional[str] = None
+
+    data_organization: Optional[str] = None
+    # dynamic fields for upserting
+    dynamic_fields: Optional[list] = field(default_factory=lambda: [])
+    dynamic_fields_schema: Optional[dict] = field(default_factory=lambda: {})
 
     # random id or vectors
     random_id: Optional[bool] = False
@@ -946,6 +960,11 @@ class ConcurrentInputParamsSceneTest(DataClassBase):
     metric_type: Optional[str] = MetricsTypeName.L2
     other_fields: Optional[list] = field(default_factory=lambda: [])
 
+    enable_dynamic_field: Optional[bool] = False
+    data_organization: Optional[str] = None
+    # dynamic fields for inserting
+    dynamic_fields: Optional[list] = field(default_factory=lambda: [])
+
     scalars_params: Optional[dict] = field(default_factory=lambda: {})
     scalars_index: Union[dict, list] = field(default_factory=lambda: {})
     vectors_index: Optional[dict] = field(default_factory=lambda: {})
@@ -961,15 +980,15 @@ class ConcurrentInputParamsSceneTest(DataClassBase):
     @property
     def set_all_fields_params_obj(self):
         return ParserFieldsParams(
-            dataset_params={
-                dim: self.dim,
-                sparse_range: self.sparse_range,
-                dataset_name: self.dataset,
-                column_name: self.column_name,
-                metric_type: self.metric_type,
-                vectors_index: self.vectors_index,
-                scalars_params: self.scalars_params
-            }, collection_params={other_fields: self.other_fields}, main_field_name=self.anns_field)
+            dataset_params={dim: self.dim,
+                            sparse_range: self.sparse_range,
+                            dataset_name: self.dataset,
+                            column_name: self.column_name,
+                            metric_type: self.metric_type,
+                            vectors_index: self.vectors_index,
+                            scalars_params: self.scalars_params},
+            collection_params={other_fields: self.other_fields, dynamic_fields: self.dynamic_fields},
+            main_field_name=self.anns_field)
 
 
 @dataclass
@@ -986,6 +1005,12 @@ class ConcurrentTaskSceneTest(DataClassBase):
     vector_field_name: Optional[str] = get_default_field_name()
     other_fields: Optional[list] = field(default_factory=lambda: [])
 
+    enable_dynamic_field: Optional[bool] = False
+    data_organization: Optional[str] = None
+    # dynamic fields for inserting
+    dynamic_fields: Optional[list] = field(default_factory=lambda: [])
+    dynamic_fields_schema: Optional[dict] = field(default_factory=lambda: {})
+
     scalars_params: Optional[dict] = field(default_factory=lambda: {})
     scalars_index: Optional[dict] = field(default_factory=lambda: {})
     vectors_index: Optional[dict] = field(default_factory=lambda: {})
@@ -993,12 +1018,29 @@ class ConcurrentTaskSceneTest(DataClassBase):
 
     all_fields_params: ParserFieldsParams = None
 
+    def __post_init__(self):
+        self.dynamic_fields_schema = self.all_fields_params.get_collection_dynamic_fields_schema
+
+        log.debug("[ConcurrentTaskSceneTest] Init done.")
+
+    @property
+    def insert_obj_params(self):
+        return {
+            "data_organization": self.data_organization,
+            "dynamic_fields": self.dynamic_fields,
+            "dynamic_fields_schema": self.dynamic_fields_schema
+        }
+
 
 @dataclass
 class ConcurrentInputParamsSceneInsertDeleteFlush(DataClassBase):
     insert_length: Optional[int] = 1
     delete_length: Optional[int] = 1
     start_id: Optional[int] = 0
+
+    data_organization: Optional[str] = None
+    # dynamic fields for inserting
+    dynamic_fields: Optional[list] = field(default_factory=lambda: [])
 
     # random id or vectors
     random_id: Optional[bool] = False
@@ -1019,6 +1061,11 @@ class ConcurrentTaskSceneInsertDeleteFlush(DataClassBase):
     delete_length: Optional[int] = 1
     start_id: Optional[int] = 0
     anns_field: Optional[str] = None
+
+    data_organization: Optional[str] = None
+    # dynamic fields for inserting
+    dynamic_fields: Optional[list] = field(default_factory=lambda: [])
+    dynamic_fields_schema: Optional[dict] = field(default_factory=lambda: {})
 
     # random id or vectors
     random_id: Optional[bool] = False
@@ -1095,6 +1142,10 @@ class ConcurrentInputParamsSceneInsertPartition(DataClassBase):
     with_flush: Optional[bool] = False
     timeout: Optional[int] = DefaultValue.default_timeout
 
+    data_organization: Optional[str] = None
+    # dynamic fields for inserting
+    dynamic_fields: Optional[list] = field(default_factory=lambda: [])
+
 
 @dataclass
 class ConcurrentTaskSceneInsertPartition(DataClassBase):
@@ -1108,9 +1159,19 @@ class ConcurrentTaskSceneInsertPartition(DataClassBase):
     with_flush: Optional[bool] = False
     timeout: Optional[int] = DefaultValue.default_timeout
 
+    data_organization: Optional[str] = None
+    # dynamic fields for inserting
+    dynamic_fields: Optional[list] = field(default_factory=lambda: [])
+    dynamic_fields_schema: Optional[dict] = field(default_factory=lambda: {})
+
     @property
-    def obj_params(self):
-        return {"timeout": self.timeout}
+    def insert_obj_params(self):
+        return {
+            "timeout": self.timeout,
+            "data_organization": self.data_organization,
+            "dynamic_fields": self.dynamic_fields,
+            "dynamic_fields_schema": self.dynamic_fields_schema
+        }
 
 
 @dataclass
@@ -1118,6 +1179,10 @@ class ConcurrentInputParamsSceneTestPartition(DataClassBase):
     # collection and insert
     data_size: Optional[int] = 3000
     ni: Optional[int] = 3000
+
+    data_organization: Optional[str] = None
+    # dynamic fields for inserting
+    dynamic_fields: Optional[list] = field(default_factory=lambda: [])
 
     # search
     nq: Optional[int] = 10
@@ -1142,6 +1207,11 @@ class ConcurrentTaskSceneTestPartition(DataClassBase):
     # collection and insert
     data_size: Optional[int] = 3000
     ni: Optional[int] = 3000
+
+    data_organization: Optional[str] = None
+    # dynamic fields for inserting
+    dynamic_fields: Optional[list] = field(default_factory=lambda: [])
+    dynamic_fields_schema: Optional[dict] = field(default_factory=lambda: {})
 
     # search
     nq: Optional[int] = 10
@@ -1169,8 +1239,13 @@ class ConcurrentTaskSceneTestPartition(DataClassBase):
         return gen_vectors(nb=self.nq, dim=self.dim, field_name=self.anns_field, sparse_range=self.sparse_range)
 
     @property
-    def obj_params(self):
-        return {"timeout": self.timeout}
+    def insert_obj_params(self):
+        return {
+            "timeout": self.timeout,
+            "data_organization": self.data_organization,
+            "dynamic_fields": self.dynamic_fields,
+            "dynamic_fields_schema": self.dynamic_fields_schema
+        }
 
 
 @dataclass
@@ -1191,6 +1266,10 @@ class ConcurrentInputParamsSceneTestPartitionHybridSearch(DataClassBase):
     # collection and insert
     data_size: Optional[int] = 3000
     ni: Optional[int] = 3000
+
+    data_organization: Optional[str] = None
+    # dynamic fields for inserting
+    dynamic_fields: Optional[list] = field(default_factory=lambda: [])
 
 
 @dataclass
@@ -1215,6 +1294,11 @@ class ConcurrentTaskSceneTestPartitionHybridSearch(DataClassBase):
     # collection and insert
     data_size: Optional[int] = 3000
     ni: Optional[int] = 3000
+
+    data_organization: Optional[str] = None
+    # dynamic fields for inserting
+    dynamic_fields: Optional[list] = field(default_factory=lambda: [])
+    dynamic_fields_schema: Optional[dict] = field(default_factory=lambda: {})
 
     # save search_obj_params
     _search_obj_params: Optional[dict] = None
@@ -1263,6 +1347,15 @@ class ConcurrentTaskSceneTestPartitionHybridSearch(DataClassBase):
     @property
     def obj_params(self):
         return {"timeout": self.timeout}
+
+    @property
+    def insert_obj_params(self):
+        return {
+            "timeout": self.timeout,
+            "data_organization": self.data_organization,
+            "dynamic_fields": self.dynamic_fields,
+            "dynamic_fields_schema": self.dynamic_fields_schema
+        }
 
 
 @dataclass
@@ -1506,6 +1599,11 @@ class ConcurrentInputParamsSceneSearchTest(DataClassBase):
     metric_type: Optional[str] = MetricsTypeName.L2
     other_fields: Optional[list] = field(default_factory=lambda: [])
 
+    enable_dynamic_field: Optional[bool] = False
+    data_organization: Optional[str] = None
+    # dynamic fields for inserting
+    dynamic_fields: Optional[list] = field(default_factory=lambda: [])
+
     scalars_params: Optional[dict] = field(default_factory=lambda: {})
     scalars_index: Union[dict, list] = field(default_factory=lambda: {})
     vectors_index: Optional[dict] = field(default_factory=lambda: {})
@@ -1541,15 +1639,15 @@ class ConcurrentInputParamsSceneSearchTest(DataClassBase):
     @property
     def set_all_fields_params_obj(self):
         return ParserFieldsParams(
-            dataset_params={
-                dim: self.dim,
-                sparse_range: self.sparse_range,
-                dataset_name: self.dataset,
-                column_name: self.column_name,
-                metric_type: self.metric_type,
-                vectors_index: self.vectors_index,
-                scalars_params: self.scalars_params
-            }, collection_params={other_fields: self.other_fields}, main_field_name=self.anns_field)
+            dataset_params={dim: self.dim,
+                            sparse_range: self.sparse_range,
+                            dataset_name: self.dataset,
+                            column_name: self.column_name,
+                            metric_type: self.metric_type,
+                            vectors_index: self.vectors_index,
+                            scalars_params: self.scalars_params},
+            collection_params={other_fields: self.other_fields, dynamic_fields: self.dynamic_fields},
+            main_field_name=self.anns_field)
 
 
 @dataclass
@@ -1566,6 +1664,12 @@ class ConcurrentTaskSceneSearchTest(DataClassBase):
     index_param: Optional[dict] = field(default_factory=lambda: {'nlist': 2048})
     metric_type: Optional[str] = MetricsTypeName.L2
     other_fields: Optional[list] = field(default_factory=lambda: [])
+
+    enable_dynamic_field: Optional[bool] = False
+    data_organization: Optional[str] = None
+    # dynamic fields for inserting
+    dynamic_fields: Optional[list] = field(default_factory=lambda: [])
+    dynamic_fields_schema: Optional[dict] = field(default_factory=lambda: {})
 
     scalars_params: Optional[dict] = field(default_factory=lambda: {})
     scalars_index: Optional[dict] = field(default_factory=lambda: {})
@@ -1593,6 +1697,19 @@ class ConcurrentTaskSceneSearchTest(DataClassBase):
     custom_insert_api: Optional[str] = insert
 
     all_fields_params: ParserFieldsParams = None
+
+    def __post_init__(self):
+        self.dynamic_fields_schema = self.all_fields_params.get_collection_dynamic_fields_schema
+
+        log.debug("[ConcurrentTaskSceneSearchTest] Init done.")
+
+    @property
+    def insert_obj_params(self):
+        return {
+            "data_organization": self.data_organization,
+            "dynamic_fields": self.dynamic_fields,
+            "dynamic_fields_schema": self.dynamic_fields_schema
+        }
 
 
 @dataclass
@@ -1624,6 +1741,11 @@ class ConcurrentInputParamsSceneHybridSearchTest(DataClassBase):
     metric_type: Optional[str] = MetricsTypeName.L2
     other_fields: Optional[list] = field(default_factory=lambda: [])
 
+    enable_dynamic_field: Optional[bool] = False
+    data_organization: Optional[str] = None
+    # dynamic fields for inserting
+    dynamic_fields: Optional[list] = field(default_factory=lambda: [])
+
     scalars_params: Optional[dict] = field(default_factory=lambda: {})
     scalars_index: Union[dict, list] = field(default_factory=lambda: {})
     vectors_index: Optional[dict] = field(default_factory=lambda: {})
@@ -1654,15 +1776,15 @@ class ConcurrentInputParamsSceneHybridSearchTest(DataClassBase):
     @property
     def set_all_fields_params_obj(self):
         return ParserFieldsParams(
-            dataset_params={
-                dim: self.dim,
-                sparse_range: self.sparse_range,
-                dataset_name: self.dataset,
-                column_name: self.column_name,
-                metric_type: self.metric_type,
-                vectors_index: self.vectors_index,
-                scalars_params: self.scalars_params
-            }, collection_params={other_fields: self.other_fields}, main_field_name=self.anns_field)
+            dataset_params={dim: self.dim,
+                            sparse_range: self.sparse_range,
+                            dataset_name: self.dataset,
+                            column_name: self.column_name,
+                            metric_type: self.metric_type,
+                            vectors_index: self.vectors_index,
+                            scalars_params: self.scalars_params},
+            collection_params={other_fields: self.other_fields, dynamic_fields: self.dynamic_fields},
+            main_field_name=self.anns_field)
 
 
 @dataclass
@@ -1693,6 +1815,12 @@ class ConcurrentTaskSceneHybridSearchTest(DataClassBase):
     metric_type: Optional[str] = MetricsTypeName.L2
     other_fields: Optional[list] = field(default_factory=lambda: [])
 
+    enable_dynamic_field: Optional[bool] = False
+    data_organization: Optional[str] = None
+    # dynamic fields for inserting
+    dynamic_fields: Optional[list] = field(default_factory=lambda: [])
+    dynamic_fields_schema: Optional[dict] = field(default_factory=lambda: {})
+
     scalars_params: Optional[dict] = field(default_factory=lambda: {})
     scalars_index: Optional[dict] = field(default_factory=lambda: {})
     vectors_index: Optional[dict] = field(default_factory=lambda: {})
@@ -1715,6 +1843,19 @@ class ConcurrentTaskSceneHybridSearchTest(DataClassBase):
     set_properties: Optional[list] = field(default_factory=lambda: [])
     alter_index: Optional[list] = field(default_factory=lambda: [])
     custom_insert_api: Optional[str] = insert
+
+    def __post_init__(self):
+        self.dynamic_fields_schema = self.all_fields_params.get_collection_dynamic_fields_schema
+
+        log.debug("[ConcurrentTaskSceneHybridSearchTest] Init done.")
+
+    @property
+    def insert_obj_params(self):
+        return {
+            "data_organization": self.data_organization,
+            "dynamic_fields": self.dynamic_fields,
+            "dynamic_fields_schema": self.dynamic_fields_schema
+        }
 
     def set_random_data(self):
         for r in self.reqs:

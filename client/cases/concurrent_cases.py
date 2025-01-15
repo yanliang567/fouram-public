@@ -145,7 +145,7 @@ class GoBenchCases(CommonCases):
                                 ni=self.params_obj.dataset_params[pn.ni_per],
                                 vector_field_name=vector_default_field_name,
                                 sparse_range=sparse_range, scalars_params=all_fields_params.get_scalar_other_params,
-                                dynamic_fields_schema=all_fields_params.gen_dynamic_fields_schema
+                                dynamic_fields_schema=all_fields_params.get_collection_dynamic_fields_schema
                                 )
             self.prepare_flush()
             self.prepare_index(vector_field_name=vector_default_field_name,
@@ -247,7 +247,7 @@ class GoBenchCases(CommonCases):
                                 ni=self.params_obj.dataset_params[pn.ni_per],
                                 vector_field_name=vector_default_field_name,
                                 sparse_range=sparse_range, scalars_params=all_fields_params.get_scalar_other_params,
-                                dynamic_fields_schema=all_fields_params.gen_dynamic_fields_schema
+                                dynamic_fields_schema=all_fields_params.get_collection_dynamic_fields_schema
                                 )
             self.prepare_flush()
             self.prepare_index(vector_field_name=vector_default_field_name,
@@ -352,10 +352,12 @@ class ConcurrentClientBase(CommonCases):
 
         elif req_type in [pn.insert, pn.upsert]:
             params = eval("ConcurrentInputParams{0}(**req_params).to_dict".format(req_type.capitalize()))
-            params.update({"dim": self.params_obj.dataset_params[pn.dim],
-                           "sparse_range": sparse_range,
-                           "scalars_params": all_fields_params.get_scalar_other_params_no_dataset,
-                           "anns_field": vector_field_name})
+            params.update({
+                "dim": self.params_obj.dataset_params[pn.dim],
+                "sparse_range": sparse_range,
+                "scalars_params": all_fields_params.get_scalar_other_params_no_dataset,
+                "anns_field": vector_field_name,
+                "dynamic_fields_schema": all_fields_params.gen_extra_dynamic_fields_schema(params[pn.dynamic_fields])})
             _p = eval("ConcurrentTask{0}(**params)".format(req_type.capitalize()))
             _p.set_params()
             return _p
@@ -385,11 +387,13 @@ class ConcurrentClientBase(CommonCases):
 
         elif req_type == pn.scene_insert_delete_flush:
             params = ConcurrentInputParamsSceneInsertDeleteFlush(**req_params).to_dict
-            params.update({"dim": self.params_obj.dataset_params[pn.dim],
-                           "sparse_range": sparse_range,
-                           "scalars_params": all_fields_params.get_scalar_other_params_no_dataset,
-                           "anns_field": vector_field_name,
-                           "varchar_id": self.params_obj.collection_params.get(pn.varchar_id, False)})
+            params.update({
+                "dim": self.params_obj.dataset_params[pn.dim],
+                "sparse_range": sparse_range,
+                "scalars_params": all_fields_params.get_scalar_other_params_no_dataset,
+                "anns_field": vector_field_name,
+                "varchar_id": self.params_obj.collection_params.get(pn.varchar_id, False),
+                "dynamic_fields_schema": all_fields_params.gen_extra_dynamic_fields_schema(params[pn.dynamic_fields])})
             _p = ConcurrentTaskSceneInsertDeleteFlush(**params)
             _p.set_params()
             return _p
@@ -399,27 +403,33 @@ class ConcurrentClientBase(CommonCases):
 
         elif req_type == pn.scene_insert_partition:
             params = ConcurrentInputParamsSceneInsertPartition(**req_params).to_dict
-            params.update({"dim": self.params_obj.dataset_params[pn.dim],
-                           "sparse_range": sparse_range,
-                           "scalars_params": all_fields_params.get_scalar_other_params_no_dataset,
-                           "anns_field": vector_field_name})
+            params.update({
+                "dim": self.params_obj.dataset_params[pn.dim],
+                "sparse_range": sparse_range,
+                "scalars_params": all_fields_params.get_scalar_other_params_no_dataset,
+                "anns_field": vector_field_name,
+                "dynamic_fields_schema": all_fields_params.gen_extra_dynamic_fields_schema(params[pn.dynamic_fields])})
             return ConcurrentTaskSceneInsertPartition(**params)
 
         elif req_type == pn.scene_test_partition:
             params = ConcurrentInputParamsSceneTestPartition(**req_params).to_dict
-            params.update({"dim": self.params_obj.dataset_params[pn.dim],
-                           "sparse_range": sparse_range,
-                           "scalars_params": all_fields_params.get_scalar_other_params_no_dataset,
-                           "anns_field": vector_field_name})
+            params.update({
+                "dim": self.params_obj.dataset_params[pn.dim],
+                "sparse_range": sparse_range,
+                "scalars_params": all_fields_params.get_scalar_other_params_no_dataset,
+                "anns_field": vector_field_name,
+                "dynamic_fields_schema": all_fields_params.gen_extra_dynamic_fields_schema(params[pn.dynamic_fields])})
             return ConcurrentTaskSceneTestPartition(**params)
 
         elif req_type == pn.scene_test_partition_hybrid_search:
             params = ConcurrentInputParamsSceneTestPartitionHybridSearch(**req_params)
             result = self.hybrid_search_param_analysis(_search_params=params.to_dict,
                                                        all_fields_params=all_fields_params)[0]
-            result.update({"all_fields_params": all_fields_params,
-                           "dim": self.params_obj.dataset_params[pn.dim],
-                           "anns_field": vector_field_name})
+            result.update({
+                "all_fields_params": all_fields_params,
+                "dim": self.params_obj.dataset_params[pn.dim],
+                "anns_field": vector_field_name,
+                "dynamic_fields_schema": all_fields_params.gen_extra_dynamic_fields_schema(result[pn.dynamic_fields])})
             return ConcurrentTaskSceneTestPartitionHybridSearch(**result)
 
         elif req_type == pn.iterate_search:
@@ -543,7 +553,7 @@ class ConcurrentClientBase(CommonCases):
                                 ni=self.params_obj.dataset_params[pn.ni_per],
                                 vector_field_name=vector_default_field_name,
                                 sparse_range=sparse_range, scalars_params=all_fields_params.get_scalar_other_params,
-                                dynamic_fields_schema=all_fields_params.gen_dynamic_fields_schema
+                                dynamic_fields_schema=all_fields_params.get_collection_dynamic_fields_schema
                                 )
             self.prepare_flush()
             self.prepare_index(vector_field_name=vector_default_field_name,

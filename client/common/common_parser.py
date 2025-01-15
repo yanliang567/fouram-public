@@ -395,6 +395,7 @@ class ParserFieldsParams:
         self._dataset_params = copy.deepcopy(dataset_params)
         self._collection_params = copy.deepcopy(collection_params)
         self._main_field_name = main_field_name
+        self._field_params_base = {}
 
         self._parser_params()
 
@@ -424,7 +425,7 @@ class ParserFieldsParams:
                 "[ParserFieldsParams] Field for `other_fields` and `dynamic_fields` are not unique: {0}, params: {1}".format(
                     list(set(_other) & set(_dynamic)), self._collection_params))
 
-        return _other + _dynamic
+        return ["id"] + _other + _dynamic
 
     def _parser_params(self):
         try:
@@ -435,7 +436,11 @@ class ParserFieldsParams:
             # get main `varchar_filled`
             main_varchar_filled = self._dataset_params.get(pn.varchar_filled, False)
 
-            # set main vector filed
+            # set field params base
+            self._field_params_base = FieldsParamsBase(dim=main_dim, sparse_range=main_sparse_range,
+                                                       varchar_filled=main_varchar_filled).to_dict
+
+            # set main vector field
             m = FieldsParamsBase(dim=main_dim, dataset=self._dataset_params.get(pn.dataset_name),
                                  column_name=self._dataset_params.get(pn.column_name),
                                  metric_type=self._dataset_params.get(pn.metric_type),
@@ -472,23 +477,18 @@ class ParserFieldsParams:
         except Exception as e:
             raise Exception(f"[ParserFieldsParams] Parser fields params failed: {e}")
 
-        log.debug(f"[ParserFieldsParams] Parser fields params done: {self.get_scalars_params}")
+        log.debug("[ParserFieldsParams] Parser fields params done: {0}, field_params_base: {1}".format(
+            self.get_scalars_params, self._field_params_base))
 
     def get_fields_params(self, _field_name: str) -> FieldsParamsBase:
         return self._get_attr(_field_name)
 
-    @property
-    def gen_dynamic_fields_schema(self):
-        _dynamic_fields = self._collection_params.get(pn.dynamic_fields, [])
-        if not _dynamic_fields:
-            log.debug(f"[ParserFieldsParams] Collection params have no dynamic fields: {self._collection_params}.")
-            return {}
-
+    def _gen_dynamic_fields_schema(self, dynamic_fields: List[str] = None):
         _scalar_params = self._dataset_params.get(pn.scalars_params, {})
         dynamic_fields_schema, _max_length = {}, self._dataset_params.get(pn.max_length, dv.default_max_length)
 
-        for name, _type in get_fields_type(_dynamic_fields).items():
-            filed_params = _scalar_params.get(name, {}).get("params", {})
+        for name, _type in get_fields_type(dynamic_fields).items():
+            filed_params = _scalar_params.get(name, {}).get("params", self._field_params_base)
 
             dynamic_fields_schema.update({
                 name: DynamicFieldSchema(
@@ -501,8 +501,21 @@ class ParserFieldsParams:
                 ).to_dict
             })
 
-        log.debug(f"[ParserFieldsParams] Gen dynamic fields:{_dynamic_fields} schema:{dynamic_fields_schema}")
+        log.debug(f"[ParserFieldsParams] Gen dynamic fields:{dynamic_fields} schema:{dynamic_fields_schema}")
         return dynamic_fields_schema
+
+    def gen_extra_dynamic_fields_schema(self, dynamic_fields: List[str] = None):
+        if not dynamic_fields:
+            return {}
+        return self._gen_dynamic_fields_schema(dynamic_fields)
+
+    @property
+    def get_collection_dynamic_fields_schema(self):
+        _dynamic_fields = self._collection_params.get(pn.dynamic_fields, [])
+        if not _dynamic_fields:
+            log.debug(f"[ParserFieldsParams] Collection params have no dynamic fields: {self._collection_params}.")
+            return {}
+        return self._gen_dynamic_fields_schema(_dynamic_fields)
 
     @property
     def get_scalar_other_params(self):

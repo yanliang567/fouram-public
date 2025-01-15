@@ -934,12 +934,16 @@ class Base:
 
     def concurrent_insert(self, params: ConcurrentTaskInsert):
         entities = gen_entities(self.collection_schema, params.get_vectors, params.get_ids, params.varchar_filled,
-                                anns_field=params.anns_field, insert_scalars_params=params.scalars_params)
+                                anns_field=params.anns_field, insert_scalars_params=params.scalars_params,
+                                data_organization=params.data_organization, dynamic_fields=params.dynamic_fields,
+                                dynamic_fields_schema=params.dynamic_fields_schema)
         return self.collection_wrap.insert(entities, **params.obj_params)
 
     def concurrent_upsert(self, params: ConcurrentTaskUpsert):
         entities = gen_entities(self.collection_schema, params.get_vectors, params.get_ids, params.varchar_filled,
-                                anns_field=params.anns_field, insert_scalars_params=params.scalars_params)
+                                anns_field=params.anns_field, insert_scalars_params=params.scalars_params,
+                                data_organization=params.data_organization, dynamic_fields=params.dynamic_fields,
+                                dynamic_fields_schema=params.dynamic_fields_schema)
         return self.collection_wrap.upsert(entities, **params.obj_params)
 
     def concurrent_delete(self, params: ConcurrentTaskDelete):
@@ -955,7 +959,7 @@ class Base:
         self.create_collection(collection_obj=collection_obj, collection_name=collection_name,
                                vector_field_name=params.vector_field_name, dim=params.dim,
                                other_fields=params.other_fields, scalars_params=params.scalars_params,
-                               log_level=log_level)
+                               log_level=log_level, enable_dynamic_field=params.enable_dynamic_field)
         time.sleep(1)
 
         # insert vectors
@@ -964,7 +968,7 @@ class Base:
                     collection_obj=collection_obj, collection_name=collection_name, anns_field=params.vector_field_name,
                     collection_schema=collection_obj.schema.to_dict(), log_level=log_level,
                     scalars_params=params.all_fields_params.get_scalar_other_params,
-                    custom_api_insert=params.custom_insert_api)
+                    custom_api_insert=params.custom_insert_api, **params.insert_obj_params)
 
         # flush collection
         self.flush_collection(collection_obj=collection_obj, log_level=log_level)
@@ -1002,7 +1006,9 @@ class Base:
         # insert vectors
         entities = gen_entities(
             self.collection_schema, params.get_vectors, params.get_insert_ids, params.varchar_filled,
-            anns_field=params.anns_field, insert_scalars_params=params.scalars_params)
+            anns_field=params.anns_field, insert_scalars_params=params.scalars_params,
+            data_organization=params.data_organization, dynamic_fields=params.dynamic_fields,
+            dynamic_fields_schema=params.dynamic_fields_schema)
         insert_res = self.collection_wrap.insert(entities, **params.insert_obj_params)
 
         # delete vectors
@@ -1031,7 +1037,7 @@ class Base:
                     collection_obj=self.collection_wrap, collection_name=self.collection_wrap.name,
                     collection_schema=self.collection_schema, log_level=log_level, partition_name=partition_name,
                     anns_field=params.anns_field, sparse_range=params.sparse_range,
-                    scalars_params=params.scalars_params, **params.obj_params)
+                    scalars_params=params.scalars_params, **params.insert_obj_params)
 
         if params.with_flush:
             self.flush_partition(partition_obj, log_level)
@@ -1058,7 +1064,7 @@ class Base:
                     collection_obj=self.collection_wrap, collection_name=self.collection_wrap.name,
                     collection_schema=self.collection_schema, log_level=log_level, partition_name=partition_name,
                     anns_field=params.anns_field, sparse_range=params.sparse_range,
-                    scalars_params=params.scalars_params, **params.obj_params)
+                    scalars_params=params.scalars_params, **params.insert_obj_params)
 
         # flush partition
         self.flush_partition(partition_obj, log_level=log_level)
@@ -1113,7 +1119,7 @@ class Base:
                     collection_obj=self.collection_wrap, collection_name=self.collection_wrap.name,
                     collection_schema=self.collection_schema, log_level=log_level, partition_name=partition_name,
                     anns_field=params.anns_field, sparse_range=params.sparse_range,
-                    scalars_params=params.scalar_params, **params.obj_params)
+                    scalars_params=params.scalar_params, **params.insert_obj_params)
 
         # flush partition
         self.flush_partition(partition_obj, log_level=log_level, **params.obj_params)
@@ -1263,7 +1269,8 @@ class Base:
         self.create_collection(collection_obj=collection_obj, collection_name=collection_name,
                                shards_num=params.shards_num, vector_field_name=params.vector_field_name, dim=params.dim,
                                using=connect_using, other_fields=params.other_fields,
-                               scalars_params=params.scalars_params, log_level=log_level)
+                               scalars_params=params.scalars_params, log_level=log_level,
+                               enable_dynamic_field=params.enable_dynamic_field)
         time.sleep(1)
         self.set_all_properties(params=params.set_properties, collection_obj=collection_obj, log_level=log_level)
 
@@ -1296,7 +1303,7 @@ class Base:
                     collection_obj=collection_obj, collection_name=collection_name, anns_field=params.vector_field_name,
                     collection_schema=collection_obj.schema.to_dict(), log_level=log_level,
                     scalars_params=params.all_fields_params.get_scalar_other_params,
-                    custom_api_insert=params.custom_insert_api)
+                    custom_api_insert=params.custom_insert_api, **params.insert_obj_params)
 
         # flush collection
         self.flush_collection(collection_obj=collection_obj, log_level=log_level)
@@ -1374,7 +1381,8 @@ class Base:
         self.create_collection(collection_obj=collection_obj, collection_name=collection_name,
                                shards_num=params.shards_num, vector_field_name=params.vector_field_name, dim=params.dim,
                                using=connect_using, other_fields=params.other_fields,
-                               scalars_params=params.scalars_params, log_level=log_level)
+                               scalars_params=params.scalars_params, log_level=log_level,
+                               enable_dynamic_field=params.enable_dynamic_field)
         time.sleep(1)
         self.set_all_properties(params=params.set_properties, collection_obj=collection_obj, log_level=log_level)
 
@@ -1407,7 +1415,7 @@ class Base:
                     collection_obj=collection_obj, collection_name=collection_name, anns_field=params.vector_field_name,
                     collection_schema=collection_obj.schema.to_dict(), log_level=log_level,
                     scalars_params=params.all_fields_params.get_scalar_other_params,
-                    custom_api_insert=params.custom_insert_api)
+                    custom_api_insert=params.custom_insert_api, **params.insert_obj_params)
 
         # flush collection
         self.flush_collection(collection_obj=collection_obj, log_level=log_level)

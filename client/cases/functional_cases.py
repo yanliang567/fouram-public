@@ -94,7 +94,7 @@ class FunctionalCases(CommonCases):
                                 ni=self.params_obj.dataset_params[pn.ni_per],
                                 vector_field_name=vector_default_field_name,
                                 sparse_range=sparse_range, scalars_params=all_fields_params.get_scalar_other_params,
-                                dynamic_fields_schema=all_fields_params.gen_dynamic_fields_schema
+                                dynamic_fields_schema=all_fields_params.get_collection_dynamic_fields_schema
                                 )
             self.prepare_flush()
             self.prepare_index(vector_field_name=vector_default_field_name,

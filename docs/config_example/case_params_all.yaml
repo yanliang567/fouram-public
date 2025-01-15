@@ -200,6 +200,12 @@ dataset_params:
         max_length: 2
         max_capacity: 5
       other_params:
+        # - Enabled the global param `dataset_params.varchar_filled` and disabled param `other_params.varchar_filled`
+        #     -> the function is disabled, varchar_filled=false
+        # - Enabled the global param `dataset_params.varchar_filled` and don't pass in param `other_params.varchar_filled`
+        #     -> the function is enabled, varchar_filled=true
+        # - Enabled the global param `dataset_params.varchar_filled` and enabled param `other_params.varchar_filled`
+        #     -> the function is enabled, varchar_filled=true
         varchar_filled: false
     array_varchar_2:
       params:
@@ -641,6 +647,11 @@ concurrent_tasks:
       nb: Optional[int] = 1  # number of batch insert
       timeout: Optional[int] = 60
 
+      # same as `common_params.data_organization`
+      data_organization: Optional[str] = None
+      # dynamic fields for inserting, same as `collection_params.dynamic_fields`
+      dynamic_fields: Optional[list] = []
+
       # random id or vectors
       # the inserted data will be retained and can be deleted later
       random_id: Optional[bool] = False
@@ -660,6 +671,11 @@ concurrent_tasks:
     params:
       nb: Optional[int] = 1  # number of batch upsert
       timeout: Optional[int] = 60
+
+      # same as `common_params.data_organization`
+      data_organization: Optional[str] = None
+      # dynamic fields for upserting, same as `collection_params.dynamic_fields`
+      dynamic_fields: Optional[list] = []
 
       # random id or vectors
       # data that upsert will be retained and can be deleted later
@@ -707,6 +723,12 @@ concurrent_tasks:
       metric_type: Optional[str] = "L2"
       other_fields: Optional[list] = []  # same as `collection_params.other_fields`
 
+      enable_dynamic_field: Optional[bool] = False
+      # same as `common_params.data_organization`
+      data_organization: Optional[str] = None
+      # dynamic fields for inserting, same as `collection_params.dynamic_fields`
+      dynamic_fields: Optional[list] = []
+
       scalars_params: Optional[dict] = {}  # same as `dataset_params.scalars_params`
       scalars_index: Optional[dict, list] = {}  # same as `dataset_params.scalars_index`
       vectors_index: Optional[dict] = {}  # same as `dataset_params.vectors_index`
@@ -723,6 +745,11 @@ concurrent_tasks:
       insert_length: Optional[int] = 1
       delete_length: Optional[int] = 1
       start_id: Optional[int] = 0
+
+      # same as `common_params.data_organization`
+      data_organization: Optional[str] = None
+      # dynamic fields for inserting, same as `collection_params.dynamic_fields`
+      dynamic_fields: Optional[list] = []
 
       # random id or vectors
       random_id: Optional[bool] = False
@@ -742,6 +769,10 @@ concurrent_tasks:
       ni: Optional[int] = 5
       with_flush: Optional[bool] = False
       timeout: Optional[int] = 60
+      # same as `common_params.data_organization`
+      data_organization: Optional[str] = None
+      # dynamic fields for inserting, same as `collection_params.dynamic_fields`
+      dynamic_fields: Optional[list] = []
 
   - type: scene_test_partition
     weight: 1
@@ -749,6 +780,10 @@ concurrent_tasks:
       # collection and insert
       data_size: Optional[int] = 3000
       ni: Optional[int] = 3000
+      # same as `common_params.data_organization`
+      data_organization: Optional[str] = None
+      # dynamic fields for inserting, same as `collection_params.dynamic_fields`
+      dynamic_fields: Optional[list] = []
 
       # search
       nq: Optional[int] = 10
@@ -783,6 +818,10 @@ concurrent_tasks:
       # collection and insert
       data_size: Optional[int] = 3000
       ni: Optional[int] = 3000
+      # same as `common_params.data_organization`
+      data_organization: Optional[str] = None
+      # dynamic fields for inserting, same as `collection_params.dynamic_fields`
+      dynamic_fields: Optional[list] = []
 
   - type: iterate_search
     weight: 1
@@ -863,6 +902,12 @@ concurrent_tasks:
       metric_type: Optional[str] = "L2"
       other_fields: Optional[list] = []  # same as `collection_params.other_fields`
 
+      enable_dynamic_field: Optional[bool] = False
+      # same as `common_params.data_organization`
+      data_organization: Optional[str] = None
+      # dynamic fields for inserting, same as `collection_params.dynamic_fields`
+      dynamic_fields: Optional[list] = []
+
       scalars_params: Optional[dict] = {}  # same as `dataset_params.scalars_params`
       scalars_index: Optional[dict, list] = {}  # same as `dataset_params.scalars_index`
       vectors_index: Optional[dict] = {}  # same as `dataset_params.vectors_index`
@@ -927,6 +972,12 @@ concurrent_tasks:
       index_param: { 'nlist': 2048 } # Optional[dict]
       metric_type: Optional[str] = "L2"
       other_fields: Optional[list] = []  # same as `collection_params.other_fields`
+
+      enable_dynamic_field: Optional[bool] = False
+      # same as `common_params.data_organization`
+      data_organization: Optional[str] = None
+      # dynamic fields for inserting, same as `collection_params.dynamic_fields`
+      dynamic_fields: Optional[list] = []
 
       scalars_params: Optional[dict] = {}  # same as `dataset_params.scalars_params`
       scalars_index: Optional[dict, list] = {}  # same as `dataset_params.scalars_index`

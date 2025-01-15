@@ -65,7 +65,7 @@ class CommonCases(Base):
         all_fields_params = ParserFieldsParams(self.params_obj.dataset_params, self.params_obj.collection_params,
                                                main_field_name=vector_default_field_name)
         scalars_params = all_fields_params.get_scalar_other_params
-        dynamic_fields_schema = all_fields_params.gen_dynamic_fields_schema
+        dynamic_fields_schema = all_fields_params.get_collection_dynamic_fields_schema
 
         varchar_id = self.params_obj.collection_params.get(pn.varchar_id, False)
         data_organization = self.params_obj.common_params.get(pn.data_organization, None)

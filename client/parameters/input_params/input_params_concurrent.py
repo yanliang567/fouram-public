@@ -277,6 +277,10 @@ class ConcurrentParams(CommonParams):
         nb: Optional[int] = 1  # number of batch insert
         timeout: Optional[int] = DefaultValue.default_timeout
 
+        data_organization: Optional[str] = None
+        # dynamic fields for inserting
+        dynamic_fields: Optional[list] = field(default_factory=lambda: [])
+
         # random id or vectors
         random_id: Optional[bool] = False
         random_vector: Optional[bool] = False
@@ -300,6 +304,10 @@ class ConcurrentParams(CommonParams):
         """
         nb: Optional[int] = 1  # number of batch insert
         timeout: Optional[int] = DefaultValue.default_timeout
+
+        data_organization: Optional[str] = None
+        # dynamic fields for inserting
+        dynamic_fields: Optional[list] = field(default_factory=lambda: [])
 
         # random id or vectors
         random_id: Optional[bool] = False
@@ -339,7 +347,11 @@ class ConcurrentParams(CommonParams):
                           metric_type=pn.MetricsTypeName.L2, other_fields=[],
                           scalars_params={}, scalars_index={}, vectors_index={}):
         """
+        dataset: Optional[str] = DefaultValue.default_dataset
+        column_name: Optional[str] = DefaultValue.default_dataset_column_name
+        vector_field_name: Optional[str] = None
         dim: Optional[int] = DefaultValue.default_dim
+        sparse_range: Union[List[int], int, None] = None
         data_size: Optional[int] = 3000
         nb: Optional[int] = 3000
         index_type: Optional[str] = "IVF_SQ8"
@@ -347,9 +359,15 @@ class ConcurrentParams(CommonParams):
         metric_type: Optional[str] = "L2"
         other_fields: Optional[list] = field(default_factory=lambda: [])
 
+        enable_dynamic_field: Optional[bool] = False
+        data_organization: Optional[str] = None
+        # dynamic fields for inserting
+        dynamic_fields: Optional[list] = field(default_factory=lambda: [])
+
         scalars_params: Optional[dict] = field(default_factory=lambda: {})
         scalars_index: Optional[dict, list] = field(default_factory=lambda: {})
         vectors_index: Optional[dict] = field(default_factory=lambda: {})
+        custom_insert_api: Optional[str] = insert
         """
         return {"type": "scene_test", "weight": weight,
                 "params": {"dim": dim, "data_size": data_size, "nb": nb, "index_type": index_type,
@@ -384,6 +402,10 @@ class ConcurrentParams(CommonParams):
         delete_length: Optional[int] = 1
         start_id: Optional[int] = 0
 
+        data_organization: Optional[str] = None
+        # dynamic fields for inserting
+        dynamic_fields: Optional[list] = field(default_factory=lambda: [])
+
         # random id or vectors
         random_id: Optional[bool] = False
         random_vector: Optional[bool] = False
@@ -403,7 +425,12 @@ class ConcurrentParams(CommonParams):
         """
         data_size: total insert data_size data into partition
         ni: insert ni into the created partition per time
+        with_flush: Optional[bool] = False
         timeout: Optional[int] = 30
+
+        data_organization: Optional[str] = None
+        # dynamic fields for inserting
+        dynamic_fields: Optional[list] = field(default_factory=lambda: [])
         """
         return {"type": "scene_insert_partition", "weight": weight,
                 "params": {"data_size": data_size, "ni": ni, "with_flush": with_flush, "timeout": timeout}}
@@ -416,6 +443,10 @@ class ConcurrentParams(CommonParams):
         # collection and insert
         data_size: total insert data_size data into partition
         ni: insert ni into the created partition per time
+
+        data_organization: Optional[str] = None
+        # dynamic fields for inserting
+        dynamic_fields: Optional[list] = field(default_factory=lambda: [])
 
         # search
         nq: Optional[int] = 10
@@ -458,6 +489,10 @@ class ConcurrentParams(CommonParams):
         # collection and insert
         data_size: Optional[int] = 3000
         ni: Optional[int] = 3000
+
+        data_organization: Optional[str] = None
+        # dynamic fields for inserting
+        dynamic_fields: Optional[list] = field(default_factory=lambda: [])
         """
         return {"type": "scene_test_partition_hybrid_search", "weight": weight,
                 "params": {"nq": nq, "top_k": top_k, "reqs": [i.obj_params for i in reqs], "rerank": rerank.obj_params,
@@ -560,7 +595,10 @@ class ConcurrentParams(CommonParams):
                                  prepare_before_insert=False, new_connect=False, new_user=False):
         """
         dataset: Optional[str] = DefaultValue.default_dataset
+        column_name: Optional[str] = DefaultValue.default_dataset_column_name
+        vector_field_name: Optional[str] = None
         dim: Optional[int] = DefaultValue.default_dim
+        sparse_range: Union[List[int], int, None] = None
         shards_num: Optional[int] = DefaultValue.default_shards_num
         data_size: Optional[int] = 3000
         nb: Optional[int] = 3000
@@ -568,6 +606,11 @@ class ConcurrentParams(CommonParams):
         index_param: Optional[dict] = field(default_factory=lambda: {'nlist': 2048})
         metric_type: Optional[str] = "L2"
         other_fields: Optional[list] = field(default_factory=lambda: [])
+
+        enable_dynamic_field: Optional[bool] = False
+        data_organization: Optional[str] = None
+        # dynamic fields for inserting
+        dynamic_fields: Optional[list] = field(default_factory=lambda: [])
 
         scalars_params: Optional[dict] = field(default_factory=lambda: {})
         scalars_index: Optional[dict, list] = field(default_factory=lambda: {})
@@ -628,7 +671,10 @@ class ConcurrentParams(CommonParams):
 
         # collection and insert and index params
         dataset: Optional[str] = DefaultValue.default_dataset
+        column_name: Optional[str] = DefaultValue.default_dataset_column_name
+        vector_field_name: Optional[str] = None
         dim: Optional[int] = DefaultValue.default_dim
+        sparse_range: Union[List[int], int, None] = None
         shards_num: Optional[int] = DefaultValue.default_shards_num
         data_size: Optional[int] = 3000
         nb: Optional[int] = 3000
@@ -636,6 +682,11 @@ class ConcurrentParams(CommonParams):
         index_param: Optional[dict] = field(default_factory=lambda: {'nlist': 2048})
         metric_type: Optional[str] = MetricsTypeName.L2
         other_fields: Optional[list] = field(default_factory=lambda: [])
+
+        enable_dynamic_field: Optional[bool] = False
+        data_organization: Optional[str] = None
+        # dynamic fields for inserting
+        dynamic_fields: Optional[list] = field(default_factory=lambda: [])
 
         scalars_params: Optional[dict] = field(default_factory=lambda: {})
         scalars_index: Union[dict, list] = field(default_factory=lambda: {})
@@ -651,6 +702,11 @@ class ConcurrentParams(CommonParams):
 
         # use db and user
         new_user: Optional[bool] = False
+
+        # common setting
+        set_properties: Union[dict, list, None] = None
+        alter_index: Union[dict, list, None] = None
+        custom_insert_api: Optional[str] = insert
         """
         return {"type": "scene_hybrid_search_test", "weight": weight,
                 "params": {"nq": nq, "top_k": top_k, "reqs": [i.obj_params for i in reqs], "rerank": rerank.obj_params,

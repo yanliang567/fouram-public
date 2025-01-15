@@ -414,8 +414,7 @@ def gen_values(data_type, vectors, ids, varchar_filled=False, field: dict = {}, 
     elif _field_element == DataType.FLOAT:
         values = pd.Series(data=[(i + 0.0) for i in ids], dtype="float32")
     elif _field_element in [DataType.VARCHAR]:
-        varchar_filled = other_params.get("varchar_filled", varchar_filled)
-        if varchar_filled is False:
+        if not (varchar_filled or other_params.get("varchar_filled", False)):
             values = [str(i) for i in ids]
         else:
             _len = int(field["params"]["max_length"])
