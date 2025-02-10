@@ -990,6 +990,12 @@ def get_required_params(source, target):
     return result
 
 
+def check_max_value(default: int, diff_value: int) -> int:
+    if diff_value > default:
+        return diff_value
+    return default
+
+
 def check_vector_length(data):
     return data.shape[0] if hasattr(data, "shape") else len(data)
 

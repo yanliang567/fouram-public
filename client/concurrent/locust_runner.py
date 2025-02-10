@@ -2,8 +2,9 @@ import time
 import gevent
 import threading
 from locust import User, events
-from locust.stats import print_stats, print_percentile_stats, StatsEntry
+from locust.stats import StatsEntry
 from locust.env import Environment
+from client.concurrent.locust_common import print_stats, print_percentile_stats
 
 from client.cases.case_report import CasesReport
 from client.common.common_func import get_spawn_rate
