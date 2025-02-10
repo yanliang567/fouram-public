@@ -26,13 +26,11 @@ def get_api_version(kind):
 
 def dict_to_str(source, target, target_list):
     for key, value in source.items():
+        _prefix = target + '.' if target != "" else target
         if isinstance(value, dict):
-            _t = ".%s" % key if target != "" else key
-            dict_to_str(source[key], target + _t, target_list)
+            dict_to_str(source[key], _prefix + key, target_list)
         else:
-            _t = ".%s=%s," % (key, str(value))
-            target_list.append(target + _t)
-
+            target_list.append(_prefix + "%s=%s," % (key, str(value)))
     return target_list
 
 
