@@ -6,6 +6,43 @@ Used in `dataset_params.scalars_params` and concurrent request params
 
 ### Random algorithms
 
+#### Common
+
+###### a. Parameters for generating VARCHAR related data
+The generated VARCHAR data is filled with the specified `varchar_prefix` character
+
+```yaml
+<dataset_params or param under concurrent_tasks>:
+  scalars_params:
+    varchar_1:
+      other_params:
+        dataset: random_algorithm
+        algorithm_params:
+          ...
+          varchar_prefix: '0'  # only 1 character
+          varchar_filled_length: 100  # can't be larger than `varchar_1` max_length
+    array_varchar_1:
+      other_params:
+        dataset: random_algorithm
+        algorithm_params:
+          ...
+          varchar_prefix: '#'  # only 1 character
+          varchar_filled_length: 51  # can't be larger than `array_varchar_1` max_length
+```
+
+```text
+Params:
+    # for `VARCHAR` & `ARRAY_VARCHAR` types
+    varchar_prefix: <str>,  len(varchar_prefix) == 1; default value = None, indicates no prefix padding
+    varchar_filled_length: <int>, >= 0; default value = 10
+
+    e.g.:
+        - varchar_prefix: 'a', varchar_filled_length: 0: VARCHAR data '1' -> '1'
+        - varchar_prefix: 'a', varchar_filled_length: 1: VARCHAR data '1' -> '1'
+        - varchar_prefix: 'a', varchar_filled_length: 3: VARCHAR data '1' -> 'aa1'
+        - varchar_prefix: 'a', varchar_filled_length: 3: VARCHAR data '1111' -> '1111'
+```
+
 #### 1. `specify_scope`
 
 **config example:**
@@ -36,6 +73,9 @@ Support data type: INT8, INT16, INT32, INT64, DOUBLE, FLOAT, VARCHAR, ARRAY(supp
 Params:
     specify_range: List<int>, e.g.: [ 1, 100 ] => 1 ~ 99
     max_capacity: <int> <- for ARRAY
+    # for `VARCHAR` & `ARRAY_VARCHAR` types
+    varchar_prefix: <str>,  len(varchar_prefix) == 1
+    varchar_filled_length: <int>, >= 0
 
 Introduce:
     Read the scalar values in `specify_range` sequentially,
@@ -83,6 +123,9 @@ Support data type: INT8, INT16, INT32, INT64, DOUBLE, FLOAT, VARCHAR, ARRAY(supp
 Params:
     specify_range: List<int>, e.g.: [ 1, 100 ] => 1 ~ 99
     max_capacity: <int> <- for ARRAY
+    # for `VARCHAR` & `ARRAY_VARCHAR` types
+    varchar_prefix: <str>,  len(varchar_prefix) == 1
+    varchar_filled_length: <int>, >= 0
 
 Introduce:
     Read the scalar values in `specify_range` sequentially,
@@ -132,6 +175,9 @@ Params:
     specify_range: List<int>, e.g.: [ 0, 100 ] => 0 ~ 99
     batch: <int>, > 0 <- the number of times the same value is repeated
     max_capacity: <int> <- for ARRAY
+    # for `VARCHAR` & `ARRAY_VARCHAR` types
+    varchar_prefix: <str>,  len(varchar_prefix) == 1
+    varchar_filled_length: <int>, >= 0
 
 Introduce:
     Read the scalar values in `specify_range` sequentially,
@@ -189,6 +235,9 @@ Params:
     custom_size: dict<str: Union[str, list]>, this value will overrides `base_size`
                  - key: the number of value, e.g.: "100", "10k"
                  - value: scalar value, must be within the `specified_range`, e.g.: 1, [10, 51]
+    # for `VARCHAR` & `ARRAY_VARCHAR` types
+    varchar_prefix: <str>,  len(varchar_prefix) == 1
+    varchar_filled_length: <int>, >= 0
 
 Introduce:
     Read the scalar values in `specify_range` sequentially,
@@ -258,6 +307,9 @@ Params:
     custom_size: dict<str: Union[str, list]>, this value will overrides `base_size`
                  - key: the number of value, e.g.: "100", "10k"
                  - value: scalar value, must be within the `specified_range`, e.g.: 1, [10, 51]
+    # for `VARCHAR` & `ARRAY_VARCHAR` types
+    varchar_prefix: <str>,  len(varchar_prefix) == 1
+    varchar_filled_length: <int>, >= 0
 
 Introduce:
     Read the scalar values in `specify_range` sequentially,
@@ -319,6 +371,9 @@ Support data type: ARRAY(INT8, INT16, INT32, INT64, DOUBLE, FLOAT, VARCHAR)
 Params:
     specify_range: List<int>, e.g.: [ 1, 100 ] => 1 ~ 99
     capacity_range: List<int> , e.g.: [ 1, 10 ] => 1 ~ 10 / [ 1, 1 ] => 1
+    # for `ARRAY_VARCHAR` type
+    varchar_prefix: <str>,  len(varchar_prefix) == 1
+    varchar_filled_length: <int>, >= 0
 
 Introduce:
     Generate a list according to the `specify_range` value,
@@ -327,7 +382,7 @@ Introduce:
     e.g.:
         specify_range: [0, 10]
         capacity_range: [0, 2]
-    -> handling scalar value types: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] * least_common_multiple(len(specify_range), max(capacity_range))
+    -> handling scalar value types: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] * math.ceil(max(capacity_range) / len(specify_range))
     -> scalar_values
         array<int>: [[0, 9], [1], [8, 2], [], [1, 5], [7], ... <repeated>]
         array<varchar>: [["0", "9"], ["1"], ["8", "2"], [], ["1", "5"], ["7"], ... <repeated>]

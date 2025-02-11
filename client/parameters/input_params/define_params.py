@@ -544,7 +544,7 @@ class DefaultScalarParams:
         :param specify_range: SpecifyRange
         :param capacity_range: List[int]
         """
-        return [DefaultScalarParams.specify_scope(field, specify_range, capacity_range) for field in fields]
+        return [DefaultScalarParams.specify_scope_array(field, specify_range, capacity_range) for field in fields]
 
 
 class DefaultDatasetParams:
