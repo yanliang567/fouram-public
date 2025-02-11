@@ -362,60 +362,70 @@ class DefaultScalarParams:
         }
 
     @staticmethod
-    def specify_scope(field: str, specify_range: SpecifyRange = SpecifyRange(), max_capacity: int = 1):
+    def specify_scope(field: str, specify_range: SpecifyRange = SpecifyRange(), max_capacity: int = 1, **kwargs):
         """
         setting random_algorithm
 
         :param field: str
         :param specify_range: SpecifyRange
         :param max_capacity: int
+        :param kwargs:
+                varchar_prefix: str
+                varchar_filled_length: int
         """
         algorithm_params = {
             "algorithm_name": "specify_scope",
             "specify_range": specify_range.value,
-            "max_capacity": max_capacity
+            "max_capacity": max_capacity,
+            **{n: kwargs.get(n) for n in [pn.varchar_prefix, pn.varchar_filled_length] if n in kwargs}
         }
         return {field: {"other_params": {"dataset": pn.DatasetsName.RandomAlgorithm,
                                          "algorithm_params": algorithm_params}}}
 
     @staticmethod
-    def specify_scope_list(fields: List[str], specify_range: SpecifyRange = SpecifyRange(), max_capacity: int = 1):
+    def specify_scope_list(fields: List[str], specify_range: SpecifyRange = SpecifyRange(), max_capacity: int = 1,
+                           **kwargs):
         """
         :param fields: ["id", "int64_1", "array_int16_1", ...]
         :param specify_range: SpecifyRange
         :param max_capacity: int
         """
-        return [DefaultScalarParams.specify_scope(field, specify_range, max_capacity) for field in fields]
+        return [DefaultScalarParams.specify_scope(field, specify_range, max_capacity, **kwargs) for field in fields]
 
     @staticmethod
-    def random_range(field: str, specify_range: SpecifyRange = SpecifyRange(), max_capacity: int = 1):
+    def random_range(field: str, specify_range: SpecifyRange = SpecifyRange(), max_capacity: int = 1, **kwargs):
         """
         setting random_algorithm
 
         :param field: str
         :param specify_range: SpecifyRange
         :param max_capacity: int
+        :param kwargs:
+                varchar_prefix: str
+                varchar_filled_length: int
         """
         algorithm_params = {
             "algorithm_name": "random_range",
             "specify_range": specify_range.value,
-            "max_capacity": max_capacity
+            "max_capacity": max_capacity,
+            **{n: kwargs.get(n) for n in [pn.varchar_prefix, pn.varchar_filled_length] if n in kwargs}
         }
         return {field: {"other_params": {"dataset": pn.DatasetsName.RandomAlgorithm,
                                          "algorithm_params": algorithm_params}}}
 
     @staticmethod
-    def random_range_list(fields: List[str], specify_range: SpecifyRange = SpecifyRange(), max_capacity: int = 1):
+    def random_range_list(fields: List[str], specify_range: SpecifyRange = SpecifyRange(), max_capacity: int = 1,
+                          **kwargs):
         """
         :param fields: ["id", "int64_1", "array_int16_1", ...]
         :param specify_range: SpecifyRange
         :param max_capacity: int
         """
-        return [DefaultScalarParams.random_range(field, specify_range, max_capacity) for field in fields]
+        return [DefaultScalarParams.random_range(field, specify_range, max_capacity, **kwargs) for field in fields]
 
     @staticmethod
     def fixed_value_range(field: str, specify_range: SpecifyRange = SpecifyRange(), batch: int = 50,
-                          max_capacity: int = 1):
+                          max_capacity: int = 1, **kwargs):
         """
         setting random_algorithm
 
@@ -423,31 +433,36 @@ class DefaultScalarParams:
         :param specify_range: SpecifyRange
         :param batch: int
         :param max_capacity: int
+        :param kwargs:
+                varchar_prefix: str
+                varchar_filled_length: int
         """
         algorithm_params = {
             "algorithm_name": "fixed_value_range",
             "specify_range": specify_range.value,
             "batch": batch,
-            "max_capacity": max_capacity
+            "max_capacity": max_capacity,
+            **{n: kwargs.get(n) for n in [pn.varchar_prefix, pn.varchar_filled_length] if n in kwargs}
         }
         return {field: {"other_params": {"dataset": pn.DatasetsName.RandomAlgorithm,
                                          "algorithm_params": algorithm_params}}}
 
     @staticmethod
     def fixed_value_range_list(fields: List[str], specify_range: SpecifyRange = SpecifyRange(), batch: int = 50,
-                               max_capacity: int = 1):
+                               max_capacity: int = 1, **kwargs):
         """
         :param fields: ["id", "int64_1", "array_int16_1", ...]
         :param specify_range: SpecifyRange
         :param batch: int
         :param max_capacity: int
         """
-        return [DefaultScalarParams.fixed_value_range(field, specify_range, batch, max_capacity) for field in fields]
+        return [DefaultScalarParams.fixed_value_range(field, specify_range, batch, max_capacity, **kwargs) for field in
+                fields]
 
     @staticmethod
     def specify_scope_custom_size(
             field: str, specify_range: SpecifyRange = SpecifyRange(), base_size: Union[int, str] = "1w",
-            custom_size: Dict[str, Union[int, List[int]]] = {}, max_capacity: int = 1):
+            custom_size: Dict[str, Union[int, List[int]]] = {}, max_capacity: int = 1, **kwargs):
         """
         setting random_algorithm
 
@@ -456,13 +471,17 @@ class DefaultScalarParams:
         :param base_size: Union[int, str]
         :param custom_size: Dict[str, Union[int, List[int]]]
         :param max_capacity: int
+        :param kwargs:
+                varchar_prefix: str
+                varchar_filled_length: int
         """
         algorithm_params = {
             "algorithm_name": "specify_scope_custom_size",
             "specify_range": specify_range.value,
             "base_size": base_size,
             "custom_size": custom_size,
-            "max_capacity": max_capacity
+            "max_capacity": max_capacity,
+            **{n: kwargs.get(n) for n in [pn.varchar_prefix, pn.varchar_filled_length] if n in kwargs}
         }
         return {field: {"other_params": {"dataset": pn.DatasetsName.RandomAlgorithm,
                                          "algorithm_params": algorithm_params}}}
@@ -470,7 +489,7 @@ class DefaultScalarParams:
     @staticmethod
     def specify_scope_custom_size_list(
             fields: List[str], specify_range: SpecifyRange = SpecifyRange(), base_size: Union[int, str] = "1w",
-            custom_size: Dict[str, Union[int, List[int]]] = {}, max_capacity: int = 1):
+            custom_size: Dict[str, Union[int, List[int]]] = {}, max_capacity: int = 1, **kwargs):
         """
         :param fields: ["id", "int64_1", "array_int16_1", ...]
         :param specify_range: SpecifyRange
@@ -479,12 +498,12 @@ class DefaultScalarParams:
         :param max_capacity: int
         """
         return [DefaultScalarParams.specify_scope_custom_size(
-            field, specify_range, base_size, custom_size, max_capacity) for field in fields]
+            field, specify_range, base_size, custom_size, max_capacity, **kwargs) for field in fields]
 
     @staticmethod
     def random_range_custom_size(
             field: str, specify_range: SpecifyRange = SpecifyRange(), base_size: Union[int, str] = "1w",
-            custom_size: Dict[str, Union[int, List[int]]] = {}, max_capacity: int = 1):
+            custom_size: Dict[str, Union[int, List[int]]] = {}, max_capacity: int = 1, **kwargs):
         """
         setting random_algorithm
 
@@ -493,13 +512,17 @@ class DefaultScalarParams:
         :param base_size: Union[int, str]
         :param custom_size: Dict[str, Union[int, List[int]]]
         :param max_capacity: int
+        :param kwargs:
+                varchar_prefix: str
+                varchar_filled_length: int
         """
         algorithm_params = {
             "algorithm_name": "random_range_custom_size",
             "specify_range": specify_range.value,
             "base_size": base_size,
             "custom_size": custom_size,
-            "max_capacity": max_capacity
+            "max_capacity": max_capacity,
+            **{n: kwargs.get(n) for n in [pn.varchar_prefix, pn.varchar_filled_length] if n in kwargs}
         }
         return {field: {"other_params": {"dataset": pn.DatasetsName.RandomAlgorithm,
                                          "algorithm_params": algorithm_params}}}
@@ -507,7 +530,7 @@ class DefaultScalarParams:
     @staticmethod
     def random_range_custom_size_list(
             fields: List[str], specify_range: SpecifyRange = SpecifyRange(), base_size: Union[int, str] = "1w",
-            custom_size: Dict[str, Union[int, List[int]]] = {}, max_capacity: int = 1):
+            custom_size: Dict[str, Union[int, List[int]]] = {}, max_capacity: int = 1, **kwargs):
         """
         :param fields: ["id", "int64_1", "array_int16_1", ...]
         :param specify_range: SpecifyRange
@@ -516,35 +539,40 @@ class DefaultScalarParams:
         :param max_capacity: int
         """
         return [DefaultScalarParams.random_range_custom_size(
-            field, specify_range, base_size, custom_size, max_capacity) for field in fields]
+            field, specify_range, base_size, custom_size, max_capacity, **kwargs) for field in fields]
 
     @staticmethod
     def specify_scope_array(field: str, specify_range: SpecifyRange = SpecifyRange(),
-                            capacity_range: List[int] = [0, 1]):
+                            capacity_range: List[int] = [0, 1], **kwargs):
         """
         setting random_algorithm
 
         :param field: str
         :param specify_range: SpecifyRange
         :param capacity_range: List[int]
+        :param kwargs:
+                varchar_prefix: str
+                varchar_filled_length: int
         """
         algorithm_params = {
             "algorithm_name": "specify_scope_array",
             "specify_range": specify_range.value,
-            "capacity_range": capacity_range
+            "capacity_range": capacity_range,
+            **{n: kwargs.get(n) for n in [pn.varchar_prefix, pn.varchar_filled_length] if n in kwargs}
         }
         return {field: {"other_params": {"dataset": pn.DatasetsName.RandomAlgorithm,
                                          "algorithm_params": algorithm_params}}}
 
     @staticmethod
     def specify_scope_array_list(fields: List[str], specify_range: SpecifyRange = SpecifyRange(),
-                                 capacity_range: List[int] = [0, 1]):
+                                 capacity_range: List[int] = [0, 1], **kwargs):
         """
         :param fields: ["array_varchar_1", "array_int16_1", "array_int16_1", ...]
         :param specify_range: SpecifyRange
         :param capacity_range: List[int]
         """
-        return [DefaultScalarParams.specify_scope_array(field, specify_range, capacity_range) for field in fields]
+        return [DefaultScalarParams.specify_scope_array(field, specify_range, capacity_range, **kwargs) for field in
+                fields]
 
 
 class DefaultDatasetParams:

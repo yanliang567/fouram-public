@@ -209,7 +209,7 @@ dataset_params:
         varchar_filled: false
     array_varchar_2:
       params:
-        max_length: 2
+        max_length: 20
         max_capacity: 5
       other_params:
         # `varchar_filled` will not be used
@@ -219,6 +219,8 @@ dataset_params:
         algorithm_params:
           algorithm_name: specify_scope
           specify_range: [ 1, 100 ]
+          # varchar_prefix: '0'  # str, only 1 character
+          # varchar_filled_length: 10  # int, can't be larger than max_length
     array_int64_1:
       params:
         max_capacity: 9999
