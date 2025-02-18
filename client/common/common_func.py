@@ -424,7 +424,7 @@ def gen_values(data_type, vectors, ids, varchar_filled=False, field: dict = {}, 
                 _s += _str
             values = [''.join(random.sample(_s, _len - 1)) for i in ids]
     elif _field_element in [DataType.BOOL]:
-        values = [bool(sum(np.fromstring(str(_id), dtype=np.uint8)) & 1) for _id in ids]
+        values = [bool(sum(np.fromstring(str(_id), dtype=np.uint8, sep=' ')) & 1) for _id in ids]
     elif hasattr(DataType, "JSON") and _field_element in [DataType.JSON]:
         values = [{"id": i} for i in ids]
 
@@ -988,6 +988,20 @@ def get_required_params(source, target):
     result = {}
     result = get_params(source, target, result)
     return result
+
+
+def set_dict_value(source: dict, value, target: dict):
+    for k, v in source.items():
+        target[k] = {}
+        if not isinstance(v, dict):
+            target[k] = copy.deepcopy(value)
+        else:
+            set_dict_value(source[k], value, target[k])
+    return target
+
+
+def rounding_number(num: Union[float, int]) -> int:
+    return int(num) if num - int(num) < 0.5 else int(num) + 1
 
 
 def check_max_value(default: int, diff_value: int) -> int:
