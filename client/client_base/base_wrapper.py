@@ -7,15 +7,15 @@ class BaseInitWrapper:
         self.message = message
 
     def __getattr__(self, name):
-        raise ImportError(f"[BaseInitWrapper] Can't import:{self.object_name}.{name}, error:{self.message}")
+        raise ImportError(f"[BaseInitWrapper] Can't import: {self.object_name}.{name}, error: {self.message}")
 
 
 class BaseWrapper:
     def __init__(self, **kwargs):
-        raise ImportError(f"[BaseWrapper] Import failed:{kwargs}")
+        raise ImportError(f"[BaseWrapper] Import failed: {kwargs}")
 
     def __getattr__(self, name):
-        raise ImportError(f"[BaseWrapper] Can't import:{self.object_name}.{name}, error:{self.message}")
+        raise ImportError(f"[BaseWrapper] Can't import: {self.object_name}.{name}, error: {self.message}")
 
 
 try:

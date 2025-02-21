@@ -13,7 +13,7 @@ class ApiIndexWrapper:
     @property
     def index(self):
         if not isinstance(self._index, Index):
-            raise Exception(f"[ApiIndexWrapper] Index object:{self._index} may not be initialized yet, please check!")
+            raise Exception(f"[ApiIndexWrapper] Index object: {self._index} may not be initialized yet, please check!")
         return self._index
 
     @index.setter

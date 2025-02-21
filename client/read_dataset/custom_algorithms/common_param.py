@@ -1,9 +1,8 @@
 import copy
 from dataclasses import dataclass, field
 from typing import List, Optional, Union
-from collections import Iterator
 
-
+from commons.common_import import Iterator
 from utils.util_log import log
 
 
@@ -36,9 +35,9 @@ class JsonKeyParams:
         _range, _max_len = self.specify_range[-1] - self.specify_range[0], 100000
         if _range > _max_len:
             raise ValueError(
-                f"[{_class_name}] There are too many basic data:{_range}, please keep it <= {_max_len}")
+                f"[{_class_name}] There are too many basic data: {_range}, please keep it <= {_max_len}")
         elif _range >= _max_len / 2:
-            log.warning(f"[{_class_name}] Too much basic data:{_range} may cause" +
+            log.warning(f"[{_class_name}] Too much basic data: {_range} may cause" +
                         " the preparation data to take too long to generate and use more memory.")
 
         if not isinstance(self.steps, int) or self.steps <= 0:
@@ -124,9 +123,9 @@ class JsonMixedKeyParams:
         _range, _max_len = self.specify_range[-1] - self.specify_range[0], 100000
         if _range > _max_len:
             raise ValueError(
-                f"[{_class_name}] There are too many basic data:{_range}, please keep it <= {_max_len}")
+                f"[{_class_name}] There are too many basic data: {_range}, please keep it <= {_max_len}")
         elif _range >= _max_len / 2:
-            log.warning(f"[{_class_name}] Too much basic data:{_range} may cause" +
+            log.warning(f"[{_class_name}] Too much basic data: {_range} may cause" +
                         " the preparation data to take too long to generate and use more memory.")
 
         if not isinstance(self.generate_ratio, int) or self.generate_ratio < 1:

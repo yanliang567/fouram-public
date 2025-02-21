@@ -1,6 +1,6 @@
 import subprocess
 import os
-from pipes import quote
+# from pipes import quote
 
 from utils.util_log import log
 

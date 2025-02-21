@@ -134,7 +134,7 @@ class Base:
             save_params.append(f"FOURAM_CONNECT_{s.upper()}")
 
         write_shell_file(file_path=save_path, input_content=input_content)
-        log.info(f"[Base] Save connect params path:{save_path}, params:{save_params}")
+        log.info(f"[Base] Save connect params path: {save_path}, params: {save_params}")
         return save_path
 
     @staticmethod
@@ -201,7 +201,7 @@ class Base:
                         deploy_mode=STANDALONE, upgrade_config=None, upgrade_waiting_time=1800):
         release_name = release_name or param_info.release_name
         if not release_name:
-            raise Exception(f"[Base] Can not upgrade empty release name:{release_name}, please check.")
+            raise Exception(f"[Base] Can not upgrade empty release name: {release_name}, please check.")
         repository = repository or param_info.tag_repository
         tag = tag or param_info.milvus_tag or (
             AutoGetTag().auto_tag(

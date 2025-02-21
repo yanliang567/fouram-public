@@ -22,6 +22,7 @@ from client.common.common_type import NAS, SimilarityMetrics, AccMetrics, Precis
 from client.common.common_param import GoBenchIndex, SegmentsAnalysis, RNG
 from client.check.func_check import InterfaceCheckTasks
 
+from commons.common_import import NaN
 from commons.common_params import EnvVariable
 from configs.config_info import config_info
 from utils.util_log import log
@@ -82,7 +83,7 @@ def get_array_element_type(data_type: str):
         for _field in FieldTypes.to_dict.keys():
             if element_type.startswith(_field.lower()):
                 return _field, eval(f"DataType.{_field}")
-        raise ValueError(f"[get_array_data_type] Can't find element type:{element_type} for array:{data_type}")
+        raise ValueError(f"[get_array_data_type] Can't find element type: {element_type} for array: {data_type}")
     raise ValueError(f"[get_array_data_type] Data type is not start with array: {data_type}")
 
 
@@ -642,7 +643,7 @@ def gen_insert_scalars_params(scalars_params: dict):
 def gen_random_query_data(random_count: int, random_range: list, query_field_name: str, query_field_type: str):
     if query_field_type not in dv.default_query_scalar_types:
         raise ValueError(
-            f"[gen_random_query_data] Query field:{query_field_type} not support in {dv.default_query_scalar_types}")
+            f"[gen_random_query_data] Query field: {query_field_type} not supported: {dv.default_query_scalar_types}")
 
     if len(random_range) != 2:
         raise ValueError(f"[gen_random_query_data] The length of random_range must be 2, not {len(random_range)}")
@@ -1051,9 +1052,9 @@ def check_vector_index_params(field_name: str, params):
         _check = [i for i in ["index_type", "metric_type", "index_param"] if i not in params.keys()]
         if not _check:
             return True
-        log.error(f"[check_vector_index_params] Vector field:{field_name} index params does not contain:{_check}")
+        log.error(f"[check_vector_index_params] Vector field: {field_name} index params does not contain: {_check}")
     else:
-        log.error(f"[check_vector_index_params] Vector field:{field_name} index params is not dict:{params}")
+        log.error(f"[check_vector_index_params] Vector field: {field_name} index params is not dict: {params}")
     return False
 
 
@@ -1062,9 +1063,9 @@ def check_set_properties_params(params):
         _check = [i for i in ["properties"] if i not in params.keys()]
         if not _check:
             return True
-        log.error(f"[check_set_properties_params] Set properties params does not contain:{_check}")
+        log.error(f"[check_set_properties_params] Set properties params does not contain: {_check}")
     else:
-        log.error(f"[check_set_properties_params] Set properties params is not dict:{params}, type:{type(params)}")
+        log.error(f"[check_set_properties_params] Set properties params is not dict: {params}, type: {type(params)}")
     return False
 
 
@@ -1078,9 +1079,9 @@ def parser_set_properties_params(params: Union[dict, list, None]) -> List[dict]:
             if isinstance(p, dict) and check_set_properties_params(p):
                 _params.append(p)
             else:
-                log.error(f"[parser_set_properties_params] Can't parser set_properties subparams:{p}, type:{type(p)}")
+                log.error(f"[parser_set_properties_params] Can't parser set_properties subparams: {p}, type: {type(p)}")
     elif params is not None:
-        log.error(f"[parser_set_properties_params] Can't parser set_properties params:{params}, type:{type(params)}")
+        log.error(f"[parser_set_properties_params] Can't parser set_properties params: {params}, type: {type(params)}")
 
     log.debug(f"[parser_set_properties_params] Parser set properties params done: {_params}")
     return _params
@@ -1091,9 +1092,9 @@ def check_alter_index_params(params):
         _check = [i for i in ["index_name", "extra_params"] if i not in params.keys()]
         if not _check:
             return True
-        log.error(f"[check_alter_index_params] Alter index params does not contain:{_check}")
+        log.error(f"[check_alter_index_params] Alter index params does not contain: {_check}")
     else:
-        log.error(f"[check_alter_index_params] Alter index params is not dict:{params}, type:{type(params)}")
+        log.error(f"[check_alter_index_params] Alter index params is not dict: {params}, type: {type(params)}")
     return False
 
 
@@ -1109,9 +1110,9 @@ def parser_alter_index_params(params: Union[dict, list, None]) -> List[dict]:
             elif isinstance(p, dict) and check_alter_index_params(p):
                 _params.append(p)
             else:
-                log.error(f"[parser_alter_index_params] Can't parser alter index subparams:{p}, type:{type(p)}")
+                log.error(f"[parser_alter_index_params] Can't parser alter index subparams: {p}, type: {type(p)}")
     elif params is not None:
-        log.error(f"[parser_alter_index_params] Can't parser alter index params:{params}, type:{type(params)}")
+        log.error(f"[parser_alter_index_params] Can't parser alter index params: {params}, type: {type(params)}")
 
     log.debug(f"[parser_alter_index_params] Parser alter index params done: {_params}")
     return _params
@@ -1152,18 +1153,17 @@ def remove_list_values(_list: list, _value):
     return _list
 
 
-def list_processing(_type: np, _list: list, _precision=Precision.ALGORITHM_PRECISION, default_value=np.NaN):
+def list_processing(_type: np, _list: list, _precision=Precision.ALGORITHM_PRECISION, default_value=NaN):
     if len(_list) == 0:
         return default_value
 
     if isinstance(_precision, int):
-        return round(_type(*_list), _precision)
-
-    return _type(*_list)
+        return round(float(_type(*_list)), _precision)
+    return float(_type(*_list))
 
 
 def parser_segment_info(segment_info, shards_num: int = 2):
-    log.debug(f"[parser_segment_info] The type for segment_info:{type(segment_info)}")
+    log.debug(f"[parser_segment_info] The type for segment_info: {type(segment_info)}")
     if len(segment_info) == 0:
         log.warning(f"[parser_segment_info] The number of segments is 0, please check segment_info: {segment_info}")
         return segment_info
@@ -1203,7 +1203,7 @@ def parser_scalar_index(scalar_index: Union[dict, list]):
 def check_object(_object, default_value: list = [None]):
     if _object not in default_value:
         return True
-    raise Exception(f"[check_object] Object:{_object} check failed in default_value:{default_value}")
+    raise Exception(f"[check_object] Object: {_object} check failed in default_value: {default_value}")
 
 
 def get_default_search_params(index_type: str):
@@ -1269,7 +1269,7 @@ def deal_insert_result(data: List[dict], acc: bool = False) -> dict:
         return data[0]
     try:
         log.debug(
-            f"[deal_insert_result] Processing insert results that only have reference effects for the same batch:{data}")
+            f"[deal_insert_result] Processing insert results that only have reference effects for the same batch: {data}")
         if acc:
             return {
                 "ann_insert": {
@@ -1287,7 +1287,7 @@ def deal_insert_result(data: List[dict], acc: bool = False) -> dict:
             }
         }
     except Exception as e:
-        log.error(f"[deal_insert_result] Can't parser insert result: {data}, error:{e}")
+        log.error(f"[deal_insert_result] Can't parser insert result: {data}, error: {e}")
         return {"insert_result": data}
 
 

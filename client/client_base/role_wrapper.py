@@ -17,7 +17,7 @@ class ApiRoleWrapper:
     @property
     def role(self):
         if not isinstance(self._role, Role):
-            raise Exception(f"[ApiRoleWrapper] Role object:{self._role} may not be initialized yet, please check!")
+            raise Exception(f"[ApiRoleWrapper] Role object: {self._role} may not be initialized yet, please check!")
         return self._role
 
     @role.setter

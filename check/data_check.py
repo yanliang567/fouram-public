@@ -1,7 +1,7 @@
 import re
 
 from commons.streaming_read import StreamRead
-from db_client.client_db import DBClient
+from db_client.client_db import Database_Client
 from utils.util_log import log
 
 
@@ -15,7 +15,7 @@ class DataCheck:
         self._format = self.data_parser_format(old_version_format=old_version_format)
         self.default_tags = tags
         self.sync_report = True
-        self.db_client = DBClient(db_name="fouram")
+        self.db_client = Database_Client
         self.read_client = StreamRead(file_path=file_path, interval=interval)
 
     @staticmethod

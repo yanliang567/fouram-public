@@ -287,8 +287,8 @@ class CommonCases(Base):
                 "LastRT": round(search_rt[-1], Precision.SEARCH_PRECISION),
                 "MinRT": round(float(np.min(search_rt)), Precision.SEARCH_PRECISION),
                 "MaxRT": round(float(np.max(search_rt)), Precision.SEARCH_PRECISION),
-                "TP99": round(np.percentile(search_rt, 99), Precision.SEARCH_PRECISION),
-                "TP95": round(np.percentile(search_rt, 95), Precision.SEARCH_PRECISION)}
+                "TP99": round(float(np.percentile(search_rt, 99)), Precision.SEARCH_PRECISION),
+                "TP95": round(float(np.percentile(search_rt, 95)), Precision.SEARCH_PRECISION)}
             self.case_report.add_attr(**{"search": search_res})
             log.info("[AccCases] Search result:{0}".format(search_res))
 

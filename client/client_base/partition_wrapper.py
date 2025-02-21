@@ -1,6 +1,5 @@
 import sys
 import time
-from numpy import NaN
 
 from pymilvus import Partition
 
@@ -8,6 +7,7 @@ from client.check.func_check import ResponseChecker
 from client.util.api_request import api_request
 from client.common.common_param import InterfaceResponse
 
+from commons.common_import import NaN
 from parameters.input_params import param_info
 from utils.util_log import log
 
@@ -21,7 +21,7 @@ class ApiPartitionWrapper:
     def partition(self):
         if not isinstance(self._partition, Partition):
             raise Exception(
-                f"[ApiPartitionWrapper] Partition object:{self._partition} may not be initialized yet, please check!")
+                f"[ApiPartitionWrapper] Partition object: {self._partition} may not be initialized yet, please check!")
         return self._partition
 
     @partition.setter

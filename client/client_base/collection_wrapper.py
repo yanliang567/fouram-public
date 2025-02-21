@@ -1,6 +1,5 @@
 import sys
 import time
-from numpy import NaN
 
 from pymilvus import Collection, DefaultConfig
 from pymilvus.orm.types import CONSISTENCY_STRONG
@@ -9,6 +8,7 @@ from client.util.api_request import api_request
 from client.check.func_check import ResponseChecker
 from client.common.common_param import InterfaceResponse
 
+from commons.common_import import NaN
 from parameters.input_params import param_info
 from utils.util_log import log
 

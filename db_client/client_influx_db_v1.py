@@ -169,3 +169,8 @@ class ClientInfluxDBV1(ClientBase):
             self.client.create_database(self.database)
             if self.database not in self.list_db():
                 log.error("[InfluxDBV1 API] Create database {0} failed, please check manually.".format(self.database))
+
+    @influxdb_v1_try_catch()
+    def close_connect(self):
+        self.client.close()
+        log.debug(f"[InfluxDBV1 API] Server closed the connection, host: {self.host}, port: {self.port}")

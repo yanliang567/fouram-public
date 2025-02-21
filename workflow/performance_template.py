@@ -1,13 +1,14 @@
-from collections import Iterable, Iterator
 from pprint import pformat
 import copy
 
+from client.cases import ConcurrentClientBase
 from deploy.commons.common_params import CLUSTER, STANDALONE
 
 from workflow.base import Base
 from parameters.input_params import param_info, InputParamsBase
-from commons.common_func import get_sync_report_flag, update_dict_value
+from commons.common_func import get_sync_report_flag, update_dict_value, deal_special_import
 from commons.common_type import TeardownType
+from commons.common_import import Iterator
 from data_report.metrics import Report_Metric_Object
 from db_client.client_db import Database_Client
 from check.data_check import DataCheck
@@ -85,7 +86,7 @@ class PerfTemplate(Base):
 
     def concurrency_template(self, input_params: InputParamsBase, case_callable_obj: callable,
                              default_case_params: dict = {}, cpu=8, mem=16, deploy_mode=STANDALONE, interval=30,
-                             sync_report=False, old_version_format=True, input_configs: dict = {},
+                             sync_report=True, old_version_format=True, input_configs: dict = {},
                              node_resources=None, set_dependence=None, **kwargs):
         log.info("[PerfTemplate] Input parameters: {0}".format(vars(input_params)))
         input_params = copy.deepcopy(input_params)
@@ -116,6 +117,9 @@ class PerfTemplate(Base):
             log.info("[PerfTemplate] Skip client test, display server host:{0}, port:{1}".format(param_info.param_host,
                                                                                                  param_info.param_port))
             return param_info.param_host, param_info.param_port
+
+        if case_callable_obj.__name__ == ConcurrentClientBase().scene_concurrent_locust.__name__:
+            deal_special_import()
 
         # init report
         report_client = DataCheck(tags={"case_name": Report_Metric_Object.client.test_case_name,

@@ -226,8 +226,8 @@ class CommonCases(Base):
             "RT": round(float(np.mean(query_rt)), Precision.QUERY_PRECISION),
             "MinRT": round(float(np.min(query_rt)), Precision.QUERY_PRECISION),
             "MaxRT": round(float(np.max(query_rt)), Precision.QUERY_PRECISION),
-            "TP99": round(np.percentile(query_rt, 99), Precision.QUERY_PRECISION),
-            "TP95": round(np.percentile(query_rt, 95), Precision.QUERY_PRECISION)}})
+            "TP99": round(float(np.percentile(query_rt, 99)), Precision.QUERY_PRECISION),
+            "TP95": round(float(np.percentile(query_rt, 95)), Precision.QUERY_PRECISION)}})
         return self.case_report.to_dict(), True
 
     def prepare_search(self, req_run_counts, **kwargs):
@@ -241,8 +241,8 @@ class CommonCases(Base):
             "RT": round(float(np.mean(search_rt)), Precision.SEARCH_PRECISION),
             "MinRT": round(float(np.min(search_rt)), Precision.SEARCH_PRECISION),
             "MaxRT": round(float(np.max(search_rt)), Precision.SEARCH_PRECISION),
-            "TP99": round(np.percentile(search_rt, 99), Precision.SEARCH_PRECISION),
-            "TP95": round(np.percentile(search_rt, 95), Precision.SEARCH_PRECISION)}})
+            "TP99": round(float(np.percentile(search_rt, 99)), Precision.SEARCH_PRECISION),
+            "TP95": round(float(np.percentile(search_rt, 95)), Precision.SEARCH_PRECISION)}})
         return self.case_report.to_dict(), True
 
     def prepare_search_recall(self, req_run_counts: int, _nq, _top_k, ground_truth_file_name: str = None, **kwargs):
@@ -270,8 +270,8 @@ class CommonCases(Base):
             "RT": round(float(np.mean(search_rt)), Precision.SEARCH_PRECISION),
             "MinRT": round(float(np.min(search_rt)), Precision.SEARCH_PRECISION),
             "MaxRT": round(float(np.max(search_rt)), Precision.SEARCH_PRECISION),
-            "TP99": round(np.percentile(search_rt, 99), Precision.SEARCH_PRECISION),
-            "TP95": round(np.percentile(search_rt, 95), Precision.SEARCH_PRECISION)}})
+            "TP99": round(float(np.percentile(search_rt, 99)), Precision.SEARCH_PRECISION),
+            "TP95": round(float(np.percentile(search_rt, 95)), Precision.SEARCH_PRECISION)}})
         return self.case_report.to_dict(), True
 
     def parser_search_params(self):
@@ -369,8 +369,8 @@ class CommonCases(Base):
             "RT": round(float(np.mean(hybrid_search_rt)), Precision.SEARCH_PRECISION),
             "MinRT": round(float(np.min(hybrid_search_rt)), Precision.SEARCH_PRECISION),
             "MaxRT": round(float(np.max(hybrid_search_rt)), Precision.SEARCH_PRECISION),
-            "TP99": round(np.percentile(hybrid_search_rt, 99), Precision.SEARCH_PRECISION),
-            "TP95": round(np.percentile(hybrid_search_rt, 95), Precision.SEARCH_PRECISION)}})
+            "TP99": round(float(np.percentile(hybrid_search_rt, 99)), Precision.SEARCH_PRECISION),
+            "TP95": round(float(np.percentile(hybrid_search_rt, 95)), Precision.SEARCH_PRECISION)}})
         return self.case_report.to_dict(), True
 
     def parser_hybrid_search_params(self):
@@ -389,9 +389,9 @@ class CommonCases(Base):
                     else:
                         s_rerank_list.extend(gen_combinations({k: v}))
                 else:
-                    log.error(f"[CommonCases] Value for attr:{k} is not a list:{type(v)}, please check:{v}")
+                    log.error(f"[CommonCases] Value for attr: {k} is not a list: {type(v)}, please check: {v}")
             else:
-                log.error(f"[CommonCases] Can't get attr:{k} from pymilvus, please check version of pymilvus!!!")
+                log.error(f"[CommonCases] Can't get attr: {k} from pymilvus, please check version of pymilvus!!!")
 
         # deal combination params
         search_params_list = []
@@ -434,7 +434,7 @@ class CommonCases(Base):
                 _reqs.append(AnnSearchRequest(**s_obj.get_params))
                 _require_reqs.append(s_obj.get_require_params)
             else:
-                log.error(f"[CommonCases] Param for hybrid_search `reqs` is not dict, type:{type(r)}, value:{r} ")
+                log.error(f"[CommonCases] Param for hybrid_search `reqs` is not dict, type: {type(r)}, value: {r} ")
 
         # deal rerank
         if isinstance(rerank, dict) and len(rerank.keys()) == 1:
@@ -443,7 +443,7 @@ class CommonCases(Base):
                 if _obj and isinstance(v, list):
                     rerank = _obj(*v)
                 else:
-                    raise ValueError(f"[CommonCases] Can't get attr:{k} from pymilvus or value is not a list:{v}")
+                    raise ValueError(f"[CommonCases] Can't get attr: {k} from pymilvus or value is not a list: {v}")
         else:
             raise ValueError(f"[CommonCases] Can't parsing rerank params: {rerank}")
 

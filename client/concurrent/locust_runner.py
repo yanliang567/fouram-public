@@ -119,7 +119,7 @@ class LocustRunner:
         MyUser.client = None
         MyUser.tasks_params = None
         log.debug(
-            f"[LocustRunner] Reset tasks:{MyUser.tasks}, client:{MyUser.client}, tasks_params:{MyUser.tasks_params}")
+            f"[LocustRunner] Reset tasks: {MyUser.tasks}, client: {MyUser.client}, tasks_params: {MyUser.tasks_params}")
 
     def start_runner(self, report_obj: CasesReport = CasesReport()):
         self.reset_my_user_params()

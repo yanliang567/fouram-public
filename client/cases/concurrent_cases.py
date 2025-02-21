@@ -98,7 +98,7 @@ class GoBenchCases(CommonCases):
         all_support_obj = ConcurrentGoBenchTasksParams().all_obj
         for task in tasks:
             if task["type"] not in all_support_obj:
-                log.error(f"[parser_concurrent_tasks] Task type:{task['type']} is not supported, please check!!!")
+                log.error(f"[parser_concurrent_tasks] Task type: {task['type']} is not supported, please check!!!")
             else:
                 task["params"] = self.parser_go_bench_tasks_params(
                     task["type"], task["params"], vector_field_name=vector_field_name, sparse_range=sparse_range)
@@ -508,12 +508,6 @@ class ConcurrentClientBase(CommonCases):
             clean_collection: bool
         :return:
         """
-        from gevent import monkey
-        _patch_params = {} if param_info.locust_patch_switch else {"ssl": False}
-        monkey.patch_all(**_patch_params)
-        # from requests.packages.urllib3.util.ssl_ import create_urllib3_context; create_urllib3_context()
-        import grpc.experimental.gevent as grpc_gevent
-        grpc_gevent.init_gevent()
         from client.concurrent.locust_runner import LocustRunner
 
         # params prepare

@@ -64,3 +64,7 @@ class ClientMySql(ClientBase):
             log.error("[ClientMySql] Cannot execute sql:{0}, raise error:{1}".format(query, e))
         else:
             return result
+
+    def close_connect(self):
+        self.client.close()
+        log.debug(f"[ClientMySql] Server closed the connection, host: {self.host}, port: {self.port}")

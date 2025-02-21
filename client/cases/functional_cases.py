@@ -408,4 +408,4 @@ class FunctionalCases(CommonCases):
 
         self.show_index()
 
-        log.info(f"[FunctionalCases] Rebuild scalars:{scalars_field} vectors:{vectors_field} indexes done.")
+        log.info(f"[FunctionalCases] Rebuild scalars: {scalars_field} vectors: {vectors_field} indexes done.")

@@ -121,3 +121,8 @@ class ClientInfluxDB(ClientBase):
             self.buckets_api.create_bucket(bucket_name=self.bucket, org=self.org)
             if self.bucket not in [i.name for i in self.buckets_api.find_buckets().buckets]:
                 log.error("[InfluxDB API] Create bucket {0} failed, please check manually.".format(self.bucket))
+
+    @influxdb_try_catch()
+    def close_connect(self):
+        self.client.close()
+        log.debug(f"[InfluxDB API] Server closed the connection, url: {self.url}, org: {self.org}")

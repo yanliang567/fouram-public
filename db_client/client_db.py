@@ -13,7 +13,7 @@ def db_client_catch():
         def inner_wrapper(*args, **kwargs):
             if str(EnvVariable.FOURAM_REPORT_DATA).lower() == "true":
                 return func(*args, **kwargs)
-            log.info(f"[db_client_catch] Data reporting is disabled:{EnvVariable.FOURAM_REPORT_DATA}")
+            log.info(f"[db_client_catch] Data reporting is disabled: {EnvVariable.FOURAM_REPORT_DATA}")
         return inner_wrapper
     return wrapper
 
@@ -64,10 +64,26 @@ class DBClient:
                 log.error("[DBClient] Failed to initialize MongoDB client : {}".format(k))
         log.debug("[DBClient] MongoDB client numbers: {}".format(len(self.mongo_db_clients)))
 
+    def close_server(self):
+        for c in self.mongo_db_clients + self.influx_db_clients + self.influx_db_v1_clients:
+            c.close_connect()
+
+        self.influx_db_clients = []
+        self.influx_db_v1_clients = []
+        self.mongo_db_clients = []
+
     @db_client_catch()
     def init_clients(self):
         self._influx_v1()
         self._influx_v2()
+        self._mongo_db()
+
+    def close_special_server(self):
+        for c in self.mongo_db_clients:
+            c.close_connect()
+        self.mongo_db_clients = []
+
+    def reconnect_special_server(self):
         self._mongo_db()
 
 

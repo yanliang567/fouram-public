@@ -24,7 +24,7 @@ class InterfaceCheckTasks:
 def parser_check_items(check_items) -> List[Error]:
     if not isinstance(check_items, (dict, list)):
         raise ValueError(
-            f"[parser_check_items] Type of `check_items` is not a dict ot list:{type(check_items)}, {check_items}")
+            f"[parser_check_items] Type of `check_items` is not a dict ot list: {type(check_items)}, {check_items}")
 
     if isinstance(check_items, dict):
         return [Error(check_items)]
@@ -33,7 +33,7 @@ def parser_check_items(check_items) -> List[Error]:
     for check_item in check_items:
         if not isinstance(check_item, dict):
             raise ValueError(
-                f"[parser_check_items] Item type in `check_items` list is not a dict:{type(check_item)}, {check_item}")
+                f"[parser_check_items] Item type in `check_items` list is not a dict: {type(check_item)}, {check_item}")
         res.append(Error(check_item))
 
     return res
@@ -89,7 +89,7 @@ class ResponseChecker:
 
         else:
             log.warning(
-                f"[CheckFunc] Check task does not exist:{self.check_task}, roll back to check response.")
+                f"[CheckFunc] Check task does not exist: {self.check_task}, roll back to check response.")
             result = self.assert_success(self.succ, True)
 
         # Add check_items here if something new need verify
@@ -116,10 +116,11 @@ class ResponseChecker:
                 check_items = Error(check_items)
                 if (check_items.code is not None or check_items.message is not None) and (
                         not (check_items.code == res.code or check_items.message in res.message)):
-                    raise ValueError("[CheckFunc] Check `{0}` response error failed: ({1} == {2} or {3} in {4})".format(
-                        self.func_name, check_items.code, res.code, check_items.message, res.message))
+                    raise ValueError(
+                        '[CheckFunc] Check `{0}` response error failed: ({1} == {2} or "{3}" in "{4}")'.format(
+                            self.func_name, check_items.code, res.code, check_items.message, res.message))
             else:
-                log.warning(f"[CheckFunc] `check_items` is not a dict, please check !!!")
+                log.warning("[CheckFunc] `check_items` is not a dict, please check !!!")
         else:
             log.error(f"[CheckFunc] Response of API is not an error of `MilvusException`: {type(res)}")
             assert False
@@ -235,7 +236,8 @@ class ResponseChecker:
                     assert len(_v) == len(v), "{0} == {1}".format(len(_v), len(v))
                     for i in v:
                         if i not in _v:
-                            raise ValueError(f"[CheckFunc] `{k}` expected value:{i} not in response:{_v}, {actual_res}")
+                            raise ValueError(
+                                f"[CheckFunc] `{k}` expected value: {i} not in response: {_v}, {actual_res}")
 
             all_keys = [set(res.keys()) for res in actual_res]
             # check all fields equal

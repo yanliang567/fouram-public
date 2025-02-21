@@ -6,13 +6,13 @@ import copy
 from typing import List, Union
 import pandas as pd
 import numpy as np
-from collections import Iterator
 
 from client.read_dataset.custom_algorithms.common_param import JsonKeyParams, JsonMixedKeyParams
 from client.client_base import DataType
 from client.common.common_func import (
     parser_data_size, get_field_dtype, set_dict_value, loop_ids, update_dict_value, rounding_number
 )
+from commons.common_import import Iterator
 from utils.util_log import log
 
 
@@ -845,9 +845,9 @@ class AlgorithmMixedValuesJson(AlgorithmBase):
                 self._class_name, self._field_name))
         elif _base_value_len > _max_len:
             raise ValueError(
-                f"[{self._class_name}] There are too many basic data:{_base_value_len}, please keep it <= {_max_len}")
+                f"[{self._class_name}] There are too many basic data: {_base_value_len}, please keep it <= {_max_len}")
         elif _base_value_len >= _max_len / 2:
-            log.warning(f"[{self._class_name}] Too much basic data:{_base_value_len} may cause" +
+            log.warning(f"[{self._class_name}] Too much basic data: {_base_value_len} may cause" +
                         " the preparation data to take too long to generate and use more memory.")
 
         self._default_base_value = [set_dict_value(_json_dict, d, {}) for d in _base_value]

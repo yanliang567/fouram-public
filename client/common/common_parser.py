@@ -135,16 +135,16 @@ class ExtraPartitionsParams:
 
         # check params len
         if len(partition_names) != len(data_sizes):
-            log.error(f"[ExtraPartitionsParams] Partitions:{partition_names}, total datasizes:{input_datasize}")
+            log.error(f"[ExtraPartitionsParams] Partitions: {partition_names}, total datasizes: {input_datasize}")
             raise ValueError(
-                f"[ExtraPartitionsParams] Len of partitions:{len(partition_names)} != datasizes:{len(data_sizes)}")
+                f"[ExtraPartitionsParams] Len of partitions: {len(partition_names)} != datasizes: {len(data_sizes)}")
 
         # check total size
         data_sizes = [parser_data_size(i) for i in data_sizes]
         if sum(data_sizes) != _input_data_size:
-            log.error(f"[ExtraPartitionsParams] Partitions datasizes:{data_sizes}, total datasizes:{input_datasize}")
+            log.error(f"[ExtraPartitionsParams] Partitions datasizes: {data_sizes}, total datasizes: {input_datasize}")
             raise ValueError(
-                f"[ExtraPartitionsParams] Total partitions data sizes:{sum(data_sizes)} != datasizes:{input_datasize}")
+                f"[ExtraPartitionsParams] Total partitions data sizes: {sum(data_sizes)} != datasizes: {input_datasize}")
 
         zip_data = self.zip_data([partition_names, data_sizes])
         partition_number = {i[0]: i[1] for i in zip_data}
@@ -363,7 +363,7 @@ class FieldsParamsEntry:
             setattr(self, k, FieldsParamsBase())
             obj = getattr(self, k)
         elif not isinstance(obj, FieldsParamsBase):
-            raise ValueError(f"[FieldsParamsEntry] Property:{k} already exists, value:{obj}")
+            raise ValueError(f"[FieldsParamsEntry] Property: {k} already exists, value: {obj}")
 
         for i, j in v.items():
             if hasattr(obj, i):
@@ -501,7 +501,7 @@ class ParserFieldsParams:
                 ).to_dict
             })
 
-        log.debug(f"[ParserFieldsParams] Gen dynamic fields:{dynamic_fields} schema:{dynamic_fields_schema}")
+        log.debug(f"[ParserFieldsParams] Gen dynamic fields: {dynamic_fields} schema: {dynamic_fields_schema}")
         return dynamic_fields_schema
 
     def gen_extra_dynamic_fields_schema(self, dynamic_fields: List[str] = None):

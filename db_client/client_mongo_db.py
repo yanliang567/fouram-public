@@ -29,7 +29,7 @@ class ClientMongoDB(ClientBase):
         self.dbname = dbname
         self.collection_name = collection_name
 
-        self.client = MongoClient(self.host, self.port)
+        self.client = MongoClient(self.host, self.port, heartbeatFrequencyMS=24 * 3600 * 1000)
         self.collection = self.get_collection(dbname, collection_name)
 
     @mongodb_try_catch()
@@ -91,3 +91,9 @@ class ClientMongoDB(ClientBase):
         else:
             log.debug("[MongoDB API] Collection %s already exists." % str(collection_name))
         return db[collection_name]
+
+    @mongodb_try_catch()
+    def close_connect(self):
+        self.client.close()
+        log.debug(
+            f"[MongoDB API] Server closed the connection, host: {str(self.host).split('@')[-1]}, port: {self.port}")

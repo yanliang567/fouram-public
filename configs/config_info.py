@@ -111,7 +111,7 @@ class DatasetConfigs(ParamsBase):
         try:
             exec(f"self.{attr_name} = {attr_value}")
         except Exception as e:
-            log.error(f"[DatasetConfigs] Can't set attr:{attr_name} to DatasetConfigs, error:{e}")
+            log.error(f"[DatasetConfigs] Can't set attr: {attr_name} to DatasetConfigs, error: {e}")
 
     @property
     def to_dict(self):
@@ -142,7 +142,7 @@ class DatasetConfigs(ParamsBase):
             try:
                 return eval(f"self.{name}.{_property}")
             except Exception as e:
-                log.error(f"[DatasetConfigs] Can't get property:{_property} of {name}, error: {e}")
+                log.error(f"[DatasetConfigs] Can't get property: {_property} of {name}, error: {e}")
         else:
             log.error(f"[DatasetConfigs] DatasetConfigs has no attribute {name}")
         return None

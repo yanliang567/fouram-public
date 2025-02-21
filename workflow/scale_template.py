@@ -1,10 +1,10 @@
-from collections import Iterator
 from pprint import pformat
 from concurrent.futures import ThreadPoolExecutor, wait, ALL_COMPLETED
 import time
 
 from commons.common_type import ReportMetric
 from commons.common_func import check_deploy_config
+from commons.common_import import Iterator
 from data_report.metrics import Report_Metric_Object
 from db_client.client_db import Database_Client
 from deploy.client.default_client import DefaultClient

@@ -14,3 +14,7 @@ class ClientBase(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def insert(self, *args, **kwargs):
         log.debug("[ClientBase] insert function %s" % (str(*args) + str(**kwargs)))
+
+    @abc.abstractmethod
+    def close_connect(self, *args, **kwargs):
+        log.debug("[ClientBase] close_connect function %s" % (str(*args) + str(**kwargs)))

@@ -326,7 +326,7 @@ def check_deploy_mode(deploy_tool: str, deploy_mode: str):
             _dp = deploy_mode.replace('-', '_')
             exec(f"ClassIDBase.{_dp} = '{deploy_mode}'")
             log.info(
-                f"[check_deploy_mode] {deploy_mode} isn't defined in the code, automatically add a deploy_mode:{_dp}")
+                f"[check_deploy_mode] {deploy_mode} isn't defined in the code, automatically add a deploy_mode: {_dp}")
             return _dp
         return deploy_mode_lower
     raise Exception(f"[check_deploy_mode] Deploy tool {deploy_tool} not supported!!")
@@ -375,3 +375,19 @@ def waiting_all_threads(timeout: int = 600):
 
     log.error(f"[waiting_all_threads] Threads haven't been cleaned: {[i.name for i in threading.enumerate()]}")
     return False
+
+
+def deal_special_import():
+    from db_client.client_db import Database_Client
+    Database_Client.close_special_server()
+
+    from gevent import monkey
+    from parameters.input_params import param_info
+
+    _patch_params = {} if param_info.locust_patch_switch else {"ssl": False}
+    monkey.patch_all(**_patch_params)
+    # from requests.packages.urllib3.util.ssl_ import create_urllib3_context; create_urllib3_context()
+    import grpc.experimental.gevent as grpc_gevent
+    grpc_gevent.init_gevent()
+
+    Database_Client.reconnect_special_server()

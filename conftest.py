@@ -3,6 +3,7 @@ import pytest
 from client.common.common_func import parser_time
 from deploy.commons.common_params import Helm, Operator, STANDALONE
 
+from db_client.client_db import Database_Client
 from utils.util_log import log
 from configs.log_config import log_config
 from commons.common_func import modify_file, check_deploy_tool, check_deploy_mode
@@ -208,9 +209,14 @@ def clear_env(request):
 
     request.addfinalizer(fin)
 
+
+def pytest_sessionfinish(session, exitstatus):
+    log.debug("[pytest_sessionfinish] Start closing Database connections ...")
+    Database_Client.close_server()
+
 # for test exit in the future
 # @pytest.hookimpl(hookwrapper=True, tryfirst=True)
-# def pytest_runtest_makereport():
+# def pytest_runtest_makereport(item, call):
 #     result = yield
 #     report = result.get_result()
 #     if report.outcome == "failed":

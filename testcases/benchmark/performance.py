@@ -901,8 +901,7 @@ class TestGoBenchCases(PerfTemplate):
             1. concurrent search and calculation of RT and QPS
         """
         self.concurrency_template(input_params=input_params, cpu=dp.default_cpu, mem=dp.default_mem,
-                                  deploy_mode=STANDALONE, case_callable_obj=GoBenchCases().scene_go_search,
-                                  sync_report=True)
+                                  deploy_mode=STANDALONE, case_callable_obj=GoBenchCases().scene_go_search)
 
     @pytest.mark.parametrize("deploy_mode", [STANDALONE])
     def test_scene_go_bench_hnsw_standalone(self, input_params: InputParamsBase, deploy_mode):
@@ -912,7 +911,7 @@ class TestGoBenchCases(PerfTemplate):
         """
         self.concurrency_template(input_params=input_params, cpu=dp.default_cpu, mem=dp.default_mem,
                                   deploy_mode=deploy_mode, case_callable_obj=GoBenchCases().scene_go_search,
-                                  default_case_params=GoBenchParams().params_scene_go_search_hnsw(), sync_report=True)
+                                  default_case_params=GoBenchParams().params_scene_go_search_hnsw())
 
     @pytest.mark.parametrize("deploy_mode", [CLUSTER])
     def test_scene_go_bench_hnsw_cluster(self, input_params: InputParamsBase, deploy_mode):
@@ -922,7 +921,7 @@ class TestGoBenchCases(PerfTemplate):
         """
         self.concurrency_template(input_params=input_params, cpu=dp.default_cpu, mem=dp.default_mem,
                                   deploy_mode=deploy_mode, case_callable_obj=GoBenchCases().scene_go_search,
-                                  default_case_params=GoBenchParams().params_scene_go_search_hnsw(), sync_report=True)
+                                  default_case_params=GoBenchParams().params_scene_go_search_hnsw())
 
     @pytest.mark.parametrize("deploy_mode", [get_class_key_name(ClassID, ClassID.class1cu)])
     def test_scene_go_bench_auto_index(self, input_params: InputParamsBase, deploy_mode):
@@ -932,8 +931,7 @@ class TestGoBenchCases(PerfTemplate):
         """
         self.concurrency_template(input_params=input_params, cpu=None, mem=None, deploy_mode=deploy_mode,
                                   case_callable_obj=GoBenchCases().scene_go_search,
-                                  default_case_params=GoBenchParams().params_scene_go_search_auto_index(),
-                                  sync_report=True)
+                                  default_case_params=GoBenchParams().params_scene_go_search_auto_index())
 
     """ go bench after refine """
 
@@ -943,8 +941,7 @@ class TestGoBenchCases(PerfTemplate):
             1. concurrent search and calculation of RT and QPS
         """
         self.concurrency_template(input_params=input_params, cpu=dp.default_cpu, mem=dp.default_mem,
-                                  deploy_mode=STANDALONE, case_callable_obj=GoBenchCases().scene_go_bench,
-                                  sync_report=True)
+                                  deploy_mode=STANDALONE, case_callable_obj=GoBenchCases().scene_go_bench)
 
     @pytest.mark.go
     @pytest.mark.parametrize("deploy_mode", [STANDALONE])
@@ -970,7 +967,7 @@ class TestGoBenchCases(PerfTemplate):
 
         self.concurrency_template(
             input_params=input_params, cpu=dp.default_cpu, mem=dp.default_mem, deploy_mode=deploy_mode,
-            case_callable_obj=GoBenchCases().scene_go_bench, default_case_params=default_case_params, sync_report=True)
+            case_callable_obj=GoBenchCases().scene_go_bench, default_case_params=default_case_params)
 
     @pytest.mark.go
     @pytest.mark.parametrize("deploy_mode", [CLUSTER])
@@ -996,7 +993,7 @@ class TestGoBenchCases(PerfTemplate):
 
         self.concurrency_template(
             input_params=input_params, cpu=dp.default_cpu, mem=dp.default_mem, deploy_mode=deploy_mode,
-            case_callable_obj=GoBenchCases().scene_go_bench, default_case_params=default_case_params, sync_report=True)
+            case_callable_obj=GoBenchCases().scene_go_bench, default_case_params=default_case_params)
 
     @pytest.mark.parametrize("deploy_mode", [get_class_key_name(ClassID, ClassID.class1cu)])
     def test_concurrent_go_bench_auto_index_dql_filter(self, input_params: InputParamsBase, deploy_mode):
@@ -1029,7 +1026,7 @@ class TestGoBenchCases(PerfTemplate):
 
         self.concurrency_template(
             input_params=input_params, cpu=dp.default_cpu, mem=dp.default_mem, deploy_mode=deploy_mode,
-            case_callable_obj=GoBenchCases().scene_go_bench, default_case_params=default_case_params, sync_report=True)
+            case_callable_obj=GoBenchCases().scene_go_bench, default_case_params=default_case_params)
 
     @pytest.mark.go
     @pytest.mark.parametrize("deploy_mode", [STANDALONE])
@@ -1063,7 +1060,7 @@ class TestGoBenchCases(PerfTemplate):
 
         self.concurrency_template(
             input_params=input_params, cpu=dp.default_cpu, mem=dp.default_mem, deploy_mode=deploy_mode,
-            case_callable_obj=GoBenchCases().scene_go_bench, default_case_params=default_case_params, sync_report=True)
+            case_callable_obj=GoBenchCases().scene_go_bench, default_case_params=default_case_params)
 
     @pytest.mark.go
     @pytest.mark.parametrize("deploy_mode", [CLUSTER])
@@ -1086,4 +1083,4 @@ class TestGoBenchCases(PerfTemplate):
             input_params=input_params, cpu=dp.min_cpu, mem=dp.min_mem, deploy_mode=deploy_mode,
             old_version_format=self.get_report_version_format(False),
             case_callable_obj=GoBenchCases().scene_go_bench, default_case_params=default_case_params,
-            node_resources=node_resources, sync_report=True)
+            node_resources=node_resources)
