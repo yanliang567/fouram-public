@@ -248,8 +248,15 @@ class ResponseChecker:
             assert len(_fields) == 1, f"_fields: {_fields}"
 
             # check value not empty
-            assert [{k: v} for res in actual_res for k, v in res.items() if v in [[], None]] == [], \
-                f"actual_res: {actual_res}"
+            res_empty = []
+            for res in actual_res:
+                for k, v in res.items():
+                    if hasattr(v, "size"):
+                        if v.size == 0:
+                            res_empty.append({k: v})
+                    elif v in [[], None]:
+                        res_empty.append({k: v})
+            assert res_empty == [], f"actual_res: {actual_res}"
 
             expect_output_fields = self._parser_output_fields(check_items=check_items, **self.kwargs)
             if isinstance(expect_output_fields, list):
