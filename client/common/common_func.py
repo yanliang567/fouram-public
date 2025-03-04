@@ -648,6 +648,8 @@ def gen_random_query_data(random_count: int, random_range: list, query_field_nam
     if len(random_range) != 2:
         raise ValueError(f"[gen_random_query_data] The length of random_range must be 2, not {len(random_range)}")
 
+    # compatible with higher versions of randint processing
+    random_range = [int(i) for i in random_range]
     if query_field_type == dv.default_int64_field_name:
         _query_range = [random.randint(*random_range) for _ in range(random_count)]
     else:

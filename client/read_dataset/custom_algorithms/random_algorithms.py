@@ -695,6 +695,8 @@ class AlgorithmSpecifyScopeArray(AlgorithmBase):
         self._default_base_value = []
 
     def algorithm_init(self):
+        self._capacity_range = [int(i) for i in self._capacity_range]
+
         if self._field_dtype != DataType.ARRAY:
             raise ValueError("[{0}] Algorithm only support `ARRAY` DataType".format(self._class_name))
 

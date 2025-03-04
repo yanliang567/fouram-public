@@ -525,6 +525,9 @@ class ConcurrentTaskQuery(DataClassBase):
         if not (_expr == "" or _expr.endswith("&&") or _expr.endswith("||")):
             self._prepare_symbol = " || "
 
+        # compatible with higher versions of randint processing
+        self.custom_range = [int(i) for i in self.custom_range]
+
         log.debug("[{0}] Init done, query obj_params:{1}".format("ConcurrentTaskQuery", self.obj_params))
 
     @property
