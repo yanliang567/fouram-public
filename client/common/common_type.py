@@ -186,9 +186,12 @@ class ConcurrentGlobalParams:
         for i in range(q_ids):
             id_list.append(queue_obj.get())
 
-        for i in range(length - q_ids):
+        filling_len = length - q_ids
+        if filling_len < 0:
+            filling_len = 0
+        for i in range(filling_len):
             id_list.append(i)
-        return id_list
+        return id_list, filling_len
 
 
 concurrent_global_params = ConcurrentGlobalParams()

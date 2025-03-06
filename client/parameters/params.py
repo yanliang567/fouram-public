@@ -920,6 +920,10 @@ class ConcurrentTaskDelete(DataClassBase):
     check_task: Optional[str] = CheckTasks.checkResponse
     check_items: Union[dict, list] = field(default_factory=lambda: {})
 
+    # count delete data
+    _max_filling_num: int = 0
+    _total_filling_len: int = 0
+
     def __post_init__(self):
         support_tasks = InterfaceCheckTasks.delete
         if self.check_task not in support_tasks:
@@ -941,8 +945,19 @@ class ConcurrentTaskDelete(DataClassBase):
 
     @property
     def get_ids(self):
-        return concurrent_global_params.get_data_from_insert_queue(
+        id_list, filling_len = concurrent_global_params.get_data_from_insert_queue(
             concurrent_global_params.concurrent_insert_ids, self.delete_length)
+
+        if filling_len > self._max_filling_num:
+            self._max_filling_num = filling_len
+        self._total_filling_len += filling_len
+        log.debug("[{0}] Record supplementary values of deletion, total_filling_len:{1}, max_filling_num:{2}".format(
+            "ConcurrentTaskDelete", self._total_filling_len, self._max_filling_num
+        ))
+
+        if self.varchar_id:
+            id_list = [str(i) for i in id_list]
+        return id_list
 
     @property
     def obj_params(self):
@@ -1088,6 +1103,10 @@ class ConcurrentTaskSceneInsertDeleteFlush(DataClassBase):
     delete_obj_params: Optional[dict] = None
     flush_obj_params: Optional[dict] = None
 
+    # count delete data
+    _max_filling_num: int = 0
+    _total_filling_len: int = 0
+
     def __post_init__(self):
         self.insert_obj_params = {"timeout": self.timeout, "check_task": None, "check_items": None}
         self.delete_obj_params = {"timeout": self.timeout, "check_task": None, "check_items": None}
@@ -1130,12 +1149,19 @@ class ConcurrentTaskSceneInsertDeleteFlush(DataClassBase):
 
     @property
     def get_delete_ids(self):
-        _ids = concurrent_global_params.get_data_from_insert_queue(
+        id_list, filling_len = concurrent_global_params.get_data_from_insert_queue(
             concurrent_global_params.concurrent_insert_delete_flush, self.delete_length)
 
+        if filling_len > self._max_filling_num:
+            self._max_filling_num = filling_len
+        self._total_filling_len += filling_len
+        log.debug("[{0}] Record supplementary values of deletion, total_filling_len:{1}, max_filling_num:{2}".format(
+            "ConcurrentTaskSceneInsertDeleteFlush", self._total_filling_len, self._max_filling_num
+        ))
+
         if self.varchar_id:
-            _ids = [str(i) for i in _ids]
-        return _ids
+            id_list = [str(i) for i in id_list]
+        return id_list
 
 
 @dataclass
