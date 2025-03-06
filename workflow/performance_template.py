@@ -2,11 +2,11 @@ from pprint import pformat
 import copy
 
 from client.cases import ConcurrentClientBase
-from deploy.commons.common_params import CLUSTER, STANDALONE
+from deploy.commons.common_params import CLUSTER, STANDALONE, DeployArchitecture
 
 from workflow.base import Base
 from parameters.input_params import param_info, InputParamsBase
-from commons.common_func import get_sync_report_flag, update_dict_value, deal_special_import
+from commons.common_func import get_sync_report_flag, update_dict_value, deal_special_import, get_deploy_architecture
 from commons.common_type import TeardownType
 from commons.common_import import Iterator
 from data_report.metrics import Report_Metric_Object
@@ -28,6 +28,8 @@ class PerfTemplate(Base):
                         node_resources=None, set_dependence=None, input_configs: dict = {}, **kwargs):
         log.info("[PerfTemplate] Input parameters: {0}".format(vars(input_params)))
         input_params = copy.deepcopy(input_params)
+        kwargs.update({DeployArchitecture:
+                       get_deploy_architecture(param_info.deploy_architecture, kwargs.get(DeployArchitecture, None))})
 
         # server
         if not param_info.deploy_skip:
@@ -90,6 +92,8 @@ class PerfTemplate(Base):
                              node_resources=None, set_dependence=None, **kwargs):
         log.info("[PerfTemplate] Input parameters: {0}".format(vars(input_params)))
         input_params = copy.deepcopy(input_params)
+        kwargs.update({DeployArchitecture:
+                       get_deploy_architecture(param_info.deploy_architecture, kwargs.get(DeployArchitecture, None))})
 
         # server
         if not param_info.deploy_skip:
@@ -166,6 +170,8 @@ class PerfTemplate(Base):
                             **kwargs):
         log.info("[PerfTemplate] Input parameters: {0}".format(vars(input_params)))
         input_params = copy.deepcopy(input_params)
+        kwargs.update({DeployArchitecture:
+                       get_deploy_architecture(param_info.deploy_architecture, kwargs.get(DeployArchitecture, None))})
 
         # server
         if not param_info.deploy_skip:
@@ -234,6 +240,8 @@ class ServerTemplate(Base):
 
         log.info("[PerfTemplate] Input parameters: {0}".format(vars(input_params)))
         input_params = copy.deepcopy(input_params)
+        kwargs.update({DeployArchitecture:
+                       get_deploy_architecture(param_info.deploy_architecture, kwargs.get(DeployArchitecture, None))})
 
         # server
         if not deploy_skip and not param_info.deploy_skip:

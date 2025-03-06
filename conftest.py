@@ -78,6 +78,24 @@ def pytest_addoption(parser):
     # upgrade server
     parser.addoption("--upgrade_waiting_time", action="store", default=1800,
                      help="time to wait for server health, used for installing and rolling upgrade instance")
+    # change deployment architecture
+    parser.addoption("--deploy_architecture", action="store", default=None,
+                     help="""<= v2.5 default architecture: proxy, Coord, dataNode, indexNode, queryNode, 3rd components;
+                             >= v2.6 new architecture: proxy, Coord, dataNode, queryNode, 3rd components;
+
+                             support values:
+                                <= v2.5 default architecture: 'default'
+                                >= v2.6 new architecture: 'streaming'
+
+                             by default, the deployment architecture specified by the case is used,
+                             you can use this parameter to enforce specific deployment architecture,
+                             and the default deployment config will change.
+
+                             Notice:
+                                This parameter will be converted into the resource config
+                             of the corresponding architecture using the existing config according to certain rules.
+                                If you need to strictly control resource config, please configure `--deploy_config`.
+                             """)
 
 
 @pytest.fixture
@@ -141,6 +159,7 @@ def initialize_env(request):
         deploy_retain_pvc=request.config.getoption("--deploy_retain_pvc"),
         deploy_force_delete=request.config.getoption("--deploy_force_delete"),
         update_helm_file=request.config.getoption("--update_helm_file"),
+        deploy_architecture=request.config.getoption("--deploy_architecture"),
         # release name
         release_name_prefix=request.config.getoption("--release_name_prefix"),
         release_name=request.config.getoption("--release_name"),

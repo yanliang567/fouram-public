@@ -148,8 +148,9 @@ class Base:
         else:
             raise Exception(f"[Base] Can not parser endpoint: {endpoint}, type: {type(endpoint)}, please check.")
 
-    def init_server_client(self, deploy_tool=Operator, deploy_mode=STANDALONE):
-        self.deploy_client = DefaultClient(deploy_tool=deploy_tool, deploy_mode=deploy_mode)
+    def init_server_client(self, deploy_tool=Operator, deploy_mode=STANDALONE, deploy_architecture=None):
+        self.deploy_client = DefaultClient(deploy_tool=deploy_tool, deploy_mode=deploy_mode,
+                                           deploy_architecture=deploy_architecture)
 
     def set_global_function_before_test(self, release_name: str = ""):
         # set global password
@@ -158,7 +159,7 @@ class Base:
 
     def deploy_default(self, deploy_tool=Operator, deploy_mode=STANDALONE, cpu=8, mem=16, other_config=None,
                        tag=None, repository=None, node_resources=None, set_dependence=None, input_configs: dict = {},
-                       upgrade_waiting_time=1800, **kwargs):
+                       upgrade_waiting_time=1800, deploy_architecture=None, **kwargs):
         repository = repository or param_info.tag_repository
         tag = tag or param_info.milvus_tag or AutoGetTag().auto_tag(deploy_tool=deploy_tool,
                                                                     idc_hub_repository=repository)
@@ -167,17 +168,20 @@ class Base:
         other_configs = parser_input_config(input_content=other_config)
 
         # init server config
-        config_obj = DefaultConfigs(deploy_tool=deploy_tool, deploy_mode=deploy_mode)
+        config_obj = DefaultConfigs(deploy_tool=deploy_tool, deploy_mode=deploy_mode,
+                                    deploy_architecture=deploy_architecture)
         custom_config = config_obj.setting_configs(node_resources=node_resources, set_dependence=set_dependence)
         set_image = config_obj.set_image(
             tag=tag, repository=repository,
             prefix=param_info.milvus_tag_prefix) if tag or param_info.milvus_tag_prefix else {}
         self.deploy_config = config_obj.server_resource(
-            cpu=cpu, mem=mem, other_configs=[custom_config, input_configs, other_configs, set_image], **kwargs)
+            cpu=cpu, mem=mem, other_configs=[custom_config, input_configs, set_image], external_configs=[other_configs],
+            **kwargs)
         log.info("[Base] deploy config: {}".format(self.deploy_config))
 
         # init server client
-        self.deploy_client = DefaultClient(deploy_tool=deploy_tool, deploy_mode=deploy_mode)
+        self.deploy_client = DefaultClient(deploy_tool=deploy_tool, deploy_mode=deploy_mode,
+                                           deploy_architecture=deploy_architecture)
 
         # install server and get endpoint
         server_install_params = check_deploy_config(deploy_tool=deploy_tool, configs=self.deploy_config[0])
@@ -198,7 +202,8 @@ class Base:
         return self.deploy_release_name, install_new_config
 
     def upgrade_service(self, release_name=None, tag=None, repository=None, deploy_tool=Operator,
-                        deploy_mode=STANDALONE, upgrade_config=None, upgrade_waiting_time=1800):
+                        deploy_mode=STANDALONE, upgrade_config=None, upgrade_waiting_time=1800,
+                        deploy_architecture=None):
         release_name = release_name or param_info.release_name
         if not release_name:
             raise Exception(f"[Base] Can not upgrade empty release name: {release_name}, please check.")
@@ -211,8 +216,10 @@ class Base:
         upgrade_configs = parser_input_config(input_content=upgrade_config)
 
         # init server client and default config
-        self.deploy_client = DefaultClient(deploy_tool=deploy_tool, deploy_mode=deploy_mode, release_name=release_name)
-        config_obj = DefaultConfigs(deploy_tool=deploy_tool, deploy_mode=deploy_mode)
+        config_obj = DefaultConfigs(deploy_tool=deploy_tool, deploy_mode=deploy_mode,
+                                    deploy_architecture=deploy_architecture)
+        self.deploy_client = DefaultClient(deploy_tool=deploy_tool, deploy_mode=deploy_mode, release_name=release_name,
+                                           deploy_architecture=deploy_architecture)
 
         # get image tag from cmd
         set_image = config_obj.set_image(

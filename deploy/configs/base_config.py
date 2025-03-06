@@ -145,3 +145,9 @@ class BaseConfig(metaclass=abc.ABCMeta):
 
     def get_deploy_mode(self, *args, **kwargs):
         return {}
+
+    def switch_configs(self, configs: dict) -> dict:
+        return configs
+
+    def process_resource(self, configs: dict) -> dict:
+        return configs

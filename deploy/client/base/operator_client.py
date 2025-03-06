@@ -3,10 +3,12 @@ from pprint import pformat
 
 from deploy.client.base.base_client import BaseClient
 from deploy.client.base.dynamic_client import DynamicClient
-from deploy.configs.operator_config import OperatorConfig
-from deploy.commons.common_params import CLUSTER, STANDALONE, Milvus, PersistentVolumeClaim, Pod
+from deploy.configs import get_config_obj
+from deploy.commons.common_params import CLUSTER, STANDALONE, Milvus, PersistentVolumeClaim, Pod, Operator
 from deploy.commons.common_func import (
-    update_dict_value, utc_conversion, format_dict_output, get_api_version, parser_op_item, check_multi_keys_exist)
+    update_dict_value, utc_conversion, format_dict_output, get_api_version, parser_op_item, check_multi_keys_exist,
+    gen_deploy_config_name
+)
 
 from parameters.input_params import param_info
 from utils.util_cmd import CmdExe
@@ -29,12 +31,13 @@ def operator_client_catch(self):
 class OperatorClient(BaseClient):
 
     def __init__(self, kubeconfig=None, namespace=None, api_version=None, deploy_mode=CLUSTER,
-                 release_name="", kind=Milvus, **kwargs):
+                 release_name="", kind=Milvus, deploy_architecture=None, **kwargs):
         super().__init__()
         self.kubeconfig = kubeconfig
         self.namespace = namespace
         self.deploy_mode = deploy_mode
         self.cluster = True if self.deploy_mode == CLUSTER else False
+        self._deploy_conf_name = gen_deploy_config_name(Operator, deploy_architecture)
 
         self.kind = kind
         self.api_version = api_version if api_version is not None else get_api_version(kind)
@@ -43,7 +46,7 @@ class OperatorClient(BaseClient):
         self.dc_pvc = DynamicClient(self.kubeconfig, self.namespace, api_version=get_api_version(PersistentVolumeClaim),
                                     kind=PersistentVolumeClaim)
         self.dc_pod = DynamicClient(self.kubeconfig, self.namespace, api_version=get_api_version(Pod), kind=Pod)
-        self.op_conf = OperatorConfig(cluster=self.cluster, api_version=api_version)
+        self.op_conf = get_config_obj(self._deploy_conf_name, cluster=self.cluster, api_version=self.api_version)
 
         self.release_name = release_name
 
@@ -67,7 +70,7 @@ class OperatorClient(BaseClient):
             self.cluster = True if self.deploy_mode == CLUSTER else False
 
             self.dc = DynamicClient(self.kubeconfig, self.namespace, self.api_version, self.kind)
-            self.op_conf = OperatorConfig(cluster=self.cluster, api_version=api_version)
+            self.op_conf = get_config_obj(self._deploy_conf_name, cluster=self.cluster, api_version=self.api_version)
 
     def install(self, body: dict, namespace=None, parser_result=True, return_release_name=False, check_health=False,
                 timeout=1800, **kwargs):

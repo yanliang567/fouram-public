@@ -1,8 +1,13 @@
+import copy
+
 from deploy.configs.base_config import BaseConfig
-from deploy.commons.common_func import get_latest_tag, get_image_tag, gen_release_name, update_dict_value
+from deploy.commons.common_func import (
+    get_latest_tag, get_image_tag, gen_release_name, update_dict_value, check_dict_keys
+)
 from deploy.commons.common_params import (
     Milvus, etcd, storage, pulsar, kafka, rocksmq, DefaultRepository, dataNode, queryNode, indexNode, all_pods,
-    standalone, ephemeral_storage, STANDALONE, CLUSTER)
+    standalone, ephemeral_storage, STANDALONE, CLUSTER, OpComponents, streamingNode
+)
 
 from utils.util_log import log
 
@@ -45,23 +50,46 @@ class OperatorConfig(BaseConfig):
         # self.standalone_local_path = {"spec": self.standalone_dict}
 
         # base config
-        self.base_config_dict = self.config_merge([self.op_base_config(), self.delete_pvc_instance()])
+        self.base_config_dict = self.config_merge([self.op_base_config(), self.delete_pvc_instance(),
+                                                   self.op_architecture()])
+
+    @staticmethod
+    def get_node_name(n: str):
+        return getattr(OpComponents, n, n)
 
     @staticmethod
     def _dependencies(dep_name, config):
         if dep_name in [etcd, storage, pulsar, kafka] and isinstance(config, dict):
             return {"spec": {"dependencies": {dep_name: {"inCluster": {"values": config}}}}}
-        if dep_name in [rocksmq] and isinstance(config, dict):
-            return {"spec": {"dependencies": {dep_name: config}}}
-        else:
-            log.error("[OperatorConfig] return dependencies config failed.")
-            return {}
 
-    def components(self, com_name, config):
+        elif dep_name in [rocksmq] and isinstance(config, dict):
+            return {"spec": {"dependencies": {dep_name: config}}}
+
+        log.error("[OperatorConfig] return dependencies config failed.")
+        return {}
+
+    @staticmethod
+    def components(com_name, config):
         return {"spec": {"components": {com_name: config}}}
+
+    @staticmethod
+    def get_components_config(conf: dict):
+        return conf.get("spec", {}).get("components", {})
+
+    @staticmethod
+    def set_components_config(conf: dict, base_conf: dict = {}):
+        if check_dict_keys(base_conf, ["spec", "components"]):
+            base_conf["spec"]["components"] = conf
+        else:
+            base_conf = update_dict_value(conf, base_conf)
+        return base_conf
 
     def reset_deploy_mode(self, cluster=True):
         self.cluster = cluster
+
+    @staticmethod
+    def op_architecture():
+        return {"spec": {"streamingMode": False}}
 
     def op_base_config(self, name="", api_version=None, kind=None):
         name = self.release_name or name or gen_release_name('fouram-op')
@@ -135,9 +163,13 @@ class OperatorConfig(BaseConfig):
     def set_nodes_resource(self, cpu=None, mem=None, custom_resource: dict = None,
                            nodes: list = [queryNode, indexNode, dataNode]):
         if not self.cluster:
-            return self.components(standalone, {"resources": custom_resource or self.gen_nodes_resource(cpu, mem)})
-        return self.config_merge(
-            [self.components(n, {"resources": custom_resource or self.gen_nodes_resource(cpu, mem)}) for n in nodes])
+            return self.components(self.get_node_name(standalone),
+                                   {"resources": copy.deepcopy(custom_resource) or self.gen_nodes_resource(cpu, mem)})
+        return self.config_merge([
+            self.components(self.get_node_name(n),
+                            {"resources": copy.deepcopy(custom_resource) or self.gen_nodes_resource(cpu, mem)})
+            for n in nodes
+        ])
 
     def set_replicas(self, **kwargs):
         """
@@ -149,18 +181,49 @@ class OperatorConfig(BaseConfig):
 
         for key in keys:
             if key in all_pods and str(kwargs[key]).isdigit():
-                set_dict = update_dict_value(self.components(key, {"replicas": int(kwargs[key])}), set_dict)
+                set_dict = update_dict_value(self.components(self.get_node_name(key), {"replicas": int(kwargs[key])}),
+                                             set_dict)
         return set_dict
 
     def set_custom_config(self, **kwargs):
         disk_size = kwargs.get("disk_size", None)
         if not disk_size:
             return {}
-        if self.cluster:
-            return {"spec": {
-                "components": {queryNode: {"resources": {"limits": {ephemeral_storage: str(disk_size) + "Gi"}}},
-                               indexNode: {"resources": {"limits": {ephemeral_storage: str(disk_size) + "Gi"}}}},
-                "config": {"disk": {"size": {"enabled": True}}}}}
-        return {"spec": {
-            "components": {standalone: {"resources": {"limits": {ephemeral_storage: str(disk_size) + "Gi"}}}},
-            "config": {"disk": {"size": {"enabled": True}}}}}
+
+        nodes = [queryNode, indexNode] if self.cluster else [standalone]
+        return {
+            "spec": {
+                "components": {
+                    self.get_node_name(n): {"resources": {"limits": {ephemeral_storage: str(disk_size) + "Gi"}}}
+                    for n in nodes
+                },
+                "config": {"disk": {"size": {"enabled": True}}}}
+        }
+
+    def switch_configs(self, configs: dict) -> dict:
+        conf = copy.deepcopy(configs)
+        _comps_conf = self.get_components_config(conf)
+        _comps = list(_comps_conf.keys())
+
+        # streamingNode -> queryNode
+        if self.get_node_name(streamingNode) in _comps:
+            if self.get_node_name(queryNode) not in _comps:
+                _comps_conf.update({
+                    self.get_node_name(queryNode): copy.deepcopy(_comps_conf.get(self.get_node_name(streamingNode), {}))
+                })
+            del _comps_conf[self.get_node_name(streamingNode)]
+
+        return self.set_components_config(_comps_conf, conf)
+
+    def process_resource(self, configs: dict) -> dict:
+        conf = copy.deepcopy(configs)
+        _comps_conf = self.get_components_config(conf)
+        _comps = list(_comps_conf.keys())
+
+        # dataNode -> indexNode
+        if self.get_node_name(indexNode) not in _comps and self.get_node_name(dataNode) in _comps:
+            _comps_conf.update({
+                self.get_node_name(indexNode): copy.deepcopy(_comps_conf.get(self.get_node_name(dataNode), {}))
+            })
+
+        return self.set_components_config(_comps_conf, conf)

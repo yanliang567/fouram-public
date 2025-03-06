@@ -70,6 +70,9 @@ class TestServerDeploy(ServerTemplate):
             6. upgrade_waiting_time: time to wait for server health
             7. deploy_force_delete: force delete server when `deploy_retain` and `deploy_retain_pvc` are False
                                     if the deletion fails, but the force_delete succeeds, no error will raising
+            8. deploy_architecture:
+                    - default: default value
+                    - streaming: the instance resource configuration will be converted
         """
         # node_resources = [NodeResource(
         #     nodes=[queryNode, indexNode], replicas=2).custom_resource(requests_cpu=1.5, requests_mem=1)]

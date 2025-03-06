@@ -6,7 +6,7 @@ from yaml import full_load
 import copy
 from typing import List
 
-from deploy.commons.common_params import Helm, Operator, OP, VDC, CLUSTER, STANDALONE, ClassID, ClassIDBase
+from deploy.commons.common_params import Helm, Operator, OP, VDC, CLUSTER, STANDALONE, ClassID, ClassIDBase, STREAMING
 
 from utils.util_log import log
 from utils.util_catch import func_request
@@ -330,6 +330,20 @@ def check_deploy_mode(deploy_tool: str, deploy_mode: str):
             return _dp
         return deploy_mode_lower
     raise Exception(f"[check_deploy_mode] Deploy tool {deploy_tool} not supported!!")
+
+
+def check_deploy_architecture(deploy_architecture):
+    if deploy_architecture in [None, "default"]:
+        return ""
+    elif str(deploy_architecture).lower() in [STREAMING]:
+        return STREAMING
+    raise ValueError(f"[check_deploy_architecture] {deploy_architecture} not supported, supports: default, {STREAMING}")
+
+
+def get_deploy_architecture(input_param, default_value):
+    if input_param is not None:
+        return check_deploy_architecture(input_param)
+    return check_deploy_architecture(default_value)
 
 
 def hide_value(source, keys):

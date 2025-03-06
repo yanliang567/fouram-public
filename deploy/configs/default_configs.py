@@ -5,7 +5,9 @@ from deploy.commons.common_params import (
     CLUSTER, STANDALONE, Helm, Operator, VDC, DefaultRepository, pulsar, kafka,
     ClassID, ClassIDMemCluster, ClassIDMemStandalone, ClassIDDiskCluster, ClassIDDiskStandalone)
 from deploy.commons.common_func import (
-    server_resource_check, gen_server_config_name, update_dict_value, write_yaml_file, modify_file)
+    server_resource_check, gen_server_config_name, update_dict_value, write_yaml_file, modify_file,
+    gen_deploy_config_name
+)
 
 from parameters.input_params import param_info
 from commons.common_params import EnvVariable
@@ -35,20 +37,23 @@ class SetDependence:
 
 class DefaultConfigs:
 
-    def __init__(self, deploy_tool=Helm, deploy_mode=CLUSTER, **kwargs):
+    def __init__(self, deploy_tool=Helm, deploy_mode=CLUSTER, deploy_architecture=None, **kwargs):
         """
         :param deploy_tool: Helm or Operator or VDC
         :param deploy_mode: cluster or standalone or class_id's name
+        :param deploy_architecture: None, "" or "streaming", for Helm & Operator
         :param kwargs: escape for helm, api_version for operator
         """
         self.deploy_tool = str(deploy_tool).lower()
         self.deploy_mode = deploy_mode
+        self.deploy_architecture = deploy_architecture
 
         self.cluster = self.check_cluster(self.deploy_mode)
         self.api_version = kwargs.get("api_version", "milvus.io/v1beta1")
         self.escape = kwargs.get("escape", True)
-        self.obj = get_config_obj(self.deploy_tool, cluster=self.cluster, api_version=self.api_version,
-                                  escape=self.escape, deploy_mode=self.deploy_mode)
+        self.obj = get_config_obj(
+            gen_deploy_config_name(self.deploy_tool, self.deploy_architecture),
+            cluster=self.cluster, api_version=self.api_version, escape=self.escape, deploy_mode=self.deploy_mode)
 
         self._default_config = [self.obj.base_config_dict, self.obj.storage_local_path, self.obj.etcd_local_path,
                                 self.obj.etcd_node_selector, self.obj.log_level]
@@ -132,7 +137,7 @@ class DefaultConfigs:
         return self.obj.config_merge([_nodes, _mq, _disk_resource])
 
     def server_resource(self, cpu=8, mem=16, use_default_config=True, deploy_mode=None, other_configs=[],
-                        update_helm_file=False, values_file_path='', **kwargs):
+                        external_configs=[], update_helm_file=False, values_file_path='', **kwargs):
         """
         :param cpu:
             cluster: for all nodes
@@ -143,6 +148,7 @@ class DefaultConfigs:
         :param use_default_config: True or False
         :param deploy_mode: cluster or standalone or class_id's name
         :param other_configs: [{}], configuration of custom dictionary format
+        :param external_configs: [{}], configuration passed in from outside
         :param update_helm_file: bool
         :param values_file_path: str
         :param kwargs: support setting replicas for dataNode, queryNode, indexNode, proxy
@@ -157,18 +163,27 @@ class DefaultConfigs:
 
         config_name = gen_server_config_name(cpu=cpu, mem=mem, cluster=self.cluster, deploy_mode=deploy_mode, **kwargs)
         deploy_mode = self.check_deploy_mode(deploy_mode)
-        _other_configs = self.obj.config_merge(server_resource_check(other_configs))
 
-        _configs_list = [self.obj.set_nodes_resource(cpu, mem), self.obj.set_replicas(**kwargs),
-                         self.obj.base_config_dict]
+        # default configuration of test case, adjust configuration according to deployment architecture
+        _switch_configs = self.obj.switch_configs(update_dict_value(
+            self.obj.config_merge(server_resource_check(other_configs)), self.obj.set_replicas(**kwargs)
+        ))
+
+        # default configuration in the code
+        _configs_list = [self.obj.set_nodes_resource(cpu, mem), self.obj.base_config_dict]
         if use_default_config:
             _configs_list += self.get_default_configs(deploy_mode=deploy_mode)
-        _configs_dict = self.obj.config_merge(_configs_list)
+        # merge all coding configs
+        _configs = update_dict_value(_switch_configs, self.obj.config_merge(_configs_list))
 
-        _configs = update_dict_value(_other_configs, _configs_dict)
+        # process resources after merging all configs -> remove or re-add indexNode resources
+        _p_configs = self.obj.process_resource(_configs)
 
-        log.debug("[DefaultConfigs] server resource: \n {}".format(_configs))
-        return self.config_conversion(_configs, update_helm_file, values_file_path), config_name, _configs
+        # merge configs passed in from outside
+        final_configs = update_dict_value(self.obj.config_merge(server_resource_check(external_configs)), _p_configs)
+
+        log.debug("[DefaultConfigs] server resource: \n {}".format(final_configs))
+        return self.config_conversion(final_configs, update_helm_file, values_file_path), config_name, final_configs
 
     def config_conversion(self, config, update_helm_file=False, values_file_path='', upgrade=False):
         if self.deploy_tool == Helm:

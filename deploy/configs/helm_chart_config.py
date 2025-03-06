@@ -1,8 +1,11 @@
+import copy
+
 from deploy.configs.base_config import BaseConfig
 from deploy.commons.common_func import get_latest_tag, get_image_tag, update_dict_value
 from deploy.commons.common_params import (
-    IDC_NAS_URL, dataNode, queryNode, indexNode, all_pods, minio, etcd, pulsarv3, kafka, standalone, DefaultRepository,
-    ephemeral_storage, STANDALONE, CLUSTER)
+    IDC_NAS_URL, dataNode, queryNode, indexNode, all_pods, minio, etcd, pulsarv3, kafka, standalone, streamingNode,
+    DefaultRepository, ephemeral_storage, STANDALONE, CLUSTER, HelmComponents
+)
 
 from utils.util_log import log
 
@@ -54,14 +57,29 @@ class HelmConfig(BaseConfig):
                                                      'mountPath': '/test'}]}
 
         # base config
-        self.base_config_dict = self.config_merge([self._deploy_mode])
+        self.base_config_dict = self.config_merge([self._deploy_mode, self.helm_architecture()])
 
     @staticmethod
-    def set_deploy_mode(cluster):
-        return {"cluster": {"enabled": False},
-                "etcd": {"replicaCount": 1},
-                "minio": {"mode": "standalone"},
-                "pulsarv3": {"enabled": False}} if cluster is False else {"cluster": {"enabled": True}}
+    def get_node_name(n: str):
+        return getattr(HelmComponents, n, n)
+
+    @staticmethod
+    def helm_architecture():
+        return {"streaming": {"enabled": False}}
+
+    def set_deploy_mode(self, cluster):
+        if cluster:
+            return {
+                "cluster": {"enabled": True},
+                **{self.get_node_name(n): {"enabled": True} for n in [queryNode, dataNode, indexNode]}
+            }
+
+        return {
+            "cluster": {"enabled": False},
+            "etcd": {"replicaCount": 1},
+            "minio": {"mode": "standalone"},
+            "pulsarv3": {"enabled": False}
+        }
 
     def get_deploy_mode(self, deploy_mode):
         if deploy_mode == STANDALONE:
@@ -108,14 +126,16 @@ class HelmConfig(BaseConfig):
 
     def set_nodes_resource(self, cpu=None, mem=None, custom_resource: dict = None,
                            nodes: list = [queryNode, indexNode, dataNode]):
-        if not self.cluster:
-            return {"standalone": {"resources": custom_resource or self.gen_nodes_resource(cpu, mem)}}
-        return {n: {"resources": custom_resource or self.gen_nodes_resource(cpu, mem)} for n in nodes}
 
-    @staticmethod
-    def set_replicas(**kwargs):
+        if not self.cluster:
+            return {self.get_node_name(standalone): {"resources": custom_resource or self.gen_nodes_resource(cpu, mem)}}
+        return {
+            self.get_node_name(n): {"resources": custom_resource or self.gen_nodes_resource(cpu, mem)} for n in nodes
+        }
+
+    def set_replicas(self, **kwargs):
         """
-        only support setting [rootCoord, dataCoord, queryCoord, dataNode, queryNode, indexNode, proxy]
+        only support setting [*Coord, dataNode, queryNode, indexNode, proxy, standalone]
         e.g.: set_replicas(dataNode=1, queryNode=5, indexNode=3)
         """
         keys = kwargs.keys()
@@ -123,18 +143,46 @@ class HelmConfig(BaseConfig):
 
         for key in keys:
             if key in all_pods and str(kwargs[key]).isdigit():
-                set_dict = update_dict_value({key: {"replicas": int(kwargs[key])}}, set_dict)
+                set_dict = update_dict_value({self.get_node_name(key): {"replicas": int(kwargs[key])}}, set_dict)
         return set_dict
 
     def set_custom_config(self, **kwargs):
         disk_size = kwargs.get("disk_size", None)
         if not disk_size:
             return {}
-        if self.cluster:
-            return {queryNode: {"resources": {"limits": {ephemeral_storage: str(disk_size) + "Gi"}},
-                                "disk": {"size": {"enabled": True}}},
-                    indexNode: {"resources": {"limits": {ephemeral_storage: str(disk_size) + "Gi"}},
-                                "disk": {"size": {"enabled": True}}}
-                    }  # for 100m datasets
-        return {standalone: {"resources": {"limits": {ephemeral_storage: str(disk_size) + "Gi"}},
-                             "disk": {"size": {"enabled": True}}}}  # for 100m datasets
+
+        nodes = [queryNode, indexNode] if self.cluster else [standalone]
+        return {
+            self.get_node_name(n): {"resources": {"limits": {ephemeral_storage: str(disk_size) + "Gi"}},
+                                    "disk": {"size": {"enabled": True}}} for n in nodes
+        }  # for 100m datasets
+
+    def switch_configs(self, configs: dict) -> dict:
+        """
+        streaming architecture -> default architecture
+        Coord, proxy, dataNode, queryNode, streamingNode -> Coord, proxy, dataNode, queryNode, indexNode
+        """
+        conf = copy.deepcopy(configs)
+        _comps = list(conf.keys())
+
+        # streamingNode -> queryNode
+        if self.get_node_name(streamingNode) in _comps:
+            if self.get_node_name(queryNode) not in _comps:
+                conf.update({
+                    self.get_node_name(queryNode): copy.deepcopy(conf.get(self.get_node_name(streamingNode), {}))
+                })
+            del conf[self.get_node_name(streamingNode)]
+
+        return conf
+
+    def process_resource(self, configs: dict) -> dict:
+        conf = copy.deepcopy(configs)
+        _comps = list(conf.keys())
+
+        # dataNode -> indexNode
+        if self.get_node_name(indexNode) not in _comps and self.get_node_name(dataNode) in _comps:
+            conf.update({
+                self.get_node_name(indexNode): copy.deepcopy(conf.get(self.get_node_name(dataNode), {}))
+            })
+
+        return conf

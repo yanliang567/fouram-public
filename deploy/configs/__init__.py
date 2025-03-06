@@ -1,7 +1,9 @@
 from deploy.configs.helm_chart_config import HelmConfig
+from deploy.configs.helm_chart_streaming_config import HelmStreamingConfig
 from deploy.configs.operator_config import OperatorConfig
+from deploy.configs.operator_streaming_config import OperatorStreamingConfig
 from deploy.configs.vdc_deploy_config import VDCDeployConfig
-from deploy.commons.common_params import Helm, Operator, VDC
+from deploy.commons.common_params import Helm, Operator, VDC, HelmStreaming, OperatorStreaming
 
 from utils.util_log import log
 
@@ -12,6 +14,8 @@ def get_config_obj(name, **kwargs):
         VDC: VDCDeployConfig,
         Helm: HelmConfig,
         Operator: OperatorConfig,
+        HelmStreaming: HelmStreamingConfig,
+        OperatorStreaming: OperatorStreamingConfig,
     }.get(name, None)
 
     if _object:

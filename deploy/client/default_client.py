@@ -30,6 +30,7 @@ class DefaultClient:
         # params for op
         self.kind = Milvus
         self.api_version = kwargs.get("api_version", APIVERSION[self.kind])
+        self.deploy_architecture = kwargs.get("deploy_architecture", None)
 
         client_params = {
             "kubeconfig": self.kubeconfig,
@@ -38,8 +39,10 @@ class DefaultClient:
             "chart": self.chart,
             "release_name": self.release_name,
             "api_version": self.api_version,
-            "kind": self.kind
+            "kind": self.kind,
+            "deploy_architecture": self.deploy_architecture
         }
+
         self.obj = get_client_obj(self.deploy_tool, **client_params)
 
     def gen_default_release_name(self):

@@ -1,15 +1,20 @@
 import enum
 
 # Milvus components
+mixCoord = "mixCoord"
 rootCoord = "rootCoord"
 dataCoord = "dataCoord"
 queryCoord = "queryCoord"
+indexCoord = "indexCoord"
 dataNode = "dataNode"
 queryNode = "queryNode"
 indexNode = "indexNode"
+streamingNode = "streamingNode"
 standalone = "standalone"
 proxy = "proxy"
-all_pods = [rootCoord, dataCoord, queryCoord, dataNode, queryNode, indexNode, proxy]
+
+all_pods = [mixCoord, rootCoord, dataCoord, queryCoord, indexCoord,
+            dataNode, queryNode, indexNode, streamingNode, proxy, standalone]
 mixcoord = "mixcoord"
 datanode = "datanode"
 querynode = "querynode"
@@ -42,17 +47,83 @@ APIVERSION = {Milvus: "milvus.io/v1beta1",
 IDC_NAS_URL = "//172.16.70.249/test"
 DefaultRepository = "harbor.milvus.io/milvus/milvus"
 
+# deploy architecture
+STREAMING = "streaming"
 # deploy type
 Helm = "helm"
 Operator = "operator"
 OP = "op"
 VDC = "vdc"
+HelmStreaming = f"{Helm}_{STREAMING}"
+OperatorStreaming = f"{Operator}_{STREAMING}"
+# method param
+DeployArchitecture = "deploy_architecture"
 
 # default params
 default_namespace = "qa-milvus"
 
 # default key's name
 ephemeral_storage = "ephemeral-storage"
+
+
+class HelmComponents:
+    mixCoord = "mixCoordinator"
+    rootCoord = "rootCoordinator"
+    dataCoord = "dataCoordinator"
+    queryCoord = "queryCoordinator"
+    indexCoord = "indexCoordinator"
+
+    dataNode = "dataNode"
+    queryNode = "queryNode"
+    indexNode = "indexNode"
+    streamingNode = "streamingNode"
+    proxy = "proxy"
+    standalone = "standalone"
+
+
+class OpComponents:
+    mixCoord = "mixCoord"
+    rootCoord = "rootCoord"
+    dataCoord = "dataCoord"
+    queryCoord = "queryCoord"
+    indexCoord = "indexCoord"
+
+    dataNode = "dataNode"
+    queryNode = "queryNode"
+    indexNode = "indexNode"
+    streamingNode = "streamingNode"
+    proxy = "proxy"
+    standalone = "standalone"
+
+
+class VDCComponents:
+    mixCoord = "mixCoord"
+    rootCoord = "rootCoord"
+    dataCoord = "dataCoord"
+    queryCoord = "queryCoord"
+    indexCoord = "indexCoord"
+
+    dataNode = "dataNode"
+    queryNode = "queryNode"
+    indexNode = "indexNode"
+    # streamingNode = "streamingNode"
+    proxy = "proxy"
+    standalone = "standalone"
+
+
+class MilvusComponents:
+    mixCoord = "mixCoord"
+    rootCoord = "rootCoord"
+    dataCoord = "dataCoord"
+    queryCoord = "queryCoord"
+    indexCoord = "indexCoord"
+
+    dataNode = "dataNode"
+    queryNode = "queryNode"
+    indexNode = "indexNode"
+    streamingNode = "streamingNode"
+    proxy = "proxy"
+    standalone = "standalone"
 
 
 class ClassIDBase(object):

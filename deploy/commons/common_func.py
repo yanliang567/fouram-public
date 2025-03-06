@@ -9,11 +9,11 @@ import string
 import math
 import unicodedata
 from yaml import full_load, dump
-from typing import Union
+from typing import Union, List
 
 from deploy.commons.common_params import (
     CLUSTER, STANDALONE, dataNode, queryNode, indexNode, proxy, APIVERSION, DefaultApiVersion, ClassID, RMNodeCategory,
-    Helm, Operator, OP, VDC, ComponentsLabel)
+    Helm, Operator, OP, VDC, HelmStreaming, OperatorStreaming, ComponentsLabel)
 
 from utils.util_log import log
 
@@ -348,6 +348,16 @@ def gen_server_config_name(cpu, mem, cluster=True, deploy_mode=None, **kwargs):
         if i in check_list:
             _name += "_{0}{1}".format(i, kwargs[i])
     log.debug("[gen_server_config_name] server config name: {}".format(_name))
+    return _name
+
+
+def gen_deploy_config_name(deploy_tool, deploy_architecture) -> str:
+    if deploy_architecture in [None, ""]:
+        return deploy_tool
+
+    _name = f"{deploy_tool}_{str(deploy_architecture).lower()}"
+    if _name not in [HelmStreaming, OperatorStreaming]:
+        raise ValueError(f"[gen_deploy_config_name] Deploy architecture {deploy_architecture} not supported!!")
     return _name
 
 
@@ -694,3 +704,25 @@ def compare_cpu_value(left_v, right_v):
 
 def compare_mem_value(left_v, right_v):
     return parser_mem_resources(left_v) == parser_mem_resources(right_v)
+
+
+def get_dict_value(data: dict, names: List[str], default_value: any):
+    if not all(isinstance(n, str) for n in names) or len(names) == 0:
+        raise ValueError(f"[get_replicas] Key names must be all string and not empty: {names}")
+
+    last_name = names.pop(-1)
+    for n in names:
+        data = data.get(n, {})
+    return data.get(last_name, default_value)
+
+
+def get_replicas(data: dict, names: List[str], default_value: int) -> int:
+    return int(is_number(get_dict_value(data, names, default_value)))
+
+
+def get_cpu(data: dict, names: List[str], default_value: Union[int, float]) -> float:
+    return is_number(get_dict_value(data, names, default_value))
+
+
+def get_mem(data: dict, names: List[str], default_value: str, tail: str) -> float:
+    return is_number(str(get_dict_value(data, names, default_value)).rstrip(tail))

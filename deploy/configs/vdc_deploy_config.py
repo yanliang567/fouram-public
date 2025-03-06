@@ -1,4 +1,4 @@
-from deploy.commons.common_params import DefaultRepository, all_pods, ClassID
+from deploy.commons.common_params import DefaultRepository, all_pods, ClassID, VDCComponents
 from deploy.commons.common_func import gen_release_name, update_dict_value, get_class_key_name
 from deploy.configs.base_config import BaseConfig
 
@@ -14,6 +14,7 @@ class VDCDeployConfig(BaseConfig):
     server_resource: {} # pod resource, such as Milvus's pods
     milvus_config: {}  # milvus.yaml config content
     """
+
     def __init__(self, deploy_mode=get_class_key_name(ClassID, ClassID.class1cu), release_name="", **kwargs):
         super().__init__()
         self.deploy_mode = self.check_deploy_mode(deploy_mode)
@@ -21,6 +22,10 @@ class VDCDeployConfig(BaseConfig):
 
         # base config
         self.base_config_dict = self.config_merge([self.vdc_base_config()])
+
+    @staticmethod
+    def get_node_name(n: str):
+        return getattr(VDCComponents, n, n)
 
     def reset_deploy_mode(self, deploy_mode: str):
         if hasattr(ClassID, deploy_mode):
@@ -56,20 +61,24 @@ class VDCDeployConfig(BaseConfig):
         return {}
 
     def set_nodes_resource(self, cpu=None, mem=None, custom_resource: dict = None, nodes: list = []):
-        return self.config_merge(
-            [self.components(n, (custom_resource or self.gen_nodes_resource(cpu, mem))) for n in nodes])
+        return self.config_merge([
+            self.components(self.get_node_name(n), (custom_resource or self.gen_nodes_resource(cpu, mem)))
+            for n in nodes
+        ])
 
     def set_replicas(self, **kwargs):
         """
-        only support setting [rootCoord, dataCoord, queryCoord, dataNode, queryNode, indexNode, proxy]
-        e.g.: set_replicas(dataNode=1, queryNode=5, indexNode=3)
+        only support setting [mixCoord, rootCoord, dataCoord, queryCoord, indexCoord,
+                              dataNode, queryNode, indexNode, proxy, standalone]
+        e.g.: set_replicas(proxy=1, queryNode=5)
         """
         keys = kwargs.keys()
         set_dict = {}
 
         for key in keys:
             if key in all_pods and str(kwargs[key]).isdigit():
-                set_dict = update_dict_value(self.components(key, {"replicas": int(kwargs[key])}), set_dict)
+                set_dict = update_dict_value(self.components(self.get_node_name(key), {"replicas": int(kwargs[key])}),
+                                             set_dict)
         return set_dict
 
     def set_custom_config(self, **kwargs):
