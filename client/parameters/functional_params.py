@@ -49,7 +49,7 @@ class FuncParamsScalarsIndex(FuncParamsBase):
     index_param: Optional[dict] = field(default_factory=lambda: {})
 
     @property
-    def to_dict(self):
+    def obj_params(self):
         index_params = {}
         if self.index_type:
             index_params["index_type"] = self.index_type

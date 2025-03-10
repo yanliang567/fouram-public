@@ -187,7 +187,7 @@ class FunctionalCases(CommonCases):
 
         # build scalar index
         for k, v in scalars_index.items():
-            result = self.build_scalar_index(field_name=k, index_params=v.to_dict)
+            result = self.build_scalar_index(field_name=k, index_params=v.obj_params)
             rt = round(result.rt, Precision.INDEX_PRECISION)
             # set report data
             if report_data:
