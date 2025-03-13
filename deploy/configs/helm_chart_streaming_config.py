@@ -15,11 +15,11 @@ class HelmStreamingConfig(HelmConfig):
         return {"streaming": {"enabled": True}}
 
     def set_deploy_mode(self, cluster):
-        # todo delete indexNode
         if cluster:
             return {
                 "cluster": {"enabled": True},
-                **{self.get_node_name(n): {"enabled": True} for n in [queryNode, dataNode, indexNode]}
+                **{self.get_node_name(n): {"enabled": True} for n in [queryNode, dataNode]},
+                **{self.get_node_name(n): {"enabled": False} for n in [indexNode]}
             }
 
         return {
@@ -29,9 +29,8 @@ class HelmStreamingConfig(HelmConfig):
             "pulsarv3": {"enabled": False}
         }
 
-    # todo delete indexNode
     def set_nodes_resource(self, cpu=None, mem=None, custom_resource: dict = None,
-                           nodes: list = [queryNode, indexNode, dataNode, streamingNode]):
+                           nodes: list = [queryNode, dataNode, streamingNode]):
         if not self.cluster:
             return {self.get_node_name(standalone): {
                 "resources": copy.deepcopy(custom_resource) or self.gen_nodes_resource(cpu, mem)
@@ -92,7 +91,9 @@ class HelmStreamingConfig(HelmConfig):
                 "resources": _resources
             }
 
-            # todo del indexNode
+            for k in list(conf[self.get_node_name(indexNode)].keys()):
+                if k != "enabled":
+                    del conf[self.get_node_name(indexNode)][k]
             # del conf[self.get_node_name(indexNode)]
 
         return conf

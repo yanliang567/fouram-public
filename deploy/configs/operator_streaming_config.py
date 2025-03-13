@@ -14,9 +14,8 @@ class OperatorStreamingConfig(OperatorConfig):
     def op_architecture():
         return {"spec": {"streamingMode": True}}
 
-    # todo delete indexNode
     def set_nodes_resource(self, cpu=None, mem=None, custom_resource: dict = None,
-                           nodes: list = [queryNode, indexNode, dataNode, streamingNode]):
+                           nodes: list = [queryNode, dataNode, streamingNode]):
         if not self.cluster:
             return self.components(self.get_node_name(standalone),
                                    {"resources": custom_resource or self.gen_nodes_resource(cpu, mem)})
@@ -77,7 +76,10 @@ class OperatorStreamingConfig(OperatorConfig):
                 "resources": _resources
             }
 
-            # todo del indexNode
+            for k in list(_comps_conf[self.get_node_name(indexNode)].keys()):
+                if k != "replicas":
+                    del _comps_conf[self.get_node_name(indexNode)][k]
+            _comps_conf[self.get_node_name(indexNode)]["replicas"] = 0
             # del _comps_conf[self.get_node_name(indexNode)]
 
         return self.set_components_config(_comps_conf, conf)
