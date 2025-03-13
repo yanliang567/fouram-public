@@ -2,7 +2,7 @@ from pymilvus import DefaultConfig
 
 from deploy.client.base.base_client import BaseClient
 from deploy.commons.common_func import gen_release_name, check_file_exist
-from deploy.commons.common_params import default_namespace
+from deploy.commons.common_params import default_namespace, HelmSetParams
 
 from parameters.input_params import param_info
 from utils.util_cmd import CmdExe
@@ -37,10 +37,10 @@ class CliClient(BaseClient):
             self.kubeconfig = " --kubeconfig=%s " % kubeconfig if kubeconfig != "" else ""
             self.ns = self.kubeconfig + self.namespace
 
-    def install(self, set_params="", release_name="", chart="", default_params=" --wait ", params="",
-                return_release_name=True, timeout="30m", **kwargs):
+    def install(self, set_params: HelmSetParams = HelmSetParams(), release_name="", chart="", default_params=" --wait ",
+                params="", return_release_name=True, timeout="30m", **kwargs):
         """
-        :param set_params: image.all.pullPolicy=IfNotPresent,image.all.tag=v2.0.2
+        :param set_params: HelmSetParams -> image.all.pullPolicy=IfNotPresent,image.all.tag=v2.0.2
         :param release_name: less than 63 characters
         :param chart: name of helm chart or use local path of helm chart
         :param default_params: --wait --timeout 30m
@@ -56,11 +56,11 @@ class CliClient(BaseClient):
             self.release_name = gen_release_name('fouram')
 
         chart = chart if chart != "" else self.chart
-        set_params = set_params if set_params == "" else " --set %s " % set_params
+        # set_params = set_params if set_params == "" else " --set %s " % set_params
         default_params += f" --timeout {timeout}s "
 
         _cmd = " helm %s upgrade --install %s %s %s %s %s " % \
-               (self.ns, set_params, default_params, params, self.release_name, chart)
+               (self.ns, set_params.to_str, default_params, params, self.release_name, chart)
         res_cmd = CmdExe(_cmd).run_cmd()
         return self.release_name if return_release_name else res_cmd, {}
 

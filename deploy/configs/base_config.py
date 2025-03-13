@@ -33,7 +33,7 @@ class BaseConfig(metaclass=abc.ABCMeta):
         # self.etcd_node_selector_dict = {"nodeSelector": {"node-role.kubernetes.io/etcd": "etcd"}}
 
         # pulsar local-path
-        self.pulsar_dict = {}
+        self.pulsar_dict = {"broker": {"configData": {"defaultRetentionTimeInMinutes": "720"}}}
         # self.pulsar_dict = {"bookkeeper": {"volumes": {"journal": {"storageClassName": "local-path"},
         #                                                "ledgers": {"storageClassName": "local-path"}}},
         #                     "zookeeper": {"volumes": {"data": {"storageClassName": "local-path"}}}}

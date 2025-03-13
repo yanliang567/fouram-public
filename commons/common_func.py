@@ -6,7 +6,7 @@ from yaml import full_load
 import copy
 from typing import List
 
-from deploy.commons.common_params import Helm, Operator, OP, VDC, CLUSTER, STANDALONE, ClassID, ClassIDBase, STREAMING
+from deploy.commons.common_params import Helm, Operator, OP, VDC, CLUSTER, STANDALONE, ClassID, HelmSetParams, STREAMING
 
 from utils.util_log import log
 from utils.util_catch import func_request
@@ -238,7 +238,7 @@ def truncated_output(context, row_length=300, func_name: str = ""):
 
 def check_deploy_config(deploy_tool, configs):
     if deploy_tool == Helm:
-        configs = configs if isinstance(configs, str) else ""
+        configs = configs if isinstance(configs, HelmSetParams) else HelmSetParams()
     elif deploy_tool == Operator:
         configs = configs if isinstance(configs, dict) else {}
     elif deploy_tool == VDC:

@@ -1,4 +1,5 @@
 import enum
+from dataclasses import dataclass
 
 # Milvus components
 mixCoord = "mixCoord"
@@ -124,6 +125,24 @@ class MilvusComponents:
     streamingNode = "streamingNode"
     proxy = "proxy"
     standalone = "standalone"
+
+
+@dataclass
+class HelmSetParams:
+    set: str = ""
+    set_string: str = ""
+
+    @property
+    def to_str(self):
+        _str = ""
+        if self.set != "":
+            _str += " --set %s " % self.set
+        if self.set_string != "":
+            _str += " --set-string %s " % self.set_string
+        return _str
+
+    def __repr__(self):
+        return str([self.set, self.set_string])
 
 
 class ClassIDBase(object):

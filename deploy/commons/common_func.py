@@ -13,7 +13,8 @@ from typing import Union, List
 
 from deploy.commons.common_params import (
     CLUSTER, STANDALONE, dataNode, queryNode, indexNode, proxy, APIVERSION, DefaultApiVersion, ClassID, RMNodeCategory,
-    Helm, Operator, OP, VDC, HelmStreaming, OperatorStreaming, ComponentsLabel)
+    Helm, Operator, OP, VDC, HelmStreaming, OperatorStreaming, ComponentsLabel, HelmSetParams
+)
 
 from utils.util_log import log
 
@@ -30,7 +31,19 @@ def dict_to_str(source, target, target_list):
         if isinstance(value, dict):
             dict_to_str(source[key], _prefix + key, target_list)
         else:
-            target_list.append(_prefix + "%s=%s," % (key, str(value)))
+            if not isinstance(value, str):
+                target_list.append(_prefix + "%s=%s," % (key, str(value)))
+    return target_list
+
+
+def dict_str_to_str(source, target, target_list):
+    for key, value in source.items():
+        _prefix = target + '.' if target != "" else target
+        if isinstance(value, dict):
+            dict_str_to_str(source[key], _prefix + key, target_list)
+        else:
+            if isinstance(value, str):
+                target_list.append(_prefix + '%s="%s",' % (key, str(value)))
     return target_list
 
 
@@ -44,12 +57,17 @@ def dict_to_set_str(source_dict):
         return ""
 
     _target_list = dict_to_str(source_dict, "", [])
+    _str_target_list = dict_str_to_str(source_dict, "", [])
 
     _target = ""
     for i in _target_list:
         _target += str(i)
 
-    return _target[:-1]
+    _str_target = ""
+    for i in _str_target_list:
+        _str_target += str(i)
+
+    return HelmSetParams(set=_target[:-1], set_string=_str_target[:-1])
 
 
 def dict_update(source, target):
