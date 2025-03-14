@@ -27,7 +27,7 @@ from client.parameters import params_name as pn
 import client.parameters.input_params.define_params as cdp
 from client.common.common_type import DefaultValue as dv
 from deploy.commons.common_params import (
-    CLUSTER, STANDALONE, queryNode, dataNode, indexNode, proxy, kafka, pulsar, ClassID)
+    CLUSTER, STANDALONE, queryNode, dataNode, indexNode, proxy, streamingNode, kafka, pulsar, ClassID, STREAMING)
 from deploy.configs.default_configs import NodeResource, SetDependence
 from deploy.commons.common_func import get_class_key_name, get_default_deploy_mode
 
@@ -703,6 +703,33 @@ class TestPerformanceCases(PerfTemplate):
                              case_callable_obj=Query().scene_query_ids,
                              default_case_params=QueryParams().params_scene_query_ids_sift(),
                              node_resources=node_resources)
+
+    @pytest.mark.query
+    @pytest.mark.parametrize("deploy_mode, architecture", [(STANDALONE, STREAMING)])
+    def test_query_by_ids_sift_streaming_standalone(self, input_params: InputParamsBase, deploy_mode, architecture):
+        """
+        :test steps:
+            1. insert and calculation of query time
+        """
+        self.serial_template(input_params=input_params, cpu=dp.min_cpu, mem=4, deploy_mode=deploy_mode,
+                             case_callable_obj=Query().scene_query_expr,
+                             default_case_params=QueryParams().params_scene_query_expr_sift(),
+                             deploy_architecture=architecture)
+
+    @pytest.mark.query
+    @pytest.mark.parametrize("deploy_mode, architecture", [(CLUSTER, STREAMING)])
+    def test_query_by_ids_sift_streaming_cluster(self, input_params: InputParamsBase, deploy_mode, architecture):
+        """
+        :test steps:
+            1. insert and calculation of query time
+        """
+
+        node_resources = [NodeResource(nodes=[streamingNode], mem=4)]
+
+        self.serial_template(input_params=input_params, cpu=dp.min_cpu, mem=dp.min_mem, deploy_mode=deploy_mode,
+                             case_callable_obj=Query().scene_query_ids,
+                             default_case_params=QueryParams().params_scene_query_ids_sift(),
+                             node_resources=node_resources, deploy_architecture=architecture)
 
     @pytest.mark.query
     @pytest.mark.parametrize("deploy_mode", [STANDALONE])

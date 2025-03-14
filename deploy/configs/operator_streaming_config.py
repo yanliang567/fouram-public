@@ -1,7 +1,7 @@
 import copy
 
 from deploy.configs.operator_config import OperatorConfig
-from deploy.commons.common_func import get_dict_value, get_replicas, get_cpu, get_mem
+from deploy.commons.common_func import get_dict_value, get_replicas, get_cpu, get_mem, check_dict_keys
 from deploy.commons.common_params import dataNode, queryNode, indexNode, standalone, streamingNode, ephemeral_storage
 
 
@@ -21,6 +21,13 @@ class OperatorStreamingConfig(OperatorConfig):
                                    {"resources": custom_resource or self.gen_nodes_resource(cpu, mem)})
         return self.config_merge(
             [self.components(n, {"resources": custom_resource or self.gen_nodes_resource(cpu, mem)}) for n in nodes])
+
+    def reset_pod_enabled_status(self, config: dict) -> dict:
+        if self.cluster:
+            config = self.config_merge([config, self.set_replicas(indexNode=0)])
+            if not check_dict_keys(config, ["spec", "components", self.get_node_name(streamingNode), "replicas"]):
+                config = self.config_merge([config,  self.set_replicas(streamingNode=1)])
+        return config
 
     def set_custom_config(self, **kwargs):
         disk_size = kwargs.get("disk_size", None)
@@ -76,10 +83,6 @@ class OperatorStreamingConfig(OperatorConfig):
                 "resources": _resources
             }
 
-            for k in list(_comps_conf[self.get_node_name(indexNode)].keys()):
-                if k != "replicas":
-                    del _comps_conf[self.get_node_name(indexNode)][k]
-            _comps_conf[self.get_node_name(indexNode)]["replicas"] = 0
-            # del _comps_conf[self.get_node_name(indexNode)]
+            del _comps_conf[self.get_node_name(indexNode)]
 
-        return self.set_components_config(_comps_conf, conf)
+        return self.reset_pod_enabled_status(self.set_components_config(_comps_conf, conf))

@@ -87,6 +87,13 @@ class OperatorConfig(BaseConfig):
     def reset_deploy_mode(self, cluster=True):
         self.cluster = cluster
 
+    def reset_pod_enabled_status(self, config: dict) -> dict:
+        if self.cluster:
+            # config = self.config_merge([config, self.set_replicas(streamingNode=0)])
+            if not check_dict_keys(config, ["spec", "components", self.get_node_name(indexNode), "replicas"]):
+                config = self.config_merge([config, self.set_replicas(indexNode=1)])
+        return config
+
     @staticmethod
     def op_architecture():
         return {"spec": {"streamingMode": False}}
@@ -207,10 +214,10 @@ class OperatorConfig(BaseConfig):
 
         # streamingNode -> queryNode
         if self.get_node_name(streamingNode) in _comps:
-            if self.get_node_name(queryNode) not in _comps:
-                _comps_conf.update({
-                    self.get_node_name(queryNode): copy.deepcopy(_comps_conf.get(self.get_node_name(streamingNode), {}))
-                })
+            # if self.get_node_name(queryNode) not in _comps:
+            #     _comps_conf.update({
+            #         self.get_node_name(queryNode): copy.deepcopy(_comps_conf.get(self.get_node_name(streamingNode), {}))
+            #     })
             del _comps_conf[self.get_node_name(streamingNode)]
 
         return self.set_components_config(_comps_conf, conf)
@@ -226,4 +233,4 @@ class OperatorConfig(BaseConfig):
                 self.get_node_name(indexNode): copy.deepcopy(_comps_conf.get(self.get_node_name(dataNode), {}))
             })
 
-        return self.set_components_config(_comps_conf, conf)
+        return self.reset_pod_enabled_status(self.set_components_config(_comps_conf, conf))

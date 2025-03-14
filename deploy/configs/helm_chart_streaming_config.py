@@ -2,7 +2,9 @@ import copy
 
 from deploy.configs.helm_chart_config import HelmConfig
 from deploy.commons.common_func import get_dict_value, get_replicas, get_cpu, get_mem
-from deploy.commons.common_params import dataNode, queryNode, indexNode, standalone, streamingNode, ephemeral_storage
+from deploy.commons.common_params import (
+    dataNode, queryNode, indexNode, standalone, streamingNode, ephemeral_storage, STREAMING
+)
 
 
 class HelmStreamingConfig(HelmConfig):
@@ -12,7 +14,7 @@ class HelmStreamingConfig(HelmConfig):
 
     @staticmethod
     def helm_architecture():
-        return {"streaming": {"enabled": True}}
+        return {STREAMING: {"enabled": True}}
 
     def set_deploy_mode(self, cluster):
         if cluster:
@@ -28,6 +30,10 @@ class HelmStreamingConfig(HelmConfig):
             "minio": {"mode": "standalone"},
             "pulsarv3": {"enabled": False}
         }
+
+    def enabled_pods(self):
+        return {**{self.get_node_name(n): {"enabled": True} for n in [queryNode, dataNode, STREAMING]},
+                **{self.get_node_name(n): {"enabled": False} for n in [indexNode]}}
 
     def set_nodes_resource(self, cpu=None, mem=None, custom_resource: dict = None,
                            nodes: list = [queryNode, dataNode, streamingNode]):
@@ -91,9 +97,6 @@ class HelmStreamingConfig(HelmConfig):
                 "resources": _resources
             }
 
-            for k in list(conf[self.get_node_name(indexNode)].keys()):
-                if k != "enabled":
-                    del conf[self.get_node_name(indexNode)][k]
-            # del conf[self.get_node_name(indexNode)]
+            del conf[self.get_node_name(indexNode)]
 
-        return conf
+        return self.reset_pod_enabled_status(conf)

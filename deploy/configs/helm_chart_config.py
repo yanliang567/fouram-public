@@ -4,7 +4,7 @@ from deploy.configs.base_config import BaseConfig
 from deploy.commons.common_func import get_latest_tag, get_image_tag, update_dict_value
 from deploy.commons.common_params import (
     IDC_NAS_URL, dataNode, queryNode, indexNode, all_pods, minio, etcd, pulsarv3, kafka, standalone, streamingNode,
-    DefaultRepository, ephemeral_storage, STANDALONE, CLUSTER, HelmComponents
+    DefaultRepository, ephemeral_storage, STANDALONE, CLUSTER, HelmComponents, STREAMING
 )
 
 from utils.util_log import log
@@ -65,7 +65,7 @@ class HelmConfig(BaseConfig):
 
     @staticmethod
     def helm_architecture():
-        return {"streaming": {"enabled": False}}
+        return {STREAMING: {"enabled": False}}
 
     def set_deploy_mode(self, cluster):
         if cluster:
@@ -80,6 +80,15 @@ class HelmConfig(BaseConfig):
             "minio": {"mode": "standalone"},
             "pulsarv3": {"enabled": False}
         }
+
+    def enabled_pods(self):
+        return {**{self.get_node_name(n): {"enabled": True} for n in [queryNode, dataNode, indexNode]},
+                **{self.get_node_name(n): {"enabled": False} for n in [STREAMING]}}
+
+    def reset_pod_enabled_status(self, config: dict) -> dict:
+        if self.cluster:
+            return self.config_merge([config, self.enabled_pods()])
+        return config
 
     def get_deploy_mode(self, deploy_mode):
         if deploy_mode == STANDALONE:
@@ -167,10 +176,10 @@ class HelmConfig(BaseConfig):
 
         # streamingNode -> queryNode
         if self.get_node_name(streamingNode) in _comps:
-            if self.get_node_name(queryNode) not in _comps:
-                conf.update({
-                    self.get_node_name(queryNode): copy.deepcopy(conf.get(self.get_node_name(streamingNode), {}))
-                })
+            # if self.get_node_name(queryNode) not in _comps:
+            #     conf.update({
+            #         self.get_node_name(queryNode): copy.deepcopy(conf.get(self.get_node_name(streamingNode), {}))
+            #     })
             del conf[self.get_node_name(streamingNode)]
 
         return conf
@@ -185,4 +194,4 @@ class HelmConfig(BaseConfig):
                 self.get_node_name(indexNode): copy.deepcopy(conf.get(self.get_node_name(dataNode), {}))
             })
 
-        return conf
+        return self.reset_pod_enabled_status(conf)

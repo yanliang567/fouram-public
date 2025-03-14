@@ -17,6 +17,8 @@ You can use this parameter to enforce a specific deployment architecture, and th
 Note:
     This parameter will be converted into the corresponding architecture's resource configuration based on certain rules.
     If you need strict control over resource configuration, please use the `--deploy_config` parameter.
+
+    This is used to quickly verify compatibility with different deployment architecture!!
 ```
 
 ### Usage Scenarios
@@ -32,7 +34,7 @@ Note:
 
 ### `deploy_architecture` is `default`
 1. **Code Configuration**:
-   - Remove the `streamingNode` configuration. If the `queryNode` configuration does not exist, copy the `streamingNode` configuration to `queryNode`
+   - Remove the `streamingNode` configuration.
    - If the `indexNode` configuration does not exist, copy the `dataNode` configuration to `indexNode`
 2. **Merge Command-Line Configuration**:
    - Merge the command-line configuration (`--deploy_config`) into the code configuration, `deploy_config` will overwrite code configuration

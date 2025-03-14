@@ -95,6 +95,8 @@ def pytest_addoption(parser):
                                 This parameter will be converted into the resource config
                              of the corresponding architecture using the existing config according to certain rules.
                                 If you need to strictly control resource config, please configure `--deploy_config`.
+
+                                This is used to quickly verify compatibility with different deployment architecture!!
                              """)
 
 
