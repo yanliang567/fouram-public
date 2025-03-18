@@ -3,7 +3,7 @@ from typing import Optional, Union, List
 from deploy.configs import get_config_obj
 from deploy.commons.common_params import (
     CLUSTER, STANDALONE, Helm, Operator, VDC, DefaultRepository, pulsar, kafka,
-    ClassID, ClassIDMemCluster, ClassIDMemStandalone, ClassIDDiskCluster, ClassIDDiskStandalone)
+    ClassID, ClassIDMemCluster, ClassIDMemStandalone, ClassIDDiskCluster, ClassIDDiskStandalone, HelmSetParams)
 from deploy.commons.common_func import (
     server_resource_check, gen_server_config_name, update_dict_value, write_yaml_file, modify_file,
     gen_deploy_config_name
@@ -191,7 +191,7 @@ class DefaultConfigs:
                 if upgrade:
                     file_path = values_file_path or EnvVariable.FOURAM_HELM_CHART_PATH + "/upgrade_values.yaml"
                     modify_file(file_path=file_path)  # create file
-                    return write_yaml_file(file_path=file_path, values_dict=config)
+                    return HelmSetParams(upgrade_file_path=write_yaml_file(file_path=file_path, values_dict=config))
                 values_file_path = values_file_path or EnvVariable.FOURAM_HELM_CHART_PATH + "/values.yaml"
                 self.obj.update_values_file(values_file_path, config)
                 return config

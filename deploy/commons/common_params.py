@@ -131,6 +131,7 @@ class MilvusComponents:
 class HelmSetParams:
     set: str = ""
     set_string: str = ""
+    upgrade_file_path: str = ""
 
     @property
     def to_str(self):
@@ -139,6 +140,17 @@ class HelmSetParams:
             _str += " --set %s " % self.set
         if self.set_string != "":
             _str += " --set-string %s " % self.set_string
+        return _str
+
+    @property
+    def upgrade_to_str(self):
+        _str = ""
+        if self.set != "":
+            _str += " --set %s " % self.set
+        if self.set_string != "":
+            _str += " --set-string %s " % self.set_string
+        if self.upgrade_file_path != "":
+            _str += " -f %s " % self.upgrade_file_path
         return _str
 
     def __repr__(self):
