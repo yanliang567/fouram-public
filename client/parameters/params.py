@@ -1175,6 +1175,9 @@ class ConcurrentInputParamsSceneInsertPartition(DataClassBase):
     # dynamic fields for inserting
     dynamic_fields: Optional[list] = field(default_factory=lambda: [])
 
+    # check request result
+    check_tasks: Optional[dict] = field(default_factory=lambda: {})
+
 
 @dataclass
 class ConcurrentTaskSceneInsertPartition(DataClassBase):
@@ -1192,6 +1195,25 @@ class ConcurrentTaskSceneInsertPartition(DataClassBase):
     # dynamic fields for inserting
     dynamic_fields: Optional[list] = field(default_factory=lambda: [])
     dynamic_fields_schema: Optional[dict] = field(default_factory=lambda: {})
+
+    # check request result
+    check_tasks: Optional[dict] = field(default_factory=lambda: {})
+
+    flush_obj_params: Optional[dict] = None
+
+    def __post_init__(self):
+        self.flush_obj_params = {"timeout": self.timeout, "check_task": None, "check_items": None}
+
+        for k, v in parser_check_tasks(check_tasks=self.check_tasks, requests=[flush]).items():
+            _obj = getattr(self, f"{k}_obj_params", None)
+            if _obj and isinstance(_obj, dict) and isinstance(v, dict):
+                _obj.update({
+                    "check_task": v.get("check_task", _obj.get("check_task", None)),
+                    "check_items": v.get("check_items", _obj.get("check_items", None))
+                })
+
+        log.debug("[{0}] Init done, flush_obj_params: {1}".format(
+            "ConcurrentTaskSceneInsertPartition", self.flush_obj_params))
 
     @property
     def insert_obj_params(self):
@@ -1225,6 +1247,9 @@ class ConcurrentInputParamsSceneTestPartition(DataClassBase):
     # other
     search_counts: Optional[int] = 1
 
+    # check request result
+    check_tasks: Optional[dict] = field(default_factory=lambda: {})
+
 
 @dataclass
 class ConcurrentTaskSceneTestPartition(DataClassBase):
@@ -1253,6 +1278,25 @@ class ConcurrentTaskSceneTestPartition(DataClassBase):
 
     # other
     search_counts: Optional[int] = 1
+
+    # check request result
+    check_tasks: Optional[dict] = field(default_factory=lambda: {})
+
+    flush_obj_params: Optional[dict] = None
+
+    def __post_init__(self):
+        self.flush_obj_params = {"timeout": self.timeout, "check_task": None, "check_items": None}
+
+        for k, v in parser_check_tasks(check_tasks=self.check_tasks, requests=[flush]).items():
+            _obj = getattr(self, f"{k}_obj_params", None)
+            if _obj and isinstance(_obj, dict) and isinstance(v, dict):
+                _obj.update({
+                    "check_task": v.get("check_task", _obj.get("check_task", None)),
+                    "check_items": v.get("check_items", _obj.get("check_items", None))
+                })
+
+        log.debug("[{0}] Init done, flush_obj_params: {1}".format(
+            "ConcurrentTaskSceneTestPartition", self.flush_obj_params))
 
     @property
     def search_obj_params(self):
@@ -1300,6 +1344,9 @@ class ConcurrentInputParamsSceneTestPartitionHybridSearch(DataClassBase):
     # dynamic fields for inserting
     dynamic_fields: Optional[list] = field(default_factory=lambda: [])
 
+    # check request result
+    check_tasks: Optional[dict] = field(default_factory=lambda: {})
+
 
 @dataclass
 class ConcurrentTaskSceneTestPartitionHybridSearch(DataClassBase):
@@ -1333,6 +1380,25 @@ class ConcurrentTaskSceneTestPartitionHybridSearch(DataClassBase):
     _search_obj_params: Optional[dict] = None
     _scalar_params: Optional[dict] = None
     _main_sparse_range: Optional[List[int]] = None
+
+    # check request result
+    check_tasks: Optional[dict] = field(default_factory=lambda: {})
+
+    flush_obj_params: Optional[dict] = None
+
+    def __post_init__(self):
+        self.flush_obj_params = {"timeout": self.timeout, "check_task": None, "check_items": None}
+
+        for k, v in parser_check_tasks(check_tasks=self.check_tasks, requests=[flush]).items():
+            _obj = getattr(self, f"{k}_obj_params", None)
+            if _obj and isinstance(_obj, dict) and isinstance(v, dict):
+                _obj.update({
+                    "check_task": v.get("check_task", _obj.get("check_task", None)),
+                    "check_items": v.get("check_items", _obj.get("check_items", None))
+                })
+
+        log.debug("[{0}] Init done, flush_obj_params: {1}".format(
+            "ConcurrentTaskSceneTestPartitionHybridSearch", self.flush_obj_params))
 
     def get_random_data(self):
         _reqs = self.reqs
@@ -1644,6 +1710,7 @@ class ConcurrentInputParamsSceneSearchTest(DataClassBase):
     nq: Optional[int] = 1
     top_k: Optional[int] = 10
     search_param: Optional[dict] = field(default_factory=lambda: {'nprobe': 16})
+    expr: Optional[str] = ""
 
     # other
     prepare_before_insert: Optional[bool] = False
@@ -1711,6 +1778,7 @@ class ConcurrentTaskSceneSearchTest(DataClassBase):
     nq: Optional[int] = 1
     top_k: Optional[int] = 10
     search_param: Optional[dict] = field(default_factory=lambda: {'nprobe': 16})
+    expr: Optional[str] = ""
 
     # other
     prepare_before_insert: Optional[bool] = False

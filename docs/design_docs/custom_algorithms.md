@@ -43,6 +43,68 @@ Params:
         - varchar_prefix: 'a', varchar_filled_length: 3: VARCHAR data '1111' -> '1111'
 ```
 
+###### b. Parameters for converting data type
+Generate data according to the data type of the parameter `convert_data_type`
+`convert_data_type` supports: 'int8', 'int16', 'int32', 'int64', 'float', 'double', 'varchar', 'bool', 'none', 'array_<dataType all above>'
+
+```yaml
+# for converting data type, specialized generation of non-dict data into JSON fields
+<dataset_params or param under concurrent_tasks>:
+  scalars_params:
+    json_1:
+      other_params:
+        dataset: random_algorithm
+        algorithm_params:
+          algorithm_name: specify_scope
+          convert_data_type: 'int8'  # Generate int8 type data
+          ...
+    json_2:
+      other_params:
+        dataset: random_algorithm
+        algorithm_params:
+          algorithm_name: random_range
+          convert_data_type: 'array_bool'  # Generate array_bool type data
+          ...
+```
+
+###### c. Parameters for custom interleaving data
+When generating data, insert custom fixed data at a certain frequency
+
+```yaml
+<dataset_params or param under concurrent_tasks>:
+  scalars_params:
+    int64_1:
+      other_params:
+        dataset: random_algorithm
+        algorithm_params:
+          ...
+          custom_insert_ratio: 1  # `custom_insert_value` default value is None
+    array_varchar_1:
+      other_params:
+        dataset: random_algorithm
+        algorithm_params:
+          ...
+          varchar_prefix: 2
+          custom_insert_value: ['test', 'test']
+```
+
+```text
+Params:
+    # for custom insert
+    custom_insert_ratio: <int>, >= 0, default value = 0
+    custom_insert_value: <any type>, default value = None
+
+    e.g.:
+        - algorithm_name: specify_scope
+        - specify_range: [ -1, 1 ]
+        - custom_insert_ratio: 1
+                                -> generate data: [-1, None, 0, None, 1, None, -1, None, 0, <cycle...>]
+        - algorithm_name: specify_scope
+        - specify_range: [ -1, 1 ]
+        - custom_insert_ratio: 2, custom_insert_value: 'test'
+                                -> generate data: [-1, 0, 'test', 1, -1, 'test', 0, 1, 'test', -1, <cycle...>]
+```
+
 #### 1. `specify_scope`
 
 **config example:**
@@ -76,6 +138,11 @@ Params:
     # for `VARCHAR` & `ARRAY_VARCHAR` types
     varchar_prefix: <str>,  len(varchar_prefix) == 1
     varchar_filled_length: <int>, >= 0
+    # for custom insert
+    custom_insert_ratio: <int>, >= 0, default value = 0
+    custom_insert_value: <any type>, default value = None
+    # cast data type, which may not match field name, in order to insert data into json field
+    convert_data_type: <str>, default value = "", e.g.: 'int8', 'array_varchar' ...
 
 Introduce:
     Read the scalar values in `specify_range` sequentially,
@@ -126,6 +193,11 @@ Params:
     # for `VARCHAR` & `ARRAY_VARCHAR` types
     varchar_prefix: <str>,  len(varchar_prefix) == 1
     varchar_filled_length: <int>, >= 0
+    # for custom insert
+    custom_insert_ratio: <int>, >= 0, default value = 0
+    custom_insert_value: <any type>, default value = None
+    # cast data type, which may not match field name, in order to insert data into json field
+    convert_data_type: <str>, default value = "", e.g.: 'int8', 'array_varchar' ...
 
 Introduce:
     Read the scalar values in `specify_range` sequentially,
@@ -178,6 +250,11 @@ Params:
     # for `VARCHAR` & `ARRAY_VARCHAR` types
     varchar_prefix: <str>,  len(varchar_prefix) == 1
     varchar_filled_length: <int>, >= 0
+    # for custom insert
+    custom_insert_ratio: <int>, >= 0, default value = 0
+    custom_insert_value: <any type>, default value = None
+    # cast data type, which may not match field name, in order to insert data into json field
+    convert_data_type: <str>, default value = "", e.g.: 'int8', 'array_varchar' ...
 
 Introduce:
     Read the scalar values in `specify_range` sequentially,
@@ -423,7 +500,7 @@ Notice:
 Algorithm name: mixed_values_json
 
 Support data type: JSON
-                   - value types: INT64, VARCHAR, DOUBLE, BOOL, ARRAY(INT64, VARCHAR, DOUBLE, BOOL)
+                   - value types: INT64, VARCHAR, DOUBLE, BOOL, NONE, ARRAY(INT64, VARCHAR, DOUBLE, BOOL, NONE)
 
 Params:
     json_key: str or List[str],
@@ -448,6 +525,9 @@ Params:
     # for `VARCHAR` & `ARRAY_VARCHAR` types
     varchar_prefix: <str>,  len(varchar_prefix) == 1
     varchar_filled_length: <int>, >= 0
+
+    custom_insert_ratio: <int>, >= 0, default value = 0
+    custom_insert_value: <any type>, default value = None
 
 Introduce:
     Parser json dict according to `json_key` and `json_depth`,
@@ -515,15 +595,15 @@ Introduce:
 Algorithm name: custom_size_json
 
 Support data type: JSON
-                   - value types: INT64, VARCHAR, DOUBLE, BOOL, ARRAY(INT64, VARCHAR, DOUBLE, BOOL)
+                   - value types: INT64, VARCHAR, DOUBLE, BOOL, NONE, ARRAY(INT64, VARCHAR, DOUBLE, BOOL, NONE)
 
 Params:
     json_keys_params: List[dict],
                e.g.:
-                - key_name: "k1.k2.k3" -> {'k1': {'k2': {'int64': `value`}}}  # split by `.`
+                - json_key: "k1.k2.k3" -> {'k1': {'k2': {'int64': `value`}}}  # split by `.`
                   specify_range: List<int>, e.g.: [ 1, 100 ] => 1 ~ 99
                   steps: int(>= 1), e.g.: 1, The number of items to be taken at one time
-                - key_name:["k1", "k2", "varchar_1"] -> {'k1': {'k2': {'varchar_1': `value`}}}
+                - json_key:["k1", "k2", "varchar_1"] -> {'k1': {'k2': {'varchar_1': `value`}}}
                   specify_range: List<int>, e.g.: [ 0, 1 ] => 0
                   steps: int(>= 1), e.g.: 10000
 
@@ -533,7 +613,7 @@ Params:
     varchar_filled_length: <int>, >= 0
 
 Introduce:
-    Read the default values in `specify_range` sequentially to init json dict `key_name`,
+    Read the default values in `specify_range` sequentially to init json dict `json_key`,
     process the json values according to the last key data type,
     get the specified amount of data(`steps`) for each group of values in sequence (loop reading).
 
@@ -612,16 +692,16 @@ Introduce:
 Algorithm name: mixed_keys_json
 
 Support data type: JSON
-                   - value types: INT64, VARCHAR, DOUBLE, BOOL, ARRAY(INT64, VARCHAR, DOUBLE, BOOL)
+                   - value types: INT64, VARCHAR, DOUBLE, BOOL, NONE, ARRAY(INT64, VARCHAR, DOUBLE, BOOL, NONE)
 
 Params:
     json_keys_params: List[dict],
                e.g.:
-                - key_name: "k1.k2.k3" -> {'k1': {'k2': {'int64': `value`}}}  # split by `.`
+                - json_key: "k1.k2.int64_1" -> {'k1': {'k2': {'int64': `value`}}}  # split by `.`
                   specify_range: List<int>, e.g.: [ 1, 100 ] => 1 ~ 99
                   generate_ratio: int(>= 1), default value: 1, set one value in every `generate_ratio` values
                   generate_start_id: int(>= 0), default value: 0, `id` that start setting value
-                - key_name:["k1", "k2", "varchar_1"] -> {'k1': {'k2': {'varchar_1': `value`}}}
+                - json_key:["k1", "k2", "varchar_1"] -> {'k1': {'k2': {'varchar_1': `value`}}}
                   specify_range: List<int>, e.g.: [ 0, 1 ] => 0
                   generate_ratio: int(>= 1), e.g.: 10000
                   generate_start_id: 1000
@@ -632,7 +712,7 @@ Params:
     varchar_filled_length: <int>, >= 0
 
 Introduce:
-    Read the default values in `specify_range` sequentially to init json dict `key_name`,
+    Read the default values in `specify_range` sequentially to init json dict `json_key`,
     process the json values according to the last key data type,
     combine all json data of the current row.
 

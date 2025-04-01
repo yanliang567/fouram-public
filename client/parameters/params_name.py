@@ -94,6 +94,7 @@ prepare_flush = "prepare_flush"
 # index
 index_type = "index_type"
 index_param = "index_param"
+params = "params"
 
 nlist = "nlist"
 
@@ -139,6 +140,10 @@ set_properties = "set_properties"
 alter_index = "alter_index"
 custom_api = "custom_api"
 prepare_insert_api = "prepare_insert_api"
+custom_insert_api = "custom_insert_api"
+
+# check
+check_tasks = "check_tasks"
 
 # hdf5
 neighbors = "neighbors"
@@ -166,6 +171,9 @@ mixed_keys_json = "mixed_keys_json"
 # params for random_algorithm
 varchar_prefix = "varchar_prefix"
 varchar_filled_length = "varchar_filled_length"
+custom_insert_ratio = "custom_insert_ratio"
+custom_insert_value = "custom_insert_value"
+convert_data_type = "convert_data_type"
 
 # data type name lower
 ARRAY = "array"

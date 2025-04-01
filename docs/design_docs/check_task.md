@@ -124,6 +124,7 @@ check_items:
     id: [0, 1, 5]
     array_int64_1: [[1,1], [2,2]]
     varchar_1: ['10', '11']
+  check_empty: bool, default value = True, If there is None or [] value, set `False` to skip this check.
 ```
 
 #### 6. `check_search_output`

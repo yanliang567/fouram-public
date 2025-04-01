@@ -2,6 +2,7 @@ from typing import Optional, Union, List, Dict
 from dataclasses import dataclass, field, asdict
 
 from client.parameters import params_name as pn
+from client.common.common_type import CheckTasks
 from client.check.exception_message import ServerExceptionsMessage
 
 search_expr = ["{'float_1': {'GT': -1.0, 'LT': %s * 0.1}}" % pn.dataset_size,
@@ -157,6 +158,31 @@ class DefaultVectorIndexParams:
         }
 
 
+class JsonCastType:
+    BOOL = 'BOOL'
+    DOUBLE = 'DOUBLE'
+    VARCHAR = 'VARCHAR'
+
+    all_types = ["BOOL", "DOUBLE", "VARCHAR"]
+
+
+@dataclass
+class JsonPathIndexParams:
+    json_cast_type: str
+    json_path: str = None
+
+    def __post_init__(self):
+        if self.json_cast_type not in JsonCastType.all_types:
+            raise ValueError(
+                f"[JsonPathIndexParams] `json_cast_type`:{self.json_cast_type} only supports: {JsonCastType.all_types}")
+
+    @property
+    def to_dict(self):
+        if self.json_path is not None:
+            return vars(self)
+        return {"json_cast_type": self.json_cast_type}
+
+
 class DefaultScalarIndexParams:
     """ setting `dataset_params.scalars_index` """
 
@@ -169,6 +195,28 @@ class DefaultScalarIndexParams:
     @staticmethod
     def default_index_list(fields: List[str]):
         return [DefaultScalarIndexParams.default_index(i) for i in fields]
+
+    @staticmethod
+    def JSON_PARH_INVERTED(field: str, params: JsonPathIndexParams):
+        return {
+            field: {
+                pn.index_type: pn.IndexTypeName.INVERTED,
+                pn.params: params.to_dict
+            }
+        }
+
+    @staticmethod
+    def JSON_PARH_INVERTED_MULTI(field: str, params: List[JsonPathIndexParams]):
+        return {
+            field: [{
+                pn.index_type: pn.IndexTypeName.INVERTED,
+                pn.params: p.to_dict
+            } for p in params]
+        }
+
+    @staticmethod
+    def JSON_PARH_INVERTED_list(fields: List[str], params: JsonPathIndexParams):
+        return [DefaultScalarIndexParams.JSON_PARH_INVERTED(i, params) for i in fields]
 
     @staticmethod
     def INVERTED(field: str):
@@ -230,6 +278,38 @@ class SpecifyRange:
     @property
     def value(self) -> list:
         return [self.left, self.right]
+
+
+@dataclass
+class CustomSizeJsonKeysParams:
+    json_key: Union[str, List[str]]
+    specify_range: SpecifyRange
+    steps: int = 1
+
+    @property
+    def to_dict(self):
+        return {
+            "json_key": self.json_key,
+            "specify_range": self.specify_range.value,
+            "steps": self.steps,
+        }
+
+
+@dataclass
+class MixedKeysJsonKeysParams:
+    json_key: Union[str, List[str]]
+    specify_range: SpecifyRange = field(default_factory=lambda: SpecifyRange(0, 1))
+    generate_ratio: int = 1
+    generate_start_id: int = 0
+
+    @property
+    def to_dict(self):
+        return {
+            "json_key": self.json_key,
+            "specify_range": self.specify_range.value,
+            "generate_ratio": self.generate_ratio,
+            "generate_start_id": self.generate_start_id,
+        }
 
 
 class DefaultScalarParams:
@@ -362,6 +442,28 @@ class DefaultScalarParams:
         }
 
     @staticmethod
+    def nullable(field: str):
+        """
+        setting null value
+
+        :param field: int64_1
+        """
+        return {
+            field: {
+                "params": {"nullable": True}
+            }
+        }
+
+    @staticmethod
+    def nullable_list(fields: List[str]):
+        """
+        setting null value
+
+        :param fields: ['json_1', ...]
+        """
+        return [DefaultScalarParams.nullable(field) for field in fields]
+
+    @staticmethod
     def specify_scope(field: str, specify_range: SpecifyRange = SpecifyRange(), max_capacity: int = 1, **kwargs):
         """
         setting random_algorithm
@@ -372,12 +474,18 @@ class DefaultScalarParams:
         :param kwargs:
                 varchar_prefix: str
                 varchar_filled_length: int
+                custom_insert_ratio: int
+                custom_insert_value: any
+                convert_data_type: str
         """
+        extra_list = [pn.varchar_prefix, pn.varchar_filled_length, pn.custom_insert_ratio, pn.custom_insert_value,
+                      pn.convert_data_type]
+
         algorithm_params = {
             "algorithm_name": "specify_scope",
             "specify_range": specify_range.value,
             "max_capacity": max_capacity,
-            **{n: kwargs.get(n) for n in [pn.varchar_prefix, pn.varchar_filled_length] if n in kwargs}
+            **{n: kwargs.get(n) for n in extra_list if n in kwargs}
         }
         return {field: {"other_params": {"dataset": pn.DatasetsName.RandomAlgorithm,
                                          "algorithm_params": algorithm_params}}}
@@ -403,12 +511,18 @@ class DefaultScalarParams:
         :param kwargs:
                 varchar_prefix: str
                 varchar_filled_length: int
+                custom_insert_ratio: int
+                custom_insert_value: any
+                convert_data_type: str
         """
+        extra_list = [pn.varchar_prefix, pn.varchar_filled_length, pn.custom_insert_ratio, pn.custom_insert_value,
+                      pn.convert_data_type]
+
         algorithm_params = {
             "algorithm_name": "random_range",
             "specify_range": specify_range.value,
             "max_capacity": max_capacity,
-            **{n: kwargs.get(n) for n in [pn.varchar_prefix, pn.varchar_filled_length] if n in kwargs}
+            **{n: kwargs.get(n) for n in extra_list if n in kwargs}
         }
         return {field: {"other_params": {"dataset": pn.DatasetsName.RandomAlgorithm,
                                          "algorithm_params": algorithm_params}}}
@@ -436,13 +550,19 @@ class DefaultScalarParams:
         :param kwargs:
                 varchar_prefix: str
                 varchar_filled_length: int
+                custom_insert_ratio: int
+                custom_insert_value: any
+                convert_data_type: str
         """
+        extra_list = [pn.varchar_prefix, pn.varchar_filled_length, pn.custom_insert_ratio, pn.custom_insert_value,
+                      pn.convert_data_type]
+
         algorithm_params = {
             "algorithm_name": "fixed_value_range",
             "specify_range": specify_range.value,
             "batch": batch,
             "max_capacity": max_capacity,
-            **{n: kwargs.get(n) for n in [pn.varchar_prefix, pn.varchar_filled_length] if n in kwargs}
+            **{n: kwargs.get(n) for n in extra_list if n in kwargs}
         }
         return {field: {"other_params": {"dataset": pn.DatasetsName.RandomAlgorithm,
                                          "algorithm_params": algorithm_params}}}
@@ -574,6 +694,138 @@ class DefaultScalarParams:
         return [DefaultScalarParams.specify_scope_array(field, specify_range, capacity_range, **kwargs) for field in
                 fields]
 
+    @staticmethod
+    def mixed_values_json(field: str, json_key: Union[str, List[str]], json_depth: int = None,
+                          json_value_types: List[str] = ['int64'], json_repeat: int = None,
+                          specify_range: SpecifyRange = SpecifyRange(), max_capacity: int = 1, **kwargs):
+        """
+        setting mixed_values_json
+
+        :param field: str
+        :param json_key: str or List[str]
+        :param json_depth: int
+        :param json_value_types: List[str]
+        :param json_repeat: int
+
+        :param specify_range: SpecifyRange
+        :param max_capacity: int
+        :param kwargs:
+                varchar_prefix: str
+                varchar_filled_length: int
+                custom_insert_ratio: int
+                custom_insert_value: any
+        """
+        extra_list = [pn.varchar_prefix, pn.varchar_filled_length, pn.custom_insert_ratio, pn.custom_insert_value]
+
+        algorithm_params = {
+            "algorithm_name": pn.mixed_values_json,
+            "json_key": json_key,
+            "json_depth": json_depth,
+            "json_value_types": json_value_types,
+            "json_repeat": json_repeat,
+            "specify_range": specify_range.value,
+            "max_capacity": max_capacity,
+            **{n: kwargs.get(n) for n in extra_list if n in kwargs}
+        }
+        return {field: {"other_params": {"dataset": pn.DatasetsName.RandomAlgorithm,
+                                         "algorithm_params": algorithm_params}}}
+
+    @staticmethod
+    def mixed_values_json_list(fields: List[str], json_key: Union[str, List[str]], json_depth: int = None,
+                               json_value_types: List[str] = ['int64'], json_repeat: int = None,
+                               specify_range: SpecifyRange = SpecifyRange(), max_capacity: int = 1, **kwargs):
+        """
+        :param fields: ["json_1", "json_2", ...]
+        :param json_key: str or List[str]
+        :param json_depth: int
+        :param json_value_types: List[str]
+        :param json_repeat: int
+
+        :param specify_range: SpecifyRange
+        :param max_capacity: int
+        """
+        return [DefaultScalarParams.mixed_values_json(field, json_key, json_depth, json_value_types, json_repeat,
+                                                      specify_range, max_capacity, **kwargs)
+                for field in fields]
+
+    @staticmethod
+    def custom_size_json(field: str, json_keys_params: List[CustomSizeJsonKeysParams], max_capacity: int = 1, **kwargs):
+        """
+        setting custom_size_json
+
+        :param field: str
+        :param json_keys_params: List[CustomSizeJsonKeysParams]
+
+        :param max_capacity: int
+        :param kwargs:
+                varchar_prefix: str
+                varchar_filled_length: int
+        """
+        extra_list = [pn.varchar_prefix, pn.varchar_filled_length]
+
+        algorithm_params = {
+            "algorithm_name": pn.custom_size_json,
+            "json_keys_params": [j.to_dict for j in json_keys_params],
+            "max_capacity": max_capacity,
+            **{n: kwargs.get(n) for n in extra_list if n in kwargs}
+        }
+        return {field: {"other_params": {"dataset": pn.DatasetsName.RandomAlgorithm,
+                                         "algorithm_params": algorithm_params}}}
+
+    @staticmethod
+    def custom_size_json_list(fields: List[str], json_keys_params: List[CustomSizeJsonKeysParams],
+                              max_capacity: int = 1, **kwargs):
+        """
+        :param fields: ["json_1", "json_2", ...]
+        :param json_keys_params: List[CustomSizeJsonKeysParams]
+
+        :param max_capacity: int
+        """
+        return [DefaultScalarParams.custom_size_json(field, json_keys_params, max_capacity, **kwargs)
+                for field in fields]
+
+    @staticmethod
+    def mixed_keys_json(field: str, json_keys_params: List[MixedKeysJsonKeysParams], max_capacity: int = 1, **kwargs):
+        """
+        setting mixed_keys_json
+
+        :param field: str
+        :param json_keys_params: List[MixedKeysJsonKeysParams]
+
+        :param max_capacity: int
+        :param kwargs:
+                varchar_prefix: str
+                varchar_filled_length: int
+        """
+        extra_list = [pn.varchar_prefix, pn.varchar_filled_length]
+
+        algorithm_params = {
+            "algorithm_name": pn.mixed_keys_json,
+            "json_keys_params": [j.to_dict for j in json_keys_params],
+            "max_capacity": max_capacity,
+            **{n: kwargs.get(n) for n in extra_list if n in kwargs}
+        }
+        return {field: {"other_params": {"dataset": pn.DatasetsName.RandomAlgorithm,
+                                         "algorithm_params": algorithm_params}}}
+
+    @staticmethod
+    def mixed_keys_json_list(fields: List[str], json_keys_params: List[MixedKeysJsonKeysParams],
+                             max_capacity: int = 1, **kwargs):
+        """
+        :param fields: ["json_1", "json_2", ...]
+        :param json_keys_params: List[MixedKeysJsonKeysParams]
+
+        :param max_capacity: int
+        """
+        return [DefaultScalarParams.mixed_keys_json(field, json_keys_params, max_capacity, **kwargs)
+                for field in fields]
+
+
+class DataOrganization:
+    column_insert = "column_insert"
+    row_insert = "row_insert"
+    data_frame = "data_frame"
+
 
 class DefaultDatasetParams:
     @staticmethod
@@ -658,6 +910,14 @@ class Expr:
     @staticmethod
     def LIKE(left, right):
         return ExprBase(expr=f'{left} LIKE "{right}"')
+
+    @staticmethod
+    def IS_Null(name):
+        return ExprBase(expr=f'{name} IS NULL')
+
+    @staticmethod
+    def Not_Null(name):
+        return ExprBase(expr=f'{name} IS NOT NULL')
 
     @staticmethod
     def exists(name):
@@ -813,6 +1073,11 @@ class Expr:
 class CheckItems:
     IgnoreFlushRateLimitAndTimeout = [{pn.message: ServerExceptionsMessage.RateLimitError},
                                       {pn.message: ServerExceptionsMessage.FlushTimeout}]
+
+
+class CheckTasksDefine:
+    FlushIgnoreFlushRateLimitAndTimeout = {'flush': {"check_task": CheckTasks.checkIgnoreExpectedErrors,
+                                                     "check_items": CheckItems.IgnoreFlushRateLimitAndTimeout}}
 
 
 @dataclass

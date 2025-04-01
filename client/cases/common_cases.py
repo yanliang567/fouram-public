@@ -20,7 +20,8 @@ from client.common.common_func import (
     get_vector_type, get_default_field_name,
     get_ground_truth_ids, get_search_ids, get_recall_value,
     parser_search_params_expr, parser_scalar_index, write_json_file, gen_go_bench_json_file, deal_insert_result,
-    check_vector_index_params, check_params_exist, convert_to_list, check_sparse_range
+    check_vector_index_params, check_params_exist, convert_to_list, check_sparse_range,
+    convert_scalar_index_params_to_list
 )
 
 from commons.common_params import EnvVariable
@@ -192,8 +193,7 @@ class CommonCases(Base):
         other_fields = self.params_obj.collection_params.get(pn.other_fields, [])
         for _field in scalars_field + vectors_field:
             if _field not in other_fields + ["id"]:
-                log.error("[CommonCases] The field `{0}` is not in the collection {1}.".format(_field, other_fields))
-                return False
+                log.debug("[CommonCases] The field `{0}` is not in the collection {1}.".format(_field, other_fields))
 
         self.show_index()
 
@@ -208,11 +208,13 @@ class CommonCases(Base):
 
         # build scalar index
         for scalar, scalar_index_params in scalars.items():
-            result = self.build_scalar_index(field_name=scalar, index_params=scalar_index_params)
-            rt = round(result.rt, Precision.INDEX_PRECISION)
-            # set report data
-            self.case_report.add_attr(update_report_data, **{"index": {scalar: {"RT": rt}}})
-            log.info("[CommonCases] RT of build scalar field index `{1}`: {0}s".format(rt, scalar))
+            for k, s in enumerate(convert_scalar_index_params_to_list(scalar_index_params)):
+                result = self.build_scalar_index(field_name=scalar, index_params=s)
+                rt = round(result.rt, Precision.INDEX_PRECISION)
+                # set report data
+                rt_name = "RT" if k == 0 else f"RT_{k}"
+                self.case_report.add_attr(update_report_data, **{"index": {scalar: {rt_name: rt}}})
+                log.info("[CommonCases] RT of build scalar field index `{1}`: {0}s, params: {2}".format(rt, scalar, s))
 
         log.info("[CommonCases] Prepare scalars:{0} vectors:{1} index done.".format(scalars_field, vectors_field))
 

@@ -46,8 +46,8 @@ class CommonParams:
     def base(dataset_name, dim, dataset_size, ni_per, metric_type=None, req_run_counts=None, vector_field_name=None,
              max_length=None, varchar_filled=None, sparse_range=None,
              vectors_index=None, scalars_index=None, scalars_params=None, extra_partitions=None,
-             other_fields=None, shards_num=2, varchar_id=None, enable_dynamic_field=None, auto_id=None,
-             num_partitions=None,
+             other_fields=None, shards_num=2, varchar_id=None, auto_id=None,
+             enable_dynamic_field=None, dynamic_fields=None, data_organization=None, num_partitions=None,
              replica_number=None, resource_groups=None,
              index_type=None, index_param=None,
              ids=None, query_expr=None, output_fields=None,
@@ -74,6 +74,7 @@ class CommonParams:
                              pn.shards_num: shards_num,
                              pn.varchar_id: varchar_id,
                              pn.enable_dynamic_field: enable_dynamic_field,
+                             pn.dynamic_fields: dynamic_fields,
                              pn.auto_id: auto_id,
                              pn.num_partitions: num_partitions}
         load_params = {pn.replica_number: replica_number,
@@ -104,7 +105,8 @@ class CommonParams:
         database_user_params = {pn.reset_rbac: reset_rbac,
                                 pn.reset_db: reset_db}
         common_params = {pn.set_properties: set_properties,
-                         pn.alter_index: alter_index
+                         pn.alter_index: alter_index,
+                         pn.data_organization: data_organization,
                          }
 
         return {k: v for k, v in dict_recursive_key({

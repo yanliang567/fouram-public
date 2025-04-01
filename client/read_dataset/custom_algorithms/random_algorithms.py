@@ -10,7 +10,8 @@ import numpy as np
 from client.read_dataset.custom_algorithms.common_param import JsonKeyParams, JsonMixedKeyParams
 from client.client_base import DataType
 from client.common.common_func import (
-    parser_data_size, get_field_dtype, set_dict_value, loop_ids, update_dict_value, rounding_number
+    parser_data_size, get_field_dtype, set_dict_value, loop_ids, update_dict_value, rounding_number,
+    iter_insert_value_after_ratio_elements
 )
 from commons.common_import import Iterator
 from utils.util_log import log
@@ -48,6 +49,31 @@ class AlgorithmBase:
 
         log.debug(f"[{self._class_name}] Parser `varchar_filled_length` value: {_varchar_filled_length}")
         return _varchar_filled_length
+
+    def parser_custom_insert_ratio(self, default_value: int = 0, **kwargs):
+        name = "custom_insert_ratio"
+        _custom_insert_ratio = kwargs.get(name, default_value)
+        if not isinstance(_custom_insert_ratio, int) or _custom_insert_ratio < 0:
+            raise ValueError("[{0}] Parser `{1}` failed: {2}".format(self._class_name, name, _custom_insert_ratio))
+
+        log.debug(f"[{self._class_name}] Parser `{name}` value: {_custom_insert_ratio}")
+        return _custom_insert_ratio
+
+    def parser_custom_insert_value(self, default_value: any = None, **kwargs):
+        name = "custom_insert_value"
+        _custom_insert_value = kwargs.get(name, default_value)
+
+        log.debug(f"[{self._class_name}] Parser `{name}` value: {_custom_insert_value}")
+        return _custom_insert_value
+
+    def parser_convert_data_type(self, default_value: str = None, **kwargs):
+        name = "convert_data_type"
+        _convert_data_type = kwargs.get(name, default_value)
+        if _convert_data_type is not None and not isinstance(_convert_data_type, str):
+            raise ValueError("[{0}] Parser `{1}` failed: {2}".format(self._class_name, name, _convert_data_type))
+
+        log.debug(f"[{self._class_name}] Parser `{name}` value: {_convert_data_type}")
+        return _convert_data_type
 
     def parser_specify_range(self, default_value: List[int] = [0, 100], **kwargs):
         # parser `specify_range`
@@ -204,6 +230,8 @@ class AlgorithmBase:
                     str(i) for i in data_list]
             elif _field_dtype in [DataType.BOOL]:
                 v = [bool(sum(np.fromstring(str(_id), dtype=np.uint8, sep=' ')) & 1) for _id in data_list]
+            elif _field_dtype in [DataType.NONE]:
+                v = [None for _ in data_list]
 
             if field_dtype and field_dtype == getattr(DataType, "ARRAY"):
                 v = [[j] * int(max_capacity) for j in v]
@@ -232,6 +260,11 @@ class AlgorithmSpecifyScope(AlgorithmBase):
             # for `VARCHAR` & `ARRAY_VARCHAR` types
             varchar_prefix: <str>,  len(varchar_prefix) == 1
             varchar_filled_length: <int>, >= 0
+            # for custom insert
+            custom_insert_ratio: <int>, >= 0, default value = 0
+            custom_insert_value: <any type>, default value = None
+            # cast data type, which may not match field name, in order to insert data into json field
+            convert_data_type: <str>, default value = "", e.g.: 'int8', 'array_varchar' ...
 
         Introduce:
             Read the scalar values in `specify_range` sequentially,
@@ -258,12 +291,23 @@ class AlgorithmSpecifyScope(AlgorithmBase):
 
         # parser params for `specify scope` algorithm
         self._specify_range = self.parser_specify_range(**self._kwargs)
+
         self._max_capacity = self.parser_max_capacity(**self._kwargs)
         self._varchar_prefix = self.parser_varchar_prefix(**self._kwargs)
         self._varchar_filled_length = self.parser_varchar_filled_length(**self._kwargs)
+        self._custom_insert_ratio = self.parser_custom_insert_ratio(**kwargs)
+        self._custom_insert_value = self.parser_custom_insert_value(**kwargs)
+        self._convert_data_type = self.parser_convert_data_type(**kwargs)
+        self._force_convert_data_type()
 
         # generated data
-        self._default_value, self._default_base_value = [], []
+        self._default_value, self._default_base_value, self._base_obj = [], [], iter([])
+
+    def _force_convert_data_type(self):
+        if self._convert_data_type:
+            self._field_dtype, self._element_dtype = get_field_dtype(self._convert_data_type)
+            log.debug("[{0}] Force convert data type, field dtype:{1}, element dtype:{2}".format(
+                self._class_name, self._field_dtype, self._element_dtype))
 
     def algorithm_init(self):
         self._default_base_value = self._data_type_conversion(
@@ -275,6 +319,9 @@ class AlgorithmSpecifyScope(AlgorithmBase):
             log.warning("[{0}] Algorithm `specify_scope` not support for field `{1}`".format(
                 self._class_name, self._field_name))
 
+        self._base_obj = iter_insert_value_after_ratio_elements(
+            data=self._default_base_value, ratio=self._custom_insert_ratio, insert_value=self._custom_insert_value)
+
         log.debug("[{0}] Field `{1}` display default_base_value: {2}".format(
             self._class_name, self._field_name, self._display_default_base_value(self._default_base_value)))
 
@@ -283,7 +330,7 @@ class AlgorithmSpecifyScope(AlgorithmBase):
             return []
 
         while len(self._default_value) < data_length:
-            self._default_value.extend(self._default_base_value)
+            self._default_value.extend(next(self._base_obj))
 
         _value = self._default_value[:data_length]
         self._default_value = self._default_value[data_length:]
@@ -303,6 +350,11 @@ class AlgorithmRandomRange(AlgorithmBase):
             # for `VARCHAR` & `ARRAY_VARCHAR` types
             varchar_prefix: <str>,  len(varchar_prefix) == 1
             varchar_filled_length: <int>, >= 0
+            # for custom insert
+            custom_insert_ratio: <int>, >= 0, default value = 0
+            custom_insert_value: <any type>, default value = None
+            # cast data type, which may not match field name, in order to insert data into json field
+            convert_data_type: <str>, default value = "", e.g.: 'int8', 'array_varchar' ...
 
         Introduce:
             Read the scalar values in `specify_range` sequentially,
@@ -327,12 +379,23 @@ class AlgorithmRandomRange(AlgorithmBase):
 
         # parser params for `random range` algorithm
         self._specify_range = self.parser_specify_range(**self._kwargs)
+
         self._max_capacity = self.parser_max_capacity(**self._kwargs)
         self._varchar_prefix = self.parser_varchar_prefix(**self._kwargs)
         self._varchar_filled_length = self.parser_varchar_filled_length(**self._kwargs)
+        self._custom_insert_ratio = self.parser_custom_insert_ratio(**kwargs)
+        self._custom_insert_value = self.parser_custom_insert_value(**kwargs)
+        self._convert_data_type = self.parser_convert_data_type(**kwargs)
+        self._force_convert_data_type()
 
         # generated data
-        self._default_value, self._default_base_value = [], []
+        self._default_value, self._default_base_value, self._base_obj = [], [], iter([])
+
+    def _force_convert_data_type(self):
+        if self._convert_data_type:
+            self._field_dtype, self._element_dtype = get_field_dtype(self._convert_data_type)
+            log.debug("[{0}] Force convert data type, field dtype:{1}, element dtype:{2}".format(
+                self._class_name, self._field_dtype, self._element_dtype))
 
     def algorithm_init(self):
         self._default_base_value = self._data_type_conversion(
@@ -344,6 +407,9 @@ class AlgorithmRandomRange(AlgorithmBase):
             log.warning("[{0}] Algorithm `random_range` not support for field `{1}`".format(
                 self._class_name, self._field_name))
 
+        self._base_obj = iter_insert_value_after_ratio_elements(
+            data=self._default_base_value, ratio=self._custom_insert_ratio, insert_value=self._custom_insert_value)
+
         log.debug("[{0}] Field `{1}` display default_base_value: {2}".format(
             self._class_name, self._field_name, self._display_default_base_value(self._default_base_value)))
 
@@ -352,7 +418,7 @@ class AlgorithmRandomRange(AlgorithmBase):
             return []
 
         while len(self._default_value) < data_length:
-            self._default_value.extend(self._default_base_value)
+            self._default_value.extend(next(self._base_obj))
 
         _value = self._default_value[:data_length]
         self._default_value = self._default_value[data_length:]
@@ -375,6 +441,11 @@ class AlgorithmFixedValueRange(AlgorithmBase):
             # for `VARCHAR` & `ARRAY_VARCHAR` types
             varchar_prefix: <str>,  len(varchar_prefix) == 1
             varchar_filled_length: <int>, >= 0
+            # for custom insert
+            custom_insert_ratio: <int>, >= 0, default value = 0
+            custom_insert_value: <any type>, default value = None
+            # cast data type, which may not match field name, in order to insert data into json field
+            convert_data_type: <str>, default value = "", e.g.: 'int8', 'array_varchar' ...
 
         Introduce:
             Read the scalar values in `specify_range` sequentially,
@@ -404,9 +475,19 @@ class AlgorithmFixedValueRange(AlgorithmBase):
         self._batch = self.parser_batch(**self._kwargs)
         self._varchar_prefix = self.parser_varchar_prefix(**self._kwargs)
         self._varchar_filled_length = self.parser_varchar_filled_length(**self._kwargs)
+        self._custom_insert_ratio = self.parser_custom_insert_ratio(**kwargs)
+        self._custom_insert_value = self.parser_custom_insert_value(**kwargs)
+        self._convert_data_type = self.parser_convert_data_type(**kwargs)
+        self._force_convert_data_type()
 
         # generated data
-        self._default_value, self._default_base_value = [], []
+        self._default_value, self._default_base_value, self._base_obj = [], [], iter([])
+
+    def _force_convert_data_type(self):
+        if self._convert_data_type:
+            self._field_dtype, self._element_dtype = get_field_dtype(self._convert_data_type)
+            log.debug("[{0}] Force convert data type, field dtype:{1}, element dtype:{2}".format(
+                self._class_name, self._field_dtype, self._element_dtype))
 
     def algorithm_init(self):
         self._default_base_value = self._data_type_conversion(
@@ -418,6 +499,9 @@ class AlgorithmFixedValueRange(AlgorithmBase):
             log.warning("[{0}] Algorithm `fixed_value_range` not support for field `{1}`".format(
                 self._class_name, self._field_name))
 
+        self._base_obj = iter_insert_value_after_ratio_elements(
+            data=self._default_base_value, ratio=self._custom_insert_ratio, insert_value=self._custom_insert_value)
+
         log.debug("[{0}] Field `{1}` display default_base_value: {2}".format(
             self._class_name, self._field_name, self._display_default_base_value(self._default_base_value)))
 
@@ -426,7 +510,7 @@ class AlgorithmFixedValueRange(AlgorithmBase):
             return []
 
         while len(self._default_value) < data_length:
-            self._default_value.extend(self._default_base_value)
+            self._default_value.extend(next(self._base_obj))
 
         _value = self._default_value[:data_length]
         self._default_value = self._default_value[data_length:]
@@ -738,7 +822,7 @@ class AlgorithmMixedValuesJson(AlgorithmBase):
         Algorithm name: mixed_values_json
 
         Support data type: JSON
-                           - value types: INT64, VARCHAR, DOUBLE, BOOL, ARRAY(INT64, VARCHAR, DOUBLE, BOOL)
+                           - value types: INT64, VARCHAR, DOUBLE, BOOL, NONE, ARRAY(INT64, VARCHAR, DOUBLE, BOOL, NONE)
 
         Params:
             json_key: str or List[str],
@@ -763,6 +847,9 @@ class AlgorithmMixedValuesJson(AlgorithmBase):
             # for `VARCHAR` & `ARRAY_VARCHAR` types
             varchar_prefix: <str>,  len(varchar_prefix) == 1
             varchar_filled_length: <int>, >= 0
+
+            custom_insert_ratio: <int>, >= 0, default value = 0
+            custom_insert_value: <any type>, default value = None
 
         Introduce:
             Parser json dict according to `json_key` and `json_depth`,
@@ -792,8 +879,8 @@ class AlgorithmMixedValuesJson(AlgorithmBase):
         # check field data type is `JSON`
         self._check_field_dtype()
 
-        self._all_supported_dtype = ['int64', 'varchar', 'double', 'bool',
-                                     'array_int64', 'array_varchar', 'array_double', 'array_bool']
+        self._all_supported_dtype = ['int64', 'varchar', 'double', 'bool', 'none',
+                                     'array_int64', 'array_varchar', 'array_double', 'array_bool', 'array_none']
         # parser params for `mixed_values_json` algorithm
         self._json_key = self.parser_json_key(**self._kwargs)
         self._json_depth = self.parser_json_depth(**self._kwargs)
@@ -804,9 +891,11 @@ class AlgorithmMixedValuesJson(AlgorithmBase):
         self._max_capacity = self.parser_max_capacity(**self._kwargs)
         self._varchar_prefix = self.parser_varchar_prefix(**self._kwargs)
         self._varchar_filled_length = self.parser_varchar_filled_length(**self._kwargs)
+        self._custom_insert_ratio = self.parser_custom_insert_ratio(**kwargs)
+        self._custom_insert_value = self.parser_custom_insert_value(**kwargs)
 
         # generated data
-        self._default_value, self._default_base_value = [], []
+        self._default_value, self._default_base_value, self._base_obj = [], [], iter([])
 
     def _check_field_dtype(self):
         if self._field_dtype != DataType.JSON:
@@ -876,6 +965,10 @@ class AlgorithmMixedValuesJson(AlgorithmBase):
                         " the preparation data to take too long to generate and use more memory.")
 
         self._default_base_value = self._gen_default_base_value(json_dict=_json_dict, base_value=_base_value)
+
+        self._base_obj = iter_insert_value_after_ratio_elements(
+            data=self._default_base_value, ratio=self._custom_insert_ratio, insert_value=self._custom_insert_value)
+
         log.debug("[{0}] Field `{1}` display default_base_value({2}): {3}".format(
             self._class_name, self._field_name, len(self._default_base_value),
             self._display_default_base_value(self._default_base_value)))
@@ -885,7 +978,7 @@ class AlgorithmMixedValuesJson(AlgorithmBase):
             return []
 
         while len(self._default_value) < data_length:
-            self._default_value.extend(self._default_base_value)
+            self._default_value.extend(next(self._base_obj))
 
         _value = self._default_value[:data_length]
         self._default_value = self._default_value[data_length:]
@@ -898,15 +991,15 @@ class AlgorithmCustomSizeJson(AlgorithmBase):
         Algorithm name: custom_size_json
 
         Support data type: JSON
-                           - value types: INT64, VARCHAR, DOUBLE, BOOL, ARRAY(INT64, VARCHAR, DOUBLE, BOOL)
+                           - value types: INT64, VARCHAR, DOUBLE, BOOL, NONE, ARRAY(INT64, VARCHAR, DOUBLE, BOOL, NONE)
 
         Params:
             json_keys_params: List[dict],
                        e.g.:
-                        - key_name: "k1.k2.k3" -> {'k1': {'k2': {'int64': `value`}}}  # split by `.`
+                        - json_key: "k1.k2.k3" -> {'k1': {'k2': {'int64': `value`}}}  # split by `.`
                           specify_range: List<int>, e.g.: [ 1, 100 ] => 1 ~ 99
                           steps: int(>= 1), e.g.: 1, The number of items to be taken at one time
-                        - key_name:["k1", "k2", "varchar_1"] -> {'k1': {'k2': {'varchar_1': `value`}}}
+                        - json_key:["k1", "k2", "varchar_1"] -> {'k1': {'k2': {'varchar_1': `value`}}}
                           specify_range: List<int>, e.g.: [ 0, 1 ] => 0
                           steps: int(>= 1), e.g.: 10000
 
@@ -916,7 +1009,7 @@ class AlgorithmCustomSizeJson(AlgorithmBase):
             varchar_filled_length: <int>, >= 0
 
         Introduce:
-            Read the default values in `specify_range` sequentially to init json dict `key_name`,
+            Read the default values in `specify_range` sequentially to init json dict `json_key`,
             process the json values according to the last key data type,
             get the specified amount of data(`steps`) for each group of values in sequence (loop reading).
 
@@ -956,8 +1049,8 @@ class AlgorithmCustomSizeJson(AlgorithmBase):
         # check field data type is `JSON`
         self._check_field_dtype()
 
-        self._all_supported_dtype = ['int64', 'varchar', 'double', 'bool',
-                                     'array_int64', 'array_varchar', 'array_double', 'array_bool']
+        self._all_supported_dtype = ['int64', 'varchar', 'double', 'bool', 'none',
+                                     'array_int64', 'array_varchar', 'array_double', 'array_bool', 'array_none']
         # parser params for `mixed_values_json` algorithm
         self._json_keys_params = self.parser_json_keys_params(**self._kwargs)
         self._json_keys_obj = self._check_json_keys_params()
@@ -1013,16 +1106,16 @@ class AlgorithmMixedKeysJson(AlgorithmBase):
         Algorithm name: mixed_keys_json
 
         Support data type: JSON
-                           - value types: INT64, VARCHAR, DOUBLE, BOOL, ARRAY(INT64, VARCHAR, DOUBLE, BOOL)
+                           - value types: INT64, VARCHAR, DOUBLE, BOOL, NONE, ARRAY(INT64, VARCHAR, DOUBLE, BOOL, NONE)
 
         Params:
             json_keys_params: List[dict],
                        e.g.:
-                        - key_name: "k1.k2.k3" -> {'k1': {'k2': {'int64': `value`}}}  # split by `.`
+                        - json_key: "k1.k2.int64_1" -> {'k1': {'k2': {'int64': `value`}}}  # split by `.`
                           specify_range: List<int>, e.g.: [ 1, 100 ] => 1 ~ 99
                           generate_ratio: int(>= 1), default value: 1, set one value in every `generate_ratio` values
                           generate_start_id: int(>= 0), default value: 0, `id` that start setting value
-                        - key_name:["k1", "k2", "varchar_1"] -> {'k1': {'k2': {'varchar_1': `value`}}}
+                        - json_key:["k1", "k2", "varchar_1"] -> {'k1': {'k2': {'varchar_1': `value`}}}
                           specify_range: List<int>, e.g.: [ 0, 1 ] => 0
                           generate_ratio: int(>= 1), e.g.: 10000
                           generate_start_id: 1000
@@ -1033,7 +1126,7 @@ class AlgorithmMixedKeysJson(AlgorithmBase):
             varchar_filled_length: <int>, >= 0
 
         Introduce:
-            Read the default values in `specify_range` sequentially to init json dict `key_name`,
+            Read the default values in `specify_range` sequentially to init json dict `json_key`,
             process the json values according to the last key data type,
             combine all json data of the current row.
 
@@ -1098,8 +1191,8 @@ class AlgorithmMixedKeysJson(AlgorithmBase):
         # check field data type is `JSON`
         self._check_field_dtype()
 
-        self._all_supported_dtype = ['int64', 'varchar', 'double', 'bool',
-                                     'array_int64', 'array_varchar', 'array_double', 'array_bool']
+        self._all_supported_dtype = ['int64', 'varchar', 'double', 'bool', 'none',
+                                     'array_int64', 'array_varchar', 'array_double', 'array_bool', 'array_none']
         # parser params for `mixed_values_json` algorithm
         self._json_keys_params = self.parser_json_keys_params(**self._kwargs)
         self._json_keys_obj = self._check_json_keys_params()

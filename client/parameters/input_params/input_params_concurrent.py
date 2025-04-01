@@ -3,7 +3,7 @@ from typing import List, Optional, Union
 from client.parameters.input_params import HybridSearchReqParams, HybridSearchRerankParams
 from client.parameters.input_params.input_params_common import CommonParams
 from client.parameters import params_name as pn
-from client.common.common_func import dict_recursive_key, parser_data_size, update_dict_value
+from client.common.common_func import dict_recursive_key, parser_data_size, update_dict_value, get_passed_params
 from client.common.common_type import DefaultValue, CheckTasks
 
 from utils.util_log import log
@@ -272,7 +272,7 @@ class ConcurrentParams(CommonParams):
     def params_insert(
             weight=1, nb=1, timeout: Optional[int] = 30,
             random_id=False, random_vector=False, varchar_filled=False, start_id=0, shuffle_id=False,
-            check_task: Optional[str] = CheckTasks.checkResponse, check_items: Union[dict, list] = None):
+            check_task: Optional[str] = CheckTasks.checkResponse, check_items: Union[dict, list] = None, **kwargs):
         """
         nb: Optional[int] = 1  # number of batch insert
         timeout: Optional[int] = DefaultValue.default_timeout
@@ -292,15 +292,19 @@ class ConcurrentParams(CommonParams):
         check_task: Optional[str] = CheckTasks.checkResponse
         check_items: Union[dict, list] = field(default_factory=lambda: {})
         """
+        extra_list = [pn.data_organization, pn.dynamic_fields]
+
         return {"type": "insert", "weight": weight,
                 "params": {"nb": nb, "timeout": timeout, "random_id": random_id, "random_vector": random_vector,
                            "varchar_filled": varchar_filled, "start_id": start_id, "shuffle_id": shuffle_id,
-                           "check_task": check_task, "check_items": check_items}}
+                           "check_task": check_task, "check_items": check_items,
+                           **get_passed_params(extra_list=extra_list, **kwargs)}}
 
     @staticmethod
-    def params_upsert(weight=1, nb=1, timeout: Optional[int] = 30,
-                      random_id=False, random_vector=False, varchar_filled=False, start_id=0, shuffle_id=False,
-                      check_task: Optional[str] = CheckTasks.checkResponse, check_items: Union[dict, list] = None):
+    def params_upsert(
+            weight=1, nb=1, timeout: Optional[int] = 30,
+            random_id=False, random_vector=False, varchar_filled=False, start_id=0, shuffle_id=False,
+            check_task: Optional[str] = CheckTasks.checkResponse, check_items: Union[dict, list] = None, **kwargs):
         """
         nb: Optional[int] = 1  # number of batch insert
         timeout: Optional[int] = DefaultValue.default_timeout
@@ -320,10 +324,13 @@ class ConcurrentParams(CommonParams):
         check_task: Optional[str] = CheckTasks.checkResponse
         check_items: Union[dict, list] = field(default_factory=lambda: {})
         """
+        extra_list = [pn.data_organization, pn.dynamic_fields]
+
         return {"type": "upsert", "weight": weight,
                 "params": {"nb": nb, "timeout": timeout, "random_id": random_id, "random_vector": random_vector,
                            "varchar_filled": varchar_filled, "start_id": start_id, "shuffle_id": shuffle_id,
-                           "check_task": check_task, "check_items": check_items}}
+                           "check_task": check_task, "check_items": check_items,
+                           **get_passed_params(extra_list=extra_list, **kwargs)}}
 
     @staticmethod
     def params_delete(weight=1, expr: str = "", delete_length: int = 1, timeout: Optional[int] = 30,
@@ -345,7 +352,7 @@ class ConcurrentParams(CommonParams):
     def params_scene_test(weight=1, dim=DefaultValue.default_dim, data_size=3000, nb=3000,
                           index_type=pn.IndexTypeName.IVF_SQ8, index_param={'nlist': 2048},
                           metric_type=pn.MetricsTypeName.L2, other_fields=[],
-                          scalars_params={}, scalars_index={}, vectors_index={}):
+                          scalars_params={}, scalars_index={}, vectors_index={}, **kwargs):
         """
         dataset: Optional[str] = DefaultValue.default_dataset
         column_name: Optional[str] = DefaultValue.default_dataset_column_name
@@ -369,11 +376,13 @@ class ConcurrentParams(CommonParams):
         vectors_index: Optional[dict] = field(default_factory=lambda: {})
         custom_insert_api: Optional[str] = insert
         """
+        extra_list = [pn.column_name, pn.vector_field_name, pn.sparse_range, pn.enable_dynamic_field,
+                      pn.data_organization, pn.dynamic_fields, pn.custom_insert_api]
         return {"type": "scene_test", "weight": weight,
                 "params": {"dim": dim, "data_size": data_size, "nb": nb, "index_type": index_type,
                            "index_param": index_param, "metric_type": metric_type, "other_fields": other_fields,
                            "scalars_params": scalars_params, "scalars_index": scalars_index,
-                           "vectors_index": vectors_index}}
+                           "vectors_index": vectors_index, **get_passed_params(extra_list=extra_list, **kwargs)}}
 
     @staticmethod
     def transfer_nodes(source: str, target: str, num_node: int):
@@ -421,7 +430,8 @@ class ConcurrentParams(CommonParams):
                            "timeout": timeout, "check_tasks": check_tasks}}
 
     @staticmethod
-    def params_scene_insert_partition(weight=1, data_size="1m", ni=5, with_flush=False, timeout: Optional[int] = 30):
+    def params_scene_insert_partition(
+            weight=1, data_size="1m", ni=5, with_flush=False, timeout: Optional[int] = 30, **kwargs):
         """
         data_size: total insert data_size data into partition
         ni: insert ni into the created partition per time
@@ -431,14 +441,19 @@ class ConcurrentParams(CommonParams):
         data_organization: Optional[str] = None
         # dynamic fields for inserting
         dynamic_fields: Optional[list] = field(default_factory=lambda: [])
+
+        # check request result
+        check_tasks: Optional[dict] = field(default_factory=lambda: {})
         """
+        extra_list = [pn.data_organization, pn.dynamic_fields, pn.check_tasks]
         return {"type": "scene_insert_partition", "weight": weight,
-                "params": {"data_size": data_size, "ni": ni, "with_flush": with_flush, "timeout": timeout}}
+                "params": {"data_size": data_size, "ni": ni, "with_flush": with_flush, "timeout": timeout,
+                           **get_passed_params(extra_list=extra_list, **kwargs)}}
 
     @staticmethod
     def params_scene_test_partition(weight=1, data_size="3k", ni=3000, nq=1, search_param={"ef": 64}, limit=10,
                                     expr=None, output_fields=None, guarantee_timestamp=None,
-                                    timeout: Optional[int] = 120, search_counts: Optional[int] = 1):
+                                    timeout: Optional[int] = 120, search_counts: Optional[int] = 1, **kwargs):
         """
         # collection and insert
         data_size: total insert data_size data into partition
@@ -459,19 +474,22 @@ class ConcurrentParams(CommonParams):
 
         # other
         search_counts: Optional[int] = 1
+
+        # check request result
+        check_tasks: Optional[dict] = field(default_factory=lambda: {})
         """
+        extra_list = [pn.data_organization, pn.dynamic_fields, pn.check_tasks]
         return {"type": "scene_test_partition", "weight": weight,
                 "params": {"data_size": data_size, "ni": ni, "nq": nq, "search_param": search_param, "limit": limit,
                            "expr": expr, "output_fields": output_fields, "guarantee_timestamp": guarantee_timestamp,
-                           "timeout": timeout, "search_counts": search_counts}}
+                           "timeout": timeout, "search_counts": search_counts,
+                           **get_passed_params(extra_list=extra_list, **kwargs)}}
 
     @staticmethod
-    def params_scene_test_partition_hybrid_search(weight=1, nq=1, top_k=1,
-                                                  reqs: List[HybridSearchReqParams] = None,
-                                                  rerank: HybridSearchRerankParams = None,
-                                                  output_fields: list = None, ignore_growing: bool = False,
-                                                  guarantee_timestamp: int = None, timeout: Optional[int] = 60,
-                                                  random_data=True, hybrid_search_counts=1, data_size="3k", ni=3000):
+    def params_scene_test_partition_hybrid_search(
+            weight=1, nq=1, top_k=1, reqs: List[HybridSearchReqParams] = None, rerank: HybridSearchRerankParams = None,
+            output_fields: list = None, ignore_growing: bool = False, guarantee_timestamp: int = None,
+            timeout: Optional[int] = 60, random_data=True, hybrid_search_counts=1, data_size="3k", ni=3000, **kwargs):
         """
         # hybrid_search
         reqs: list
@@ -493,12 +511,17 @@ class ConcurrentParams(CommonParams):
         data_organization: Optional[str] = None
         # dynamic fields for inserting
         dynamic_fields: Optional[list] = field(default_factory=lambda: [])
+
+        # check request result
+        check_tasks: Optional[dict] = field(default_factory=lambda: {})
         """
+        extra_list = [pn.data_organization, pn.dynamic_fields, pn.check_tasks]
         return {"type": "scene_test_partition_hybrid_search", "weight": weight,
                 "params": {"nq": nq, "top_k": top_k, "reqs": [i.obj_params for i in reqs], "rerank": rerank.obj_params,
                            "output_fields": output_fields, "ignore_growing": ignore_growing,
                            "guarantee_timestamp": guarantee_timestamp, "timeout": timeout, "random_data": random_data,
-                           "hybrid_search_counts": hybrid_search_counts, "data_size": data_size, "ni": ni}}
+                           "hybrid_search_counts": hybrid_search_counts, "data_size": data_size, "ni": ni,
+                           **get_passed_params(extra_list=extra_list, **kwargs)}}
 
     @staticmethod
     def params_iterate_search(weight=1, nq=1, top_k=1, search_param={"ef": 64}, guarantee_timestamp: int = None,
@@ -590,9 +613,9 @@ class ConcurrentParams(CommonParams):
                                  index_type=pn.IndexTypeName.IVF_SQ8, index_param={'nlist': 2048},
                                  metric_type=pn.MetricsTypeName.L2, other_fields=[],
                                  replica_number=1,
-                                 nq=1, top_k=10, search_param={'nprobe': 16}, search_counts=1,
+                                 nq=1, top_k=10, search_param={'nprobe': 16}, expr: str = "", search_counts=1,
                                  scalars_params={}, scalars_index={}, vectors_index={},
-                                 prepare_before_insert=False, new_connect=False, new_user=False):
+                                 prepare_before_insert=False, new_connect=False, new_user=False, **kwargs):
         """
         dataset: Optional[str] = DefaultValue.default_dataset
         column_name: Optional[str] = DefaultValue.default_dataset_column_name
@@ -623,6 +646,7 @@ class ConcurrentParams(CommonParams):
         nq: Optional[int] = 1
         top_k: Optional[int] = 10
         search_param: Optional[dict] = field(default_factory=lambda: {'nprobe': 16})
+        expr: Optional[str] = ""
 
         # other
         prepare_before_insert: Optional[bool] = False
@@ -632,14 +656,17 @@ class ConcurrentParams(CommonParams):
         # use user
         new_user: Optional[bool] = False
         """
+        extra_list = [pn.column_name, pn.vector_field_name, pn.sparse_range, pn.enable_dynamic_field,
+                      pn.data_organization, pn.dynamic_fields]
         return {"type": "scene_search_test", "weight": weight,
                 "params": {"dataset": dataset, "dim": dim, "shards_num": shards_num, "data_size": data_size, "nb": nb,
                            "index_type": index_type, "index_param": index_param, "metric_type": metric_type,
-                           "other_fields": other_fields, "replica_number": replica_number,
+                           "other_fields": other_fields, "replica_number": replica_number, "expr": expr,
                            "nq": nq, "top_k": top_k, "search_param": search_param, "search_counts": search_counts,
                            "scalars_params": scalars_params, "scalars_index": scalars_index,
                            "vectors_index": vectors_index, "prepare_before_insert": prepare_before_insert,
-                           "new_connect": new_connect, "new_user": new_user}}
+                           "new_connect": new_connect, "new_user": new_user,
+                           **get_passed_params(extra_list=extra_list, **kwargs)}}
 
     @staticmethod
     def params_scene_hybrid_search_test(weight=1, nq=1, top_k=1,
@@ -654,7 +681,7 @@ class ConcurrentParams(CommonParams):
                                         metric_type=pn.MetricsTypeName.L2, other_fields=[],
                                         replica_number=1, hybrid_search_counts=1,
                                         scalars_params={}, scalars_index={}, vectors_index={},
-                                        prepare_before_insert=False, new_connect=False, new_user=False):
+                                        prepare_before_insert=False, new_connect=False, new_user=False, **kwargs):
         """
         # hybrid_search
         nq: int
@@ -708,6 +735,9 @@ class ConcurrentParams(CommonParams):
         alter_index: Union[dict, list, None] = None
         custom_insert_api: Optional[str] = insert
         """
+        extra_list = [pn.column_name, pn.vector_field_name, pn.sparse_range, pn.enable_dynamic_field,
+                      pn.data_organization, pn.dynamic_fields, pn.set_properties, pn.alter_index, pn.custom_insert_api]
+
         return {"type": "scene_hybrid_search_test", "weight": weight,
                 "params": {"nq": nq, "top_k": top_k, "reqs": [i.obj_params for i in reqs], "rerank": rerank.obj_params,
                            "output_fields": output_fields, "ignore_growing": ignore_growing,
@@ -719,13 +749,14 @@ class ConcurrentParams(CommonParams):
                            "scalars_params": scalars_params, "scalars_index": scalars_index,
                            "vectors_index": vectors_index, "prepare_before_insert": prepare_before_insert,
                            "hybrid_search_counts": hybrid_search_counts, "new_connect": new_connect,
-                           "new_user": new_user}}
+                           "new_user": new_user, **get_passed_params(extra_list=extra_list, **kwargs)}}
 
     def params_scene_concurrent(self, concurrent_tasks: list, dataset_name=pn.DatasetsName.SIFT, dim=128,
                                 dataset_size="1m", ni_per=50000, vector_field_name=None, sparse_range=None,
                                 max_length=None, varchar_filled=None,
                                 vectors_index=None, scalars_index=None, scalars_params=None, extra_partitions=None,
                                 other_fields=[], shards_num=2, varchar_id=None, auto_id=None, num_partitions=None,
+                                enable_dynamic_field=None, dynamic_fields=None, data_organization=None,
                                 replica_number=None, resource_groups=None,
                                 reset_rg=False, groups=None, reset_rbac=False, reset_db=False,
                                 set_properties=None, alter_index=None,
@@ -741,6 +772,8 @@ class ConcurrentParams(CommonParams):
             extra_partitions=extra_partitions,
             other_fields=other_fields, shards_num=shards_num, varchar_id=varchar_id, auto_id=auto_id,
             num_partitions=num_partitions,
+            enable_dynamic_field=enable_dynamic_field, dynamic_fields=dynamic_fields,
+            data_organization=data_organization,
             metric_type=metric_type, index_type=index_type, index_param=index_param, reset_rg=reset_rg,
             groups=groups, replica_number=replica_number, resource_groups=resource_groups,
             reset_rbac=reset_rbac, reset_db=reset_db, set_properties=set_properties, alter_index=alter_index)

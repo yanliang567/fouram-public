@@ -218,6 +218,7 @@ class ResponseChecker:
                                 id: [0, 1, 5]
                                 array_int64_1: [[1,1], [2,2]]
                                 varchar_1: ['10', '11']
+                        check_empty: bool, default value = True
         """
         self.assert_success(actual_res_check, True)
         check_items = check_items if isinstance(check_items, dict) else {}
@@ -248,15 +249,16 @@ class ResponseChecker:
             assert len(_fields) == 1, f"_fields: {_fields}"
 
             # check value not empty
-            res_empty = []
-            for res in actual_res:
-                for k, v in res.items():
-                    if hasattr(v, "size"):
-                        if v.size == 0:
+            if check_items.get("check_empty", True):
+                res_empty = []
+                for res in actual_res:
+                    for k, v in res.items():
+                        if hasattr(v, "size"):
+                            if v.size == 0:
+                                res_empty.append({k: v})
+                        elif v in [[], None]:
                             res_empty.append({k: v})
-                    elif v in [[], None]:
-                        res_empty.append({k: v})
-            assert res_empty == [], f"actual_res: {actual_res}"
+                assert res_empty == [], f"actual_res: {actual_res}"
 
             expect_output_fields = self._parser_output_fields(check_items=check_items, **self.kwargs)
             if isinstance(expect_output_fields, list):

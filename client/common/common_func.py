@@ -13,7 +13,7 @@ import subprocess
 from typing import Optional, List, Union, Iterable, Iterator, Dict
 from sklearn import preprocessing
 import pyarrow.parquet as pq
-from itertools import product, zip_longest
+from itertools import product, zip_longest, cycle
 from scipy.sparse import csr_matrix, isspmatrix
 
 from client.client_base import ApiCollectionSchemaWrapper, ApiFieldSchemaWrapper, AnnSearchRequest, DataType
@@ -993,6 +993,10 @@ def get_required_params(source, target):
     return result
 
 
+def get_passed_params(extra_list: List[str], **kwargs) -> dict:
+    return {n: kwargs.get(n) for n in extra_list if n in kwargs}
+
+
 def set_dict_value(source: dict, value, target: dict):
     for k, v in source.items():
         target[k] = {}
@@ -1005,6 +1009,17 @@ def set_dict_value(source: dict, value, target: dict):
 
 def rounding_number(num: Union[float, int]) -> int:
     return int(num) if num - int(num) < 0.5 else int(num) + 1
+
+
+def iter_insert_value_after_ratio_elements(data: list, ratio: int = 0, insert_value: any = None):
+    if ratio == 0:
+        while True:
+            yield data
+
+    else:
+        c = cycle(data)
+        while True:
+            yield [next(c) for _ in range(ratio)] + [insert_value]
 
 
 def check_max_value(default: int, diff_value: int) -> int:
@@ -1206,6 +1221,15 @@ def check_object(_object, default_value: list = [None]):
     if _object not in default_value:
         return True
     raise Exception(f"[check_object] Object: {_object} check failed in default_value: {default_value}")
+
+
+def convert_scalar_index_params_to_list(param) -> List[dict]:
+    if isinstance(param, dict):
+        return [param]
+    elif isinstance(param, list):
+        return param
+    raise ValueError(
+        "[convert_scalar_index_params_to_list] Scalar index parameter types can only support: dict & List[dict]")
 
 
 def get_default_search_params(index_type: str):

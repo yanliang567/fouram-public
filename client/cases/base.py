@@ -28,7 +28,7 @@ from client.common.common_func import (
     go_bench, go_bench_refine,
     remove_list_values, parser_segment_info, update_dict_value, hide_dict_value,
     get_default_search_params, parser_search_params_expr, get_ann_search_request_params, check_vector_index_params,
-    parser_set_properties_params, parser_alter_index_params, check_vector_length
+    parser_set_properties_params, parser_alter_index_params, check_vector_length, convert_scalar_index_params_to_list
 )
 from client.common.common_param import TransferNodesParams, TransferReplicasParams
 from client.common.common_type import Precision, CheckTasks, DefaultValue as dv
@@ -988,8 +988,9 @@ class Base:
 
         # build scalar index
         for scalar, scalar_index_params in params.scalars_index.items():
-            self.build_scalar_index(field_name=scalar, index_params=scalar_index_params, collection_obj=collection_obj,
-                                    log_level=log_level)
+            for s in convert_scalar_index_params_to_list(scalar_index_params):
+                self.build_scalar_index(field_name=scalar, index_params=s, collection_obj=collection_obj,
+                                        log_level=log_level)
 
         time.sleep(59)
         # drop collection
@@ -1040,7 +1041,7 @@ class Base:
                     scalars_params=params.scalars_params, **params.insert_obj_params)
 
         if params.with_flush:
-            self.flush_partition(partition_obj, log_level)
+            self.flush_partition(partition_obj, log_level, **params.flush_obj_params)
 
         # release before dropping
         self.release_partition(partition_obj, log_level=log_level, timeout=params.timeout,
@@ -1067,7 +1068,7 @@ class Base:
                     scalars_params=params.scalars_params, **params.insert_obj_params)
 
         # flush partition
-        self.flush_partition(partition_obj, log_level=log_level)
+        self.flush_partition(partition_obj, log_level=log_level, **params.flush_obj_params)
 
         # count vectors
         self.count_partition_entities(partition_obj, log_level=log_level)
@@ -1122,7 +1123,7 @@ class Base:
                     scalars_params=params.scalar_params, **params.insert_obj_params)
 
         # flush partition
-        self.flush_partition(partition_obj, log_level=log_level, **params.obj_params)
+        self.flush_partition(partition_obj, log_level=log_level, **params.flush_obj_params)
 
         # count vectors
         self.count_partition_entities(partition_obj, log_level=log_level)
@@ -1288,8 +1289,9 @@ class Base:
 
             # build scalar index
             for scalar, scalar_index_params in params.scalars_index.items():
-                self.build_scalar_index(field_name=scalar, index_params=scalar_index_params,
-                                        collection_obj=collection_obj, log_level=log_level)
+                for s in convert_scalar_index_params_to_list(scalar_index_params):
+                    self.build_scalar_index(field_name=scalar, index_params=s, collection_obj=collection_obj,
+                                            log_level=log_level)
 
             self.set_alter_index(params=params.alter_index, collection_obj=collection_obj, log_level=log_level)
 
@@ -1323,8 +1325,9 @@ class Base:
 
         # build scalar index
         for scalar, scalar_index_params in params.scalars_index.items():
-            self.build_scalar_index(field_name=scalar, index_params=scalar_index_params, collection_obj=collection_obj,
-                                    log_level=log_level)
+            for s in convert_scalar_index_params_to_list(scalar_index_params):
+                self.build_scalar_index(field_name=scalar, index_params=s, collection_obj=collection_obj,
+                                        log_level=log_level)
 
         self.set_alter_index(params=params.alter_index, collection_obj=collection_obj, log_level=log_level)
 
@@ -1340,7 +1343,7 @@ class Base:
                             sparse_range=params.sparse_range),
                 anns_field=params.vector_field_name,
                 param={"metric_type": params.metric_type, "params": params.search_param},
-                limit=params.top_k, check_task=CheckTasks.checkResponse)
+                limit=params.top_k, expr=params.expr, check_task=CheckTasks.checkResponse)
             search_results.append(res.check_result)
 
         # drop collection
@@ -1400,8 +1403,9 @@ class Base:
 
             # build scalar index
             for scalar, scalar_index_params in params.scalars_index.items():
-                self.build_scalar_index(field_name=scalar, index_params=scalar_index_params,
-                                        collection_obj=collection_obj, log_level=log_level)
+                for s in convert_scalar_index_params_to_list(scalar_index_params):
+                    self.build_scalar_index(field_name=scalar, index_params=s, collection_obj=collection_obj,
+                                            log_level=log_level)
 
             self.set_alter_index(params=params.alter_index, collection_obj=collection_obj, log_level=log_level)
 
@@ -1435,8 +1439,9 @@ class Base:
 
         # build scalar index
         for scalar, scalar_index_params in params.scalars_index.items():
-            self.build_scalar_index(field_name=scalar, index_params=scalar_index_params, collection_obj=collection_obj,
-                                    log_level=log_level)
+            for s in convert_scalar_index_params_to_list(scalar_index_params):
+                self.build_scalar_index(field_name=scalar, index_params=s, collection_obj=collection_obj,
+                                        log_level=log_level)
 
         self.set_alter_index(params=params.alter_index, collection_obj=collection_obj, log_level=log_level)
 

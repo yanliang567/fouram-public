@@ -191,6 +191,13 @@ def dict_merge(dicts: List[dict]) -> dict:
     return _result
 
 
+def gen_recursive_json_key_name(name: str, depth: int) -> str:
+    json_name = ""
+    for i in range(depth):
+        json_name = f'["{name}_{i}"]' + json_name
+    return json_name
+
+
 def execute_funcs(funcs: List[tuple]):
     for func in funcs:
         if len(func) == 1:

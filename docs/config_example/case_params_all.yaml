@@ -79,6 +79,16 @@ dataset_params:
     varchar_1:
       index_type: INVERTED
     varchar_2: { }  # for default index, don't pass in params
+    # creating multi-index on the same scalar field
+    json_1:
+    - index_type: INVERTED
+      params:
+        json_cast_type: DOUBLE
+        json_path: json["key_0"]
+    - index_type: INVERTED
+      params:
+        json_cast_type: VARCHAR
+        json_path: json["key_1"]
 
   # parameters required to create scalars: {<field_name>: {<params>: {}, <other_params>: {} }}
   scalars_params:
@@ -776,10 +786,21 @@ concurrent_tasks:
       # dynamic fields for inserting, same as `collection_params.dynamic_fields`
       dynamic_fields: Optional[list] = []
 
+      # check request result
+      # e.g.: {<flush>: {"check_task": <request check task>, "check_items": <items for task>} ... }
+      # only supports `flush`
+#      check_tasks:
+#        flush:
+#          check_task: check_ignore_expected_errors
+#          check_items:
+#          - message: request is rejected by grpc RateLimiter middleware
+#          - message: wait for flush timeout
+      check_tasks: Optional[dict] = {}
+
   - type: scene_test_partition
     weight: 1
     params:
-      # collection and insert
+      # partition: create->insert->flush->index->load->search->release->search failed->drop
       data_size: Optional[int] = 3000
       ni: Optional[int] = 3000
       # same as `common_params.data_organization`
@@ -799,10 +820,21 @@ concurrent_tasks:
       # other
       search_counts: Optional[int] = 1  # Number of serial search
 
+      # check request result
+      # e.g.: {<flush>: {"check_task": <request check task>, "check_items": <items for task>} ... }
+      # only supports `flush`
+#      check_tasks:
+#        flush:
+#          check_task: check_ignore_expected_errors
+#          check_items:
+#          - message: request is rejected by grpc RateLimiter middleware
+#          - message: wait for flush timeout
+      check_tasks: Optional[dict] = {}
+
   - type: scene_test_partition_hybrid_search
     weight: 1
     params:
-      # hybrid_search
+      # partition: create->insert->flush->index->load->hybrid_search->release->hybrid_search failed->drop
       # same as the params of `- type: hybrid_search`
       reqs: list
       rerank:
@@ -824,6 +856,14 @@ concurrent_tasks:
       data_organization: Optional[str] = None
       # dynamic fields for inserting, same as `collection_params.dynamic_fields`
       dynamic_fields: Optional[list] = []
+
+      # check request result
+      # e.g.: {<flush>: {"check_task": <request check task>, "check_items": <items for task>} ... }
+      # only supports `flush`
+#      check_tasks:
+#        flush:
+#          check_task: check_ignore_rate_limit
+      check_tasks: Optional[dict] = {}
 
   - type: iterate_search
     weight: 1
@@ -921,6 +961,7 @@ concurrent_tasks:
       nq: Optional[int] = 1
       top_k: Optional[int] = 10
       search_param: { 'nprobe': 16 } # Optional[dict]
+      expr: Optional[str] = ""
 
       # other
       prepare_before_insert: Optional[bool] = False
