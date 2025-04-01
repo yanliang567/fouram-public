@@ -71,7 +71,7 @@ class DataCheck:
 
     def parser_content(self, str_content: str):
         if self.old_version_format:
-            dt = str_content.split(']')[0].split('[')[-1]
+            dt = str(str_content.split(']')[0].split('[')[-1]).strip()
             k = str_content.split('-')[-1].split()
             if len(k) == 13:
                 _params = [k[0], k[1], int(k[2]), int(str(k[3]).split('(')[0]), float(k[5]), float(k[6]), float(k[7]),
