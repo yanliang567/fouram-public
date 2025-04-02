@@ -44,14 +44,23 @@ class FunctionalParams(CommonParams):
 
     @staticmethod
     def params_scene_functional_rebuild_partial_index(
+            skip_drop_index: bool = False,
             vectors_index: Dict[str, FuncParamsVectorsIndex] = {},
-            scalars_index: Dict[str, FuncParamsScalarsIndex] = {}):
+            scalars_index: Dict[str, FuncParamsScalarsIndex] = {},
+            multi_scalars_index: Dict[str, List[FuncParamsScalarsIndex]] = {}
+    ):
         """
+        skip_drop_index: bool = False
         vectors_index: Optional[Dict[str, FuncParamsVectorsIndex]] = {}
         scalars_index: Optional[Dict[str, FuncParamsScalarsIndex]] = {}
+        multi_scalars_index: Optional[Dict[str, List[FuncParamsScalarsIndex]]] = {}
         """
-        return {"vectors_index": {k: v.to_dict for k, v in vectors_index.items()},
-                "scalars_index": {k: v.to_dict for k, v in scalars_index.items()}}
+        return {
+            "skip_drop_index": skip_drop_index,
+            "vectors_index": {k: v.to_dict for k, v in vectors_index.items()},
+            "scalars_index": {k: v.to_dict for k, v in scalars_index.items()},
+            "multi_scalars_index": {k: [o.to_dict for o in v] for k, v in multi_scalars_index.items()}
+        }
 
     def params_scene_functional(self, functional_params: dict, dataset_name=pn.DatasetsName.SIFT, dim=128,
                                 dataset_size="1m", ni_per=50000,

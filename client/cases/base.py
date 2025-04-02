@@ -522,7 +522,7 @@ class Base:
         for _index_obj in self.collection_wrap.indexes:
             if _index_obj.field_name == field_name:
                 self.collection_wrap.drop_index(index_name=_index_obj.index_name)
-                log.info(f"[Base] Drop index of field:`{field_name}` done.")
+                log.info(f"[Base] Drop index of field:`{field_name}`, index name:{_index_obj.index_name} done.")
 
         if field_name in [i.field_name for i in self.collection_wrap.indexes]:
             log.error(f"[Base] Index of collection:{self.collection_wrap.name} field:`{field_name}` can't be dropped.")

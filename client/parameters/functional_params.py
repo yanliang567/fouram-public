@@ -127,8 +127,10 @@ class ParamsQueryAllDeleted(ParamsBase):
 
 @dataclass
 class ParamsRebuildPartialIndex(ParamsBase):
+    skip_drop_index: bool = False
     vectors_index: Optional[Dict[str, FuncParamsVectorsIndex]] = field(default_factory=lambda: {})
     scalars_index: Optional[Dict[str, FuncParamsScalarsIndex]] = field(default_factory=lambda: {})
+    multi_scalars_index: Optional[Dict[str, List[FuncParamsScalarsIndex]]] = field(default_factory=lambda: {})
 
 
 class GetParamObj:

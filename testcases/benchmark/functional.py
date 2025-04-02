@@ -103,9 +103,17 @@ class TestFunctionalCases(PerfTemplate):
                     "int64_1": FuncParamsScalarsIndex(index_type="INVERTED"),
                     "int64_2": FuncParamsScalarsIndex(),
                     "int64_3": FuncParamsScalarsIndex(),
-                    "varchar_1": FuncParamsScalarsIndex(index_type="INVERTED", index_param={})}
+                    "varchar_1": FuncParamsScalarsIndex(index_type="INVERTED", index_param={})},
+                multi_scalars_index={
+                    "json_1": [
+                        FuncParamsScalarsIndex(index_type="INVERTED",
+                                               index_param={"json_cast_type": "DOUBLE", "json_path": 'json_1["int8"]'}),
+                        FuncParamsScalarsIndex(index_type="INVERTED",
+                                               index_param={"json_cast_type": "BOOL", "json_path": 'json_1["bool"]'})
+                    ]
+                }
             ),
-            other_fields=cdp.other_fields + ["int64_3", "float_vector_1"], scalars_index=cdp.other_fields,
+            other_fields=cdp.other_fields + ["int64_3", "float_vector_1", "json_1"], scalars_index=cdp.other_fields,
             vectors_index=cdp.DefaultVectorIndexParams.DISKANN_IP("float_vector_1"), **cdp.DefaultIndexParams.HNSW)
 
         self.functional_template(

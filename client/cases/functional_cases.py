@@ -1,6 +1,6 @@
 import copy
 import dacite
-from typing import Dict
+from typing import Dict, List
 
 from pymilvus.orm.types import CONSISTENCY_STRONG
 
@@ -175,7 +175,8 @@ class FunctionalCases(CommonCases):
         return res
 
     def build_indexes(self, vectors_index: Dict[str, FuncParamsVectorsIndex] = {},
-                      scalars_index: Dict[str, FuncParamsScalarsIndex] = {}, report_data: bool = True):
+                      scalars_index: Dict[str, FuncParamsScalarsIndex] = {},
+                      multi_scalars_index: Dict[str, List[FuncParamsScalarsIndex]] = {}, report_data: bool = True):
         # build vector index
         for k, v in vectors_index.items():
             result = self.build_index(k, **v.to_dict)
@@ -193,6 +194,17 @@ class FunctionalCases(CommonCases):
             if report_data:
                 self.set_report_data({"index": {k: {"RT": rt}}})
             log.info("[FunctionalCases] RT of build scalar field index `{0}`: {1}s".format(k, rt))
+
+        # build scalar multi-index
+        for k, p in multi_scalars_index.items():
+            for n, v in enumerate(p):
+                result = self.build_scalar_index(field_name=k, index_params=v.obj_params)
+                rt = round(result.rt, Precision.INDEX_PRECISION)
+                # set report data
+                if report_data:
+                    rt_name = "RT" if n == 0 else f"RT_{n}"
+                    self.set_report_data({"index": {k: {rt_name: rt}}})
+                log.info("[FunctionalCases] RT of build scalar field index `{0}`: {1}s".format(k, rt))
 
     """ Test steps """
 
@@ -359,18 +371,26 @@ class FunctionalCases(CommonCases):
     def scene_functional_rebuild_partial_index(self, **kwargs):
         """
         steps:
-            1. release collection
-            2. drop indexes
-            3. rebuild indexes
+            1. release collection and drop indexes, or skip release and drop indexes
+            2. rebuild indexes
 
         input params:
+            skip_drop_index: bool = False
             vectors_index:
-                metric_type: str
-                index_type: str
-                index_param: dict
+                <vector field name>:
+                    metric_type: str
+                    index_type: str
+                    index_param: dict
             scalars_index:
-                index_type: Optional[str] = ""
-                index_param: Optional[dict] = {}
+                <scalar field name>:
+                    index_type: Optional[str] = ""
+                    index_param: Optional[dict] = {}
+            multi_scalars_index:
+                <scalar field name>:
+                -   index_type: Optional[str] = ""
+                    index_param: Optional[dict] = {}
+                -   index_type: Optional[str] = ""
+                    index_param: Optional[dict] = {}
 
         notice:
             Collection would not re-load after rebuilding indexes
@@ -380,8 +400,8 @@ class FunctionalCases(CommonCases):
                                                 all_params=kwargs)
 
         # exec steps
-        scalars_index, vectors_index = params.scalars_index, params.vectors_index
-        scalars_field, vectors_field = list(scalars_index.keys()), list(vectors_index.keys())
+        scalars_field = list(params.scalars_index.keys()) + list(params.multi_scalars_index.keys())
+        vectors_field = list(params.vectors_index.keys())
 
         # check rebuild fields
         if len(scalars_field) + len(vectors_field) == 0:
@@ -391,20 +411,22 @@ class FunctionalCases(CommonCases):
         other_fields = self.get_collection_fields()
         for _field in scalars_field + vectors_field:
             if _field not in other_fields:
-                raise ValueError(f"[FunctionalCases] The field `{_field}` isn't in collection {other_fields}.")
+                log.debug(f"[FunctionalCases] The field `{_field}` isn't in collection {other_fields}.")
 
         self.show_index()
 
-        # release collection
-        self.release_collection()
+        if not params.skip_drop_index:
+            # release collection
+            self.release_collection()
 
-        # drop indexes
-        for field_name in scalars_field + vectors_field:
-            self.drop_specified_field_index(field_name=field_name)
+            # drop indexes
+            for field_name in scalars_field + vectors_field:
+                self.drop_specified_field_index(field_name=field_name)
 
         # rebuild indexes
         log.info(f"[FunctionalCases] Start rebuilding indexes, scalars: {scalars_field}, vectors: {vectors_field}")
-        self.build_indexes(vectors_index=vectors_index, scalars_index=scalars_index)
+        self.build_indexes(vectors_index=params.vectors_index, scalars_index=params.scalars_index,
+                           multi_scalars_index=params.multi_scalars_index)
 
         self.show_index()
 
