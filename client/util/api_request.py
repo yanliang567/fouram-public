@@ -34,7 +34,8 @@ def time_catch():
     def wrapper(func):
         # @functools.wraps(func)
         def inner_wrapper(*args, **kwargs) -> Tuple[tuple, bool]:
-            request_id = uuid.uuid1().hex # use hex of uuid to remove "-"
+            # use hex of uuid to remove "-"
+            request_id = uuid.uuid1().hex
             func_name = args[0][0].__qualname__
             start = time.perf_counter()
             try:
@@ -83,9 +84,8 @@ def api_request(_list, request_id: str = None, **kwargs):
                 # set client_request_id if not exists in input kwargs
                 # this attribute shall be used as client tracing id 
                 kwargs.setdefault("client_request_id", request_id)
-                return func(*arg, **kwargs)
-            else:
-                return func(*arg)
+            
+            return func(*arg, **kwargs)
     return (False, 0), False
 
 def accept_kwargs(func) -> bool:
