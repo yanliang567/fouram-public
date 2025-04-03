@@ -1,3 +1,4 @@
+import inspect
 import traceback
 import time
 from typing import Tuple
@@ -33,7 +34,7 @@ def time_catch():
     def wrapper(func):
         # @functools.wraps(func)
         def inner_wrapper(*args, **kwargs) -> Tuple[tuple, bool]:
-            request_id = str(uuid.uuid1())
+            request_id = uuid.uuid1().hex # use hex of uuid to remove "-"
             func_name = args[0][0].__qualname__
             start = time.perf_counter()
             try:
@@ -78,9 +79,24 @@ def api_request(_list, request_id: str = None, **kwargs):
                 func_name, truncated_output(arg, info_logout.log_row_length, func_name=func_name), str(kwargs),
                 request_id))
 
-            return func(*arg, **kwargs)
+            if accept_kwargs(func):
+                # set client_request_id if not exists in input kwargs
+                # this attribute shall be used as client tracing id 
+                kwargs.setdefault("client_request_id", request_id)
+                func(*arg, **kwargs)
+            else:
+                func(*arg)
     return (False, 0), False
 
+def accept_kwargs(func) -> bool:
+    """
+    This is utility function to check whether the input func accepts **kwargs or not
+    """
+    sig = inspect.signature(func)
+    for param in sig.parameters.values():
+        if param.kind == param.VAR_KEYWORD:
+            return True
+    return False
 
 def time_wrapper(func):
     """
