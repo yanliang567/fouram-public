@@ -35,7 +35,7 @@ def time_catch():
         # @functools.wraps(func)
         def inner_wrapper(*args, **kwargs) -> Tuple[tuple, bool]:
             # use hex of uuid to remove "-"
-            request_id = uuid.uuid1().hex
+            request_id = uuid.uuid4().hex
             func_name = args[0][0].__qualname__
             start = time.perf_counter()
             try:
