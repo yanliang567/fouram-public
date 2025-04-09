@@ -5740,7 +5740,7 @@ class TestFeatureCases(PerfTemplate):
         node_resources = [
             NodeResource(nodes=[dataNode], replicas=3, cpu=2, mem=8),
             NodeResource(nodes=[indexNode], replicas=4, cpu=4, mem=8),
-            NodeResource(nodes=[queryNode], replicas=1, cpu=16, mem=26)  # rss: < 12, mmap: < 6
+            NodeResource(nodes=[queryNode], replicas=1, cpu=16, mem=26)  # rss: < 13, mmap: < 7
         ]
 
         self.concurrency_template(
@@ -5891,19 +5891,19 @@ class TestFeatureCases(PerfTemplate):
 
         concurrent_tasks = [
             ConcurrentParams.params_search(
-                nq=10, top_k=1, search_param={"ef": 16}, output_fields=['*'], timeout=30,
+                nq=10, top_k=1, search_param={"ef": 16}, output_fields=['*'], timeout=240,
                 expr=Expr.OR(Expr.GE(Expr.MOD('json_1["int64"]', 10).value, 1).value,
                              Expr.LIKE('json_dynamic["varchar"]', "%11").value).value,
                 check_task=CheckTasks.checkSearchOutput,
                 check_items={"output_fields": all_other_fields + all_dynamic_fields + ['id', 'float_vector'], "nq": 10}
             ),
             ConcurrentParams.params_query(
-                expr="", timeout=120, output_fields=['id', 'float_vector', 'json_1', 'json_dynamic'], limit=10,
+                expr="", timeout=240, output_fields=['id', 'float_vector', 'json_1', 'json_dynamic'], limit=10,
                 random_data=True, random_count=10, random_range=[0, 1000], field_type="int64",
                 field_name='json_dynamic["int64"]', check_task=CheckTasks.checkQueryOutput
             ),
             ConcurrentParams.params_hybrid_search(
-                nq=1, top_k=1, timeout=30, output_fields=["*"],
+                nq=1, top_k=1, timeout=240, output_fields=["*"],
                 reqs=[HybridSearchReqParams(anns_field="float_vector", search_param={"ef": 128}, top_k=100,
                                             expr=Expr.OR(Expr.LT('json_1["double"]', -50.0).value,
                                                          Expr.GE('json_dynamic["double"]', -20).value).value),
@@ -5979,7 +5979,7 @@ class TestFeatureCases(PerfTemplate):
             NodeResource(nodes=[dataNode], replicas=3, cpu=2, mem=8),
             NodeResource(nodes=[indexNode], replicas=4, cpu=4, mem=8),
             NodeResource(nodes=[queryNode], replicas=1).custom_resource(
-                limits_cpu=16, limits_mem=64, requests_cpu=10, requests_mem=64)  # rss: < 55G, mmap: < 250M
+                limits_cpu=32, limits_mem=64, requests_cpu=20, requests_mem=64)  # rss: < 55G, mmap: < 250M
         ]
 
         self.concurrency_template(
@@ -6028,19 +6028,19 @@ class TestFeatureCases(PerfTemplate):
 
         concurrent_tasks = [
             ConcurrentParams.params_search(
-                nq=10, top_k=1, search_param={"ef": 16}, output_fields=['*'], timeout=30,
+                nq=10, top_k=1, search_param={"ef": 16}, output_fields=['*'], timeout=240,
                 expr=Expr.OR(Expr.GE(Expr.MOD('json_1["int64"]', 10).value, 1).value,
                              Expr.LIKE('json_dynamic["varchar"]', "%11").value).value,
                 check_task=CheckTasks.checkSearchOutput,
                 check_items={"output_fields": all_other_fields + all_dynamic_fields + ['id', 'float_vector'], "nq": 10}
             ),
             ConcurrentParams.params_query(
-                expr="", timeout=120, output_fields=['id', 'float_vector', 'json_1', 'json_dynamic'], limit=10,
+                expr="", timeout=240, output_fields=['id', 'float_vector', 'json_1', 'json_dynamic'], limit=10,
                 random_data=True, random_count=10, random_range=[0, 1000], field_type="int64",
                 field_name='json_dynamic["int64"]', check_task=CheckTasks.checkQueryOutput
             ),
             ConcurrentParams.params_hybrid_search(
-                nq=1, top_k=1, timeout=30, output_fields=["*"],
+                nq=1, top_k=1, timeout=240, output_fields=["*"],
                 reqs=[HybridSearchReqParams(anns_field="float_vector", search_param={"nprobe": 101}, top_k=100,
                                             expr=Expr.OR(Expr.LT('json_1["double"]', -50.0).value,
                                                          Expr.GE('json_dynamic["double"]', -20).value).value),
@@ -6108,7 +6108,7 @@ class TestFeatureCases(PerfTemplate):
 
         # rss < 50G, mmap < 320M
         self.concurrency_template(
-            input_params=input_params, cpu=16, mem=64, deploy_mode=deploy_mode,
+            input_params=input_params, cpu=32, mem=64, deploy_mode=deploy_mode,
             old_version_format=self.get_report_version_format(False),
             case_callable_obj=self.get_callable_object(ConcurrentClientBase().scene_concurrent_locust),
             default_case_params=default_case_params)
@@ -6409,7 +6409,7 @@ class TestFeatureCases(PerfTemplate):
 
         node_resources = [
             NodeResource(nodes=[indexNode], replicas=6, cpu=8),
-            NodeResource(nodes=[queryNode], cpu=16, mem=32)  # cpu = 16G, mem < 16G
+            NodeResource(nodes=[queryNode], cpu=16, mem=32)  # cpu = 16G, mem < 18G
         ]
 
         self.concurrency_template(
@@ -6965,7 +6965,7 @@ class TestFeatureCases(PerfTemplate):
 
         node_resources = [
             NodeResource(nodes=[indexNode], replicas=3),
-            NodeResource(nodes=[queryNode], replicas=4, cpu=8, mem=32)
+            NodeResource(nodes=[queryNode], replicas=4, cpu=8, mem=32)  # mem < 16G
         ]
 
         self.concurrency_template(

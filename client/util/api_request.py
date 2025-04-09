@@ -1,4 +1,3 @@
-import inspect
 import traceback
 import time
 from typing import Tuple
@@ -7,7 +6,7 @@ import uuid
 from client.common.common_param import InterfaceResponse
 
 from commons.common_type import PRECISION
-from commons.common_func import truncated_output
+from commons.common_func import truncated_output, accept_kwargs
 from utils.util_log import log
 
 
@@ -75,28 +74,19 @@ def api_request(_list, request_id: str = None, **kwargs):
                 for a in _list[1:]:
                     arg.append(a)
 
+            if accept_kwargs(func):
+                # set client_request_id if not exists in input kwargs
+                # this attribute shall be used as client tracing id 
+                kwargs.setdefault("client_request_id", request_id)
+
             func_name = func.__qualname__
             log.debug("(api_request)  : [%s] args: %s, kwargs: %s, [requestId: %s]" % (
                 func_name, truncated_output(arg, info_logout.log_row_length, func_name=func_name), str(kwargs),
                 request_id))
 
-            if accept_kwargs(func):
-                # set client_request_id if not exists in input kwargs
-                # this attribute shall be used as client tracing id 
-                kwargs.setdefault("client_request_id", request_id)
-            
             return func(*arg, **kwargs)
     return (False, 0), False
 
-def accept_kwargs(func) -> bool:
-    """
-    This is utility function to check whether the input func accepts **kwargs or not
-    """
-    sig = inspect.signature(func)
-    for param in sig.parameters.values():
-        if param.kind == param.VAR_KEYWORD:
-            return True
-    return False
 
 def time_wrapper(func):
     """

@@ -5,6 +5,7 @@ import json
 from yaml import full_load
 import copy
 from typing import List
+import inspect
 
 from deploy.commons.common_params import Helm, Operator, OP, VDC, CLUSTER, STANDALONE, ClassID, HelmSetParams, STREAMING
 
@@ -412,3 +413,14 @@ def deal_special_import():
     grpc_gevent.init_gevent()
 
     Database_Client.reconnect_special_server()
+
+
+def accept_kwargs(func) -> bool:
+    """
+    This is utility function to check whether the input func accepts **kwargs or not
+    """
+    sig = inspect.signature(func)
+    for param in sig.parameters.values():
+        if param.kind == param.VAR_KEYWORD:
+            return True
+    return False
