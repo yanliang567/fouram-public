@@ -10,7 +10,8 @@ from deploy.commons.status_code import RMErrorCode, InstanceStatus, InstanceType
 from deploy.commons.common_params import ClassID, RMNodeCategory, Pod
 from deploy.commons.common_func import (
     update_dict_value, add_resource, get_child_class_id, parser_modify_params, check_multi_keys_exist, get_api_version,
-    get_class_key_name, deal_child_instance_class, compare_cpu_value, compare_mem_value)
+    get_class_key_name, deal_child_instance_class, compare_cpu_value, compare_mem_value, check_sub_dict
+)
 from deploy.commons.sql_statement import (
     sql_query_instance_id, sql_query_instance_class, sql_insert_instance_class,
     sql_query_cust_instance_node, sql_delete_cust_instance_node, sql_insert_cust_instance_node,
@@ -41,6 +42,7 @@ class VDCClientBase:
     cloud_service_host = ""
     infra_host = ""
     infra_token = ""
+    cluster_name = ""
     cloud_service_test_host = ""
     mysql_params = {}
 
@@ -126,6 +128,7 @@ class VDCClientBase:
         self.cloud_service_host = vdc_env.cloud_service_host
         self.infra_host = vdc_env.infra_host
         self.infra_token = vdc_env.infra_token
+        self.cluster_name = vdc_env.cluster_name
         self.cloud_service_test_host = vdc_env.cloud_service_test_host
         self.mysql_params = vdc_env.mysql
 
@@ -385,6 +388,34 @@ class VDCClientBase:
         log.info("[VDCClientBase] Update instance's:%s, instance_id:%s  image from %s to %s done" % (
             self.instance_name, self.real_instance_id, _db_version, image_tag))
 
+    def rm_update_labels(self, labels: dict, instance_type: InstanceType = InstanceType.Milvus, timeout: int = 1800):
+        """
+        Update labels for milvus instance
+        """
+        # Record server init status
+        self.display_server(log_level=LogLevel.DEBUG)
+
+        # update instance labels
+        log.debug(f"[VDCClientBase] Start updating labels:{labels} for instance: {self.instance_name}")
+        self.cloud_rm_api.update_labels(instance_id=self.instance_id, labels=labels, user_id=self.real_user_id)
+
+        if instance_type == InstanceType.Milvus:
+            self.rm_restart_server(timeout=timeout)
+        elif instance_type in [InstanceType.FreeTier, InstanceType.ElasticServerless]:
+            self.rm_restart_serverless_server(timeout=timeout)
+        else:
+            self._raise(f"[VDCClientBase] Unrecognized instance type {instance_type}")
+        log.info(f"[VDCClientBase] Update labels for instance's: {self.instance_name} completed.")
+
+        # display server after modification
+        self.display_server(log_level=LogLevel.DEBUG)
+
+        # check values
+        res = self.infra_api.pod_labels(instance_id=self.instance_id, cluster_name=self.cluster_name)
+        # check res.data contains labels
+        if not check_sub_dict(labels, res.data):
+            self._raise(f"[VDCClientBase] Check labels failed!! labels:{labels}, server labels:{res.data}")
+
     def modify_instance(self, class_mode, timeout: int = 1800):
         """ Upgrade server's class mode """
         class_id = eval(f"ClassID.{class_mode}")
@@ -540,10 +571,11 @@ class VDCClientBase:
         assert self.infra_check_server_status(timeout=timeout)
         log.info(f"[VDCClientBase] Update resource done.")
 
-        # serverless does not support rewrite db
-        if instance_type == InstanceType.Milvus:
-            # update msg in db
-            self.rewrite_db_msg()
+        # todo changing the update method
+        # # serverless does not support rewrite db
+        # if instance_type == InstanceType.Milvus:
+        #     # update msg in db
+        #     self.rewrite_db_msg()
 
     def rewrite_db_msg(self):
         # update msg of resource db: instance_class, cust_instance_node, instance_class_oversold, child_class_template

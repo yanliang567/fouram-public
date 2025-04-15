@@ -1,5 +1,6 @@
 import enum
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Optional
 
 # Milvus components
 mixCoord = "mixCoord"
@@ -259,6 +260,60 @@ class ParserExtraConfig:
         self.all_configs = kwargs
 
     @property
-    def processor_architecture(self):
-        res = self.all_configs.get("processorArchitecture", ProcessorArchitecture.X86)
-        return res if res in ProcessorArchitecture.all_values else ProcessorArchitecture.X86
+    def processor_architecture(self) -> int:
+        name = '_processor_architecture'
+        if not hasattr(self, name):
+            res = self.all_configs.get("processorArchitecture", ProcessorArchitecture.X86)
+            setattr(self, name, res if res in ProcessorArchitecture.all_values else ProcessorArchitecture.X86)
+
+        return getattr(self, name)
+
+    @property
+    def labels(self) -> dict:
+        name = '_labels'
+        if not hasattr(self, name):
+            res = self.all_configs.get("labels", {})
+
+            if not isinstance(res, dict):
+                raise ValueError(f"[ParserExtraConfig] Labels can only be passed in as a dict, type:{type(res)}, {res}")
+            if not all(isinstance(i, str) for i in list(res.keys()) + list(res.values())):
+                raise ValueError(f"[ParserExtraConfig] The key and value of labels must both be string types: {res}")
+
+            setattr(self, name, res)
+
+        return getattr(self, name)
+
+
+@dataclass
+class VDCBodyConfig:
+    deploy_mode: Optional[str] = ""
+    image_tag: Optional[str] = ""
+    milvus_tag_prefix: Optional[str] = ""
+    server_resource: Optional[dict] = field(default_factory=lambda: {})
+    milvus_config: Optional[dict] = field(default_factory=lambda: {})
+    extra_config: Optional[dict] = field(default_factory=lambda: {})
+
+    _extra_config_obj: Optional[ParserExtraConfig] = None
+
+    def __post_init__(self):
+        # check params type
+        str_list = [self.deploy_mode, self.image_tag, self.milvus_tag_prefix]
+        if not all([isinstance(i, str) for i in str_list]):
+            raise ValueError(f"[VDCBodyConfig] Check params failed: {str_list}")
+
+        if not isinstance(self.extra_config, dict):
+            self.extra_config = {}
+
+    @property
+    def extra_config_obj(self) -> ParserExtraConfig:
+        if self._extra_config_obj is None:
+            self._extra_config_obj = ParserExtraConfig(**self.extra_config)
+        return self._extra_config_obj
+
+    @property
+    def upgrade_config(self) -> dict:
+        return {n: getattr(self, n) for n in ["server_resource", "milvus_config", "extra_config"]}
+
+    @property
+    def serverless_upgrade_config(self) -> dict:
+        return {n: getattr(self, n) for n in ["server_resource", "milvus_config"]}

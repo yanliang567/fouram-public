@@ -283,3 +283,12 @@ class CloudRMApi:
     def get_host(self, instance_id: str, log_level=Log_Level) -> RequestResponseParser:
         url = self.host + "/resource/v1/serverless/getHost?instanceId={0}".format(instance_id)
         return self.req.get(url=url, headers=self.headers, log_level=log_level)
+
+    """ instance-controller """
+
+    @request_catch()
+    def update_labels(self, instance_id: str, labels: dict, user_id: str = "",
+                      log_level=Log_Level) -> RequestResponseParser:
+        url = self.host + "/resource/v1/instance/milvus/update_labels?InstanceId=" + instance_id
+        body = labels
+        return self.req.post(url=url, body=body, headers=self.update_headers(user_id=user_id), log_level=log_level)

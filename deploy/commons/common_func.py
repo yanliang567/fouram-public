@@ -449,6 +449,25 @@ def check_multi_keys_exist(target: dict, keys: list):
     return t
 
 
+def check_sub_dict(sub_dict: dict, target_dict: dict) -> bool:
+    if not (isinstance(sub_dict, dict) and isinstance(target_dict, dict)):
+        raise ValueError(f"[check_sub_dict] The data type to be verified must be dict: {sub_dict}, {target_dict}")
+
+    for k, v in sub_dict.items():
+        if k not in target_dict:
+            log.debug(f"[check_sub_dict] Key:{k} not in {list(target_dict.keys())}")
+            return False
+
+        if isinstance(v, dict):
+            if not isinstance(target_dict[k], dict) or not check_sub_dict(v, target_dict[k]):
+                return False
+        elif target_dict[k] != v:
+            # Does not handle special values
+            return False
+
+    return True
+
+
 def parser_op_item(item: dict):
     # _tt = utc_conversion(item["metadata"]["creationTimestamp"])
     # return {"NAME": item["metadata"]["name"],

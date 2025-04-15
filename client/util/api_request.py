@@ -76,7 +76,7 @@ def api_request(_list, request_id: str = None, **kwargs):
 
             if accept_kwargs(func):
                 # set client_request_id if not exists in input kwargs
-                # this attribute shall be used as client tracing id 
+                # this attribute shall be used as client tracing id
                 kwargs.setdefault("client_request_id", request_id)
 
             func_name = func.__qualname__
