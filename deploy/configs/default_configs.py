@@ -2,7 +2,7 @@ from typing import Optional, Union, List
 
 from deploy.configs import get_config_obj
 from deploy.commons.common_params import (
-    CLUSTER, STANDALONE, Helm, Operator, VDC, DefaultRepository, pulsar, kafka,
+    CLUSTER, STANDALONE, Helm, Operator, VDC, DefaultRepository, pulsar, kafka, woodpecker,
     ClassID, ClassIDMemCluster, ClassIDMemStandalone, ClassIDDiskCluster, ClassIDDiskStandalone, HelmSetParams)
 from deploy.commons.common_func import (
     server_resource_check, gen_server_config_name, update_dict_value, write_yaml_file, modify_file,
@@ -30,7 +30,7 @@ class NodeResource:
 
 
 class SetDependence:
-    def __init__(self, mq_type: Union[pulsar, kafka] = pulsar, disk_size: Union[int, float] = None):
+    def __init__(self, mq_type: Union[pulsar, kafka, woodpecker] = pulsar, disk_size: Union[int, float] = None):
         self.mq_type = mq_type
         self.disk_size = disk_size
 
@@ -128,7 +128,7 @@ class DefaultConfigs:
         return self.obj.config_merge(totals)
 
     def set_mq(self, set_dependence: SetDependence):
-        return self.obj.set_mq(_pulsar=(set_dependence.mq_type == pulsar), _kafka=(set_dependence.mq_type == kafka))
+        return self.obj.set_mq(mq_type=set_dependence.mq_type)
 
     def setting_configs(self, node_resources: List[NodeResource], set_dependence: SetDependence):
         _nodes = self.set_nodes_resource(node_resources=node_resources) if node_resources else {}

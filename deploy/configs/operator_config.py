@@ -1,12 +1,14 @@
 import copy
+from typing import Union
 
 from deploy.configs.base_config import BaseConfig
 from deploy.commons.common_func import (
     get_latest_tag, get_image_tag, gen_release_name, update_dict_value, check_dict_keys
 )
 from deploy.commons.common_params import (
-    Milvus, etcd, storage, pulsar, kafka, rocksmq, DefaultRepository, dataNode, queryNode, indexNode, all_pods,
-    standalone, ephemeral_storage, STANDALONE, CLUSTER, OpComponents, streamingNode
+    Milvus, DefaultRepository, dataNode, queryNode, indexNode, all_pods, standalone,
+    etcd, storage, pulsar, kafka, woodpecker, rocksmq,
+    ephemeral_storage, STANDALONE, CLUSTER, OpComponents, streamingNode
 )
 
 from utils.util_log import log
@@ -124,24 +126,13 @@ class OperatorConfig(BaseConfig):
             return update_dict_value({"spec": {"mode": "cluster"}}, base_config)
         return base_config
 
-    def delete_pvc_instance(self, pvc_deletion=True, deletion_policy="Delete"):
-        if self.cluster:
-            return {"spec": {"dependencies": {
-                etcd: {"inCluster": {"deletionPolicy": deletion_policy,
-                                     "pvcDeletion": pvc_deletion}},
-                pulsar: {"inCluster": {"deletionPolicy": deletion_policy,
-                                       "pvcDeletion": pvc_deletion}},
-                kafka: {"inCluster": {"deletionPolicy": deletion_policy,
-                                      "pvcDeletion": pvc_deletion}},
-                storage: {"inCluster": {"deletionPolicy": deletion_policy,
-                                        "pvcDeletion": pvc_deletion}}}}}
-        else:
-            return {"spec": {"dependencies": {
-                etcd: {"inCluster": {"deletionPolicy": deletion_policy,
-                                     "pvcDeletion": pvc_deletion}},
-                rocksmq: {"persistence": {"pvcDeletion": pvc_deletion}},
-                storage: {"inCluster": {"deletionPolicy": deletion_policy,
-                                        "pvcDeletion": pvc_deletion}}}}}
+    @staticmethod
+    def delete_pvc_instance(pvc_deletion=True, deletion_policy="Delete"):
+        conf = {"inCluster": {"deletionPolicy": deletion_policy, "pvcDeletion": pvc_deletion}}
+        return {"spec": {"dependencies": {
+            rocksmq: {"persistence": {"pvcDeletion": pvc_deletion}},
+            **{n: copy.deepcopy(conf) for n in [storage, etcd, pulsar, kafka, woodpecker]}
+        }}}
 
     # common funcs
     def set_image(self, tag=None, repository=DefaultRepository, prefix="master"):
@@ -157,15 +148,13 @@ class OperatorConfig(BaseConfig):
             repository = repository.rstrip('/')
         return self.components("image", repository + ":" + tag)
 
-    @staticmethod
-    def set_mq(_pulsar: bool = False, _kafka: bool = False):
-        if _pulsar and not _kafka:
-            return {"spec": {"dependencies": {"msgStreamType": "pulsar"}}}
-        elif not _pulsar and _kafka:
-            return {"spec": {"dependencies": {"msgStreamType": "kafka"}}}
-        log.error(f"[OperatorConfig] Can not support all mqs or none, pulsar:{_pulsar}, kafka:{_kafka}")
-        # use default mq
-        return {}
+    def set_mq(self, mq_type: Union[pulsar, kafka, woodpecker]):
+        if mq_type not in [pulsar, kafka, woodpecker]:
+            log.error(f"[OperatorConfig] Not support mq type: {mq_type}")
+            # use default mq
+            return {}
+
+        return {"spec": {"dependencies": {"msgStreamType": mq_type}}}
 
     def set_nodes_resource(self, cpu=None, mem=None, custom_resource: dict = None,
                            nodes: list = [queryNode, indexNode, dataNode]):

@@ -6,7 +6,9 @@ from client.common.common_type import DefaultValue as dv, CheckTasks
 from client.parameters.input_params import ConcurrentParams, HybridSearchReqParams, HybridSearchRerankParams
 from client.parameters import params_name as pn
 import client.parameters.input_params.define_params as cdp
-from deploy.commons.common_params import CLUSTER, STANDALONE, queryNode, dataNode, indexNode, proxy, kafka, pulsar
+from deploy.commons.common_params import (
+    CLUSTER, STANDALONE, STREAMING, queryNode, dataNode, indexNode, proxy, kafka, pulsar, woodpecker
+)
 from deploy.configs.default_configs import NodeResource, SetDependence
 
 from workflow.performance_template import PerfTemplate
@@ -671,6 +673,69 @@ class TestConcurrentCases(PerfTemplate):
             old_version_format=self.get_report_version_format(False),
             case_callable_obj=self.get_callable_object(ConcurrentClientBase().scene_concurrent_locust),
             default_case_params=default_case_params)
+
+    @pytest.mark.locust
+    @pytest.mark.parametrize("deploy_mode", [STANDALONE])
+    def test_concurrent_locust_diskann_compaction_kafka_standalone(self, input_params: InputParamsBase, deploy_mode):
+        """
+        :test steps:
+            1. concurrent test and calculation of RT and QPS
+        """
+        data_size = "10w"
+
+        concurrent_tasks = [
+            ConcurrentParams.params_search(
+                weight=20, nq=10, top_k=10, search_param={"search_list": 30},
+                expr=eval("{'float_1': {'GT': -1.0, 'LT': parser_data_size(data_size) * 0.5}}")),
+            ConcurrentParams.params_query(weight=10, ids=[i for i in range(10)]),
+            ConcurrentParams.params_load(weight=1),
+            ConcurrentParams.params_scene_insert_delete_flush(
+                weight=1, insert_length=1, delete_length=1, random_id=True, random_vector=True, varchar_filled=True,
+                check_tasks=cdp.DefaultCheckTasks.task(pn.flush, check_task=CheckTasks.checkIgnoreRateLimit))
+        ]
+        default_case_params = ConcurrentParams().params_scene_concurrent(
+            concurrent_tasks, concurrent_number=[20], during_time="5h", interval=20, dataset_size=data_size,
+            other_fields=["float_1"], **cdp.DefaultIndexParams.DISKANN)
+
+        set_dependence = SetDependence(mq_type=kafka)
+
+        self.concurrency_template(
+            input_params=input_params, cpu=6, mem=12, deploy_mode=deploy_mode,
+            old_version_format=self.get_report_version_format(False),
+            case_callable_obj=self.get_callable_object(ConcurrentClientBase().scene_concurrent_locust),
+            default_case_params=default_case_params, set_dependence=set_dependence)
+
+    @pytest.mark.locust
+    @pytest.mark.parametrize("deploy_mode, architecture", [(STANDALONE, STREAMING)])
+    def test_concurrent_locust_diskann_compaction_woodpecker_standalone(
+            self, input_params: InputParamsBase, deploy_mode, architecture):
+        """
+        :test steps:
+            1. concurrent test and calculation of RT and QPS
+        """
+        data_size = "10w"
+
+        concurrent_tasks = [
+            ConcurrentParams.params_search(
+                weight=20, nq=10, top_k=10, search_param={"search_list": 30},
+                expr=eval("{'float_1': {'GT': -1.0, 'LT': parser_data_size(data_size) * 0.5}}")),
+            ConcurrentParams.params_query(weight=10, ids=[i for i in range(10)]),
+            ConcurrentParams.params_load(weight=1),
+            ConcurrentParams.params_scene_insert_delete_flush(
+                weight=1, insert_length=1, delete_length=1, random_id=True, random_vector=True, varchar_filled=True,
+                check_tasks=cdp.DefaultCheckTasks.task(pn.flush, check_task=CheckTasks.checkIgnoreRateLimit))
+        ]
+        default_case_params = ConcurrentParams().params_scene_concurrent(
+            concurrent_tasks, concurrent_number=[20], during_time="5h", interval=20, dataset_size=data_size,
+            other_fields=["float_1"], **cdp.DefaultIndexParams.DISKANN)
+
+        set_dependence = SetDependence(mq_type=woodpecker)
+
+        self.concurrency_template(
+            input_params=input_params, cpu=6, mem=12, deploy_mode=deploy_mode,
+            old_version_format=self.get_report_version_format(False),
+            case_callable_obj=self.get_callable_object(ConcurrentClientBase().scene_concurrent_locust),
+            default_case_params=default_case_params, set_dependence=set_dependence, deploy_architecture=architecture)
 
     @pytest.mark.locust
     @pytest.mark.parametrize("deploy_mode", [CLUSTER])

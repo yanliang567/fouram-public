@@ -56,7 +56,7 @@ class VDCDeployConfig(BaseConfig):
         return {"deploy_mode": self.check_deploy_mode(deploy_mode)}
 
     @staticmethod
-    def set_mq(_pulsar: bool = False, _kafka: bool = False):
+    def set_mq(*args, **kwargs):
         # can not be set
         return {}
 

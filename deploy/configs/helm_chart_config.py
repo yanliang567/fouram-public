@@ -1,9 +1,11 @@
 import copy
+from typing import Union
 
 from deploy.configs.base_config import BaseConfig
 from deploy.commons.common_func import get_latest_tag, get_image_tag, update_dict_value
 from deploy.commons.common_params import (
-    IDC_NAS_URL, dataNode, queryNode, indexNode, all_pods, minio, etcd, pulsarv3, kafka, standalone, streamingNode,
+    IDC_NAS_URL, dataNode, queryNode, indexNode, all_pods, standalone, streamingNode,
+    minio, etcd, pulsar, pulsarv3, kafka, woodpecker,
     DefaultRepository, ephemeral_storage, STANDALONE, CLUSTER, HelmComponents, STREAMING
 )
 
@@ -125,13 +127,18 @@ class HelmConfig(BaseConfig):
         repository_dict = self.set_image_repository(repository)
         return update_dict_value(tag_dict, repository_dict)
 
-    @staticmethod
-    def set_mq(_pulsar: bool = False, _kafka: bool = False):
-        if _pulsar + _kafka == 1:
-            return {"pulsarv3": {"enabled": _pulsar}, "kafka": {"enabled": _kafka}}
-        log.error(f"[HelmConfig] Can not support all mqs or none, pulsarv3:{_pulsar}, kafka:{_kafka}")
-        # use default mq
-        return {}
+    def set_mq(self, mq_type: Union[pulsar, kafka, woodpecker]):
+        if mq_type not in [pulsar, kafka, woodpecker]:
+            log.error(f"[HelmConfig] Not support mq type: {mq_type}")
+            # use default mq
+            return {}
+
+        if not self.cluster:
+            return {"standalone": {"messageQueue": mq_type}, mq_type: {"enabled": True}}
+
+        if mq_type == pulsar:
+            return {"pulsarv3": {"enabled": True}}
+        return {"pulsarv3": {"enabled": False}, mq_type: {"enabled": True}}
 
     def set_nodes_resource(self, cpu=None, mem=None, custom_resource: dict = None,
                            nodes: list = [queryNode, indexNode, dataNode]):

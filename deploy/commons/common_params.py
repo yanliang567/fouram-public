@@ -27,6 +27,7 @@ storage = "storage"
 pulsar = "pulsar"
 pulsarv3 = "pulsarv3"
 kafka = "kafka"
+woodpecker = "woodpecker"
 minio = "minio"
 rocksmq = "rocksmq"
 
