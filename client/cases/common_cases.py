@@ -21,7 +21,7 @@ from client.common.common_func import (
     get_ground_truth_ids, get_search_ids, get_recall_value,
     parser_search_params_expr, parser_scalar_index, write_json_file, gen_go_bench_json_file, deal_insert_result,
     check_vector_index_params, check_params_exist, convert_to_list, check_sparse_range,
-    convert_scalar_index_params_to_list
+    convert_scalar_index_params_to_list, convert_batch_insert_ni_per
 )
 
 from commons.common_params import EnvVariable
@@ -488,7 +488,7 @@ class InsertBatch(CommonCases):
         vector_type = get_vector_type(self.params_obj.dataset_params[pn.dataset_name])
         vector_default_field_name = get_default_field_name(
             vector_type, self.params_obj.dataset_params.get(pn.vector_field_name, ""))
-        ni_per = self.params_obj.dataset_params[pn.ni_per]
+        ni_per = convert_batch_insert_ni_per(self.params_obj.dataset_params[pn.ni_per])
         sparse_range = check_sparse_range(self.params_obj.dataset_params.get(pn.sparse_range, dv.default_sparse_range))
         all_fields_params = ParserFieldsParams(self.params_obj.dataset_params, self.params_obj.collection_params,
                                                main_field_name=vector_default_field_name)

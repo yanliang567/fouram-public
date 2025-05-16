@@ -1232,6 +1232,14 @@ def convert_scalar_index_params_to_list(param) -> List[dict]:
         "[convert_scalar_index_params_to_list] Scalar index parameter types can only support: dict & List[dict]")
 
 
+def convert_batch_insert_ni_per(ni_per) -> List[int]:
+    if not isinstance(ni_per, list) and isinstance(ni_per, int):
+        return [ni_per]
+    elif all(isinstance(n, int) for n in ni_per):
+        return ni_per
+    raise ValueError(f"[convert_batch_insert_ni_per] `ni_per` only support `int` or `List[int]`: {ni_per}")
+
+
 def get_default_search_params(index_type: str):
     all_index_types = {
         pn.IndexTypeName.IVF_SQ8: {"nprobe": 64},

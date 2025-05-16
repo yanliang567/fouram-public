@@ -123,7 +123,7 @@ class ParamsFormat:
 
     acc_scene_recall = update_dict_value({
         dataset_params: {dataset_name: ([type(str())], MUST),
-                         ni_per: ([type(int()), type(str())], OPTION),
+                         ni_per: ([type(int())], OPTION),
                          req_run_counts: ([type((int()))], OPTION)},
         index_params: {index_type: ([type(str())], MUST),
                        index_param: ([type(dict())], MUST)},
@@ -137,14 +137,14 @@ class ParamsFormat:
         dataset_params: {dataset_name: ([type(str())], MUST),
                          dim: ([type(int())], MUST),
                          dataset_size: ([type(str()), type(int())], MUST),
-                         ni_per: ([type(list())], MUST)},
+                         ni_per: ([type(list()),  type(int())], MUST)},
     }, base)
 
     common_scene_build_index = update_dict_value({
         dataset_params: {dataset_name: ([type(str())], MUST),
                          dim: ([type(int())], MUST),
                          dataset_size: ([type(str()), type(int())], MUST),
-                         ni_per: ([type(int()), type(str())], MUST),
+                         ni_per: ([type(int())], MUST),
                          metric_type: ([type(str())], MUST)},
         index_params: {index_type: ([type(str())], MUST),
                        index_param: ([type(dict())], MUST)},
@@ -154,7 +154,7 @@ class ParamsFormat:
         dataset_params: {dataset_name: ([type(str())], MUST),
                          dim: ([type(int())], MUST),
                          dataset_size: ([type(str()), type(int())], MUST),
-                         ni_per: ([type(int()), type(str())], MUST),
+                         ni_per: ([type(int())], MUST),
                          metric_type: ([type(str())], MUST)},
         index_params: {index_type: ([type(str())], MUST),
                        index_param: ([type(dict())], MUST)},
