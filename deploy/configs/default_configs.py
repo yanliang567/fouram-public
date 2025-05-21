@@ -159,7 +159,7 @@ class DefaultConfigs:
 
         # update params from outside
         update_helm_file = update_helm_file or param_info.update_helm_file
-        values_file_path = values_file_path or EnvVariable.FOURAM_HELM_CHART_PATH + "/values.yaml"
+        values_file_path = values_file_path or EnvVariable.FOURAM_HELM_CHART_PATH + "/install_values.yaml"
 
         config_name = gen_server_config_name(cpu=cpu, mem=mem, cluster=self.cluster, deploy_mode=deploy_mode, **kwargs)
         deploy_mode = self.check_deploy_mode(deploy_mode)
@@ -192,9 +192,14 @@ class DefaultConfigs:
                     file_path = values_file_path or EnvVariable.FOURAM_HELM_CHART_PATH + "/upgrade_values.yaml"
                     modify_file(file_path=file_path)  # create file
                     return HelmSetParams(upgrade_file_path=write_yaml_file(file_path=file_path, values_dict=config))
-                values_file_path = values_file_path or EnvVariable.FOURAM_HELM_CHART_PATH + "/values.yaml"
-                self.obj.update_values_file(values_file_path, config)
-                return config
+
+                file_path = values_file_path or EnvVariable.FOURAM_HELM_CHART_PATH + "/install_values.yaml"
+                modify_file(file_path=file_path)  # create file
+                return HelmSetParams(install_file_path=write_yaml_file(file_path=file_path, values_dict=config))
+
+                # values_file_path = values_file_path or EnvVariable.FOURAM_HELM_CHART_PATH + "/values.yaml"
+                # self.obj.update_values_file(values_file_path, config)
+                # return config
             else:
                 return self.obj.config_to_set_params(config)
         elif self.deploy_tool in [Operator, VDC]:

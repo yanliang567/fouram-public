@@ -134,6 +134,7 @@ class HelmSetParams:
     set: str = ""
     set_string: str = ""
     upgrade_file_path: str = ""
+    install_file_path: str = ""
 
     @property
     def to_str(self):
@@ -142,6 +143,8 @@ class HelmSetParams:
             _str += " --set %s " % self.set
         if self.set_string != "":
             _str += " --set-string %s " % self.set_string
+        if self.install_file_path != "":
+            _str += " -f %s " % self.install_file_path
         return _str
 
     @property
