@@ -7400,6 +7400,116 @@ class TestFeatureCases(PerfTemplate):
             case_callable_obj=self.get_callable_object(ConcurrentClientBase().scene_concurrent_locust),
             default_case_params=default_case_params, node_resources=node_resources)
 
+    @pytest.mark.parametrize("deploy_mode, architecture", [(CLUSTER, STREAMING)])
+    def test_json_path_locust_dql_dml_streaming_cluster(self, input_params: InputParamsBase, deploy_mode, architecture):
+        """
+        concurrent test and calculation of RT and QPS
+
+        :purpose:  `primary key: INT64`, shards_num=2, enabled dynamic field, DQL & DML
+                    2 fields of different vector types, json and dynamic fields
+
+        :test steps:
+            1. create collection with fields:
+                'float_vector': 128dim
+                'float_vector_1': 768dim
+                'id': primary key type is INT64
+
+                'json_1': scalar json field, random_range[0, 1000] & None value
+                'json_2': scalar json field, {'id': <all cast type>} & None value
+                'json_dynamic_1': dynamic field, random_range[0, 1000] & None value
+                'json_dynamic_2': dynamic field, {'id': <all cast type>} & None value
+            2. build indexes:
+                HNSW: 'float_vector'
+                IVF_SQ8: 'float_vector_1'
+
+                JsonPathIndex - 'DOUBLE': 'json_1', 'json_2["id"]', 'json_dynamic_1', 'json_dynamic_2["id"]'
+            3. insert 10 million data
+            4. flush collection
+            5. build indexes again using the same params
+            6. load collection
+            7. concurrent request:
+                - search
+                - query
+                - hybrid_search
+                - insert: nb=100
+                - delete: delete all inserted
+                - flush -> ignore rate limit
+        """
+        dataset_size = parser_data_size("10m")
+
+        # 1 extra vector fields, and `float_vector` is default vector field
+        all_other_fields = ["float_vector_1", 'json_1', 'json_2']
+        all_dynamic_fields = ['json_dynamic_1', 'json_dynamic_2']
+
+        concurrent_tasks = [
+            ConcurrentParams.params_search(
+                nq=10, top_k=1, search_param={"ef": 16}, output_fields=['*'], timeout=20,
+                expr=Expr.OR(Expr.GE(Expr.MOD('json_1', 10), 1), Expr.LIKE('json_dynamic_2["id"]', "%1")).value,
+                check_task=CheckTasks.checkSearchOutput,
+                check_items={"output_fields": all_other_fields + all_dynamic_fields + ['id', 'float_vector'], "nq": 10}
+            ),
+            ConcurrentParams.params_query(
+                expr="", timeout=20, output_fields=['id', 'float_vector', 'json_1', 'json_dynamic_1'], limit=10,
+                random_data=True, random_count=10, random_range=[0, 1000], field_type="int64",
+                field_name='json_2["id"]', check_task=CheckTasks.checkQueryOutput, check_items={"check_empty": False}
+            ),
+            ConcurrentParams.params_hybrid_search(
+                nq=1, top_k=1, timeout=20, output_fields=["*"],
+                reqs=[HybridSearchReqParams(anns_field="float_vector", search_param={"ef": 128}, top_k=100,
+                                            expr=Expr.OR(Expr.LT(Expr.MOD('json_2["id"]', 10), 5),
+                                                         Expr.GE(Expr.MOD('json_dynamic_2["id"]', 10), 4)).value),
+                      HybridSearchReqParams(anns_field="float_vector_1", search_param={"nprobe": 64},
+                                            expr=Expr.AND(Expr.GT('json_1', 500), Expr.GT('json_dynamic_1', 600)).value)
+                      ],
+                rerank=HybridSearchRerankParams(RRFRanker=[]), check_task=CheckTasks.checkSearchOutput,
+                check_items={"output_fields": all_other_fields + all_dynamic_fields + ['id', 'float_vector'], "nq": 1}
+            ),
+            ConcurrentParams.params_insert(
+                nb=100, random_id=True, random_vector=True, start_id=dataset_size,
+                data_organization=DataOrganization.row_insert, dynamic_fields=all_dynamic_fields),
+            ConcurrentParams.params_delete(delete_length=100),
+            ConcurrentParams.params_flush(timeout=180, check_task=CheckTasks.checkIgnoreExpectedErrors,
+                                          check_items=CheckItems.IgnoreFlushRateLimitAndTimeout),
+        ]
+
+        default_case_params = ConcurrentParams().params_scene_concurrent(
+            concurrent_tasks, dataset_size=dataset_size, ni_per=10000, other_fields=all_other_fields,
+            enable_dynamic_field=True, dynamic_fields=all_dynamic_fields, data_organization=DataOrganization.row_insert,
+            vectors_index=cdp.DefaultVectorIndexParams.IVF_SQ8('float_vector_1'),
+            scalars_index=dict_merge([
+                *cdp.DefaultScalarIndexParams.JSON_PARH_INVERTED_list(
+                    ['json_1', 'json_dynamic_1'], params=JsonPathIndexParams(JsonCastType.DOUBLE)),
+                cdp.DefaultScalarIndexParams.JSON_PARH_INVERTED(
+                    'json_2', params=JsonPathIndexParams(JsonCastType.DOUBLE, json_path='json_2["id"]')),
+                cdp.DefaultScalarIndexParams.JSON_PARH_INVERTED(
+                    'json_dynamic_2', params=JsonPathIndexParams(JsonCastType.DOUBLE, json_path='json_dynamic_2["id"]'))
+            ]),
+            scalars_params=dict_merge([
+                cdp.DefaultScalarParams.laion2b_multi('float_vector_1'),
+                *cdp.DefaultScalarParams.nullable_list(["json_1", "json_2"]),
+                *cdp.DefaultScalarParams.random_range_list(
+                    ["json_1", "json_dynamic_1"], specify_range=SpecifyRange(0, 1000), convert_data_type="int64",
+                    custom_insert_ratio=1),
+                *cdp.DefaultScalarParams.mixed_values_json_list(
+                    ["json_2", "json_dynamic_2"], json_key="id",
+                    json_value_types=['int64', 'varchar', 'double', 'bool', 'none', 'array_int64', 'array_varchar',
+                                      'array_double', 'array_bool', 'array_none'],
+                    specify_range=SpecifyRange(0, 1000), custom_insert_ratio=1),
+            ]),
+            concurrent_number=[20], during_time="3h", interval=20, **cdp.DefaultIndexParams.HNSW)
+
+        node_resources = [
+            NodeResource(nodes=[dataNode], replicas=6, cpu=6),
+            NodeResource(nodes=[streamingNode], cpu=2, mem=8),
+            NodeResource(nodes=[queryNode], cpu=4, mem=28)  # mem < 15G
+        ]
+
+        self.concurrency_template(
+            input_params=input_params, cpu=dp.min_cpu, mem=dp.min_mem, deploy_mode=deploy_mode,
+            old_version_format=self.get_report_version_format(False),
+            case_callable_obj=self.get_callable_object(ConcurrentClientBase().scene_concurrent_locust),
+            default_case_params=default_case_params, node_resources=node_resources, deploy_architecture=architecture)
+
     @pytest.mark.parametrize("deploy_mode", [STANDALONE])
     def test_json_path_locust_dql_dml_standalone(self, input_params: InputParamsBase, deploy_mode):
         """
@@ -7595,6 +7705,109 @@ class TestFeatureCases(PerfTemplate):
             old_version_format=self.get_report_version_format(False),
             case_callable_obj=self.get_callable_object(ConcurrentClientBase().scene_concurrent_locust),
             default_case_params=default_case_params, node_resources=node_resources)
+
+    @pytest.mark.parametrize("deploy_mode, architecture", [(CLUSTER, STREAMING)])
+    def test_json_path_locust_dql_dml_upsert_streaming_cluster(
+            self, input_params: InputParamsBase, deploy_mode, architecture):
+        """
+        concurrent test and calculation of RT and QPS
+
+        :purpose:  `primary key: INT64`, shards_num=2, enabled dynamic field, DQL & upsert
+                    2 fields of different vector types, json and dynamic fields
+
+        :test steps:
+            1. create collection with fields:
+                'float_vector': 128dim
+                'float_vector_1': 768dim
+                'id': primary key type is INT64
+
+                'json_1': scalar json field, random_range[0, 1000] & None value
+                'json_2': scalar json field, {'id': <all cast type>} & None value
+                'json_dynamic_1': dynamic field, random_range[0, 1000] & None value
+                'json_dynamic_2': dynamic field, {'id': <all cast type>} & None value
+            2. build indexes:
+                HNSW: 'float_vector'
+                IVF_SQ8: 'float_vector_1'
+
+                JsonPathIndex - 'DOUBLE': 'json_1["id"]', 'json_2["id"]', 'json_dynamic_1["id"]', 'json_dynamic_2["id"]'
+            3. insert 10 million data
+            4. flush collection
+            5. build indexes again using the same params
+            6. load collection
+            7. concurrent request:
+                - search
+                - query
+                - hybrid_search
+                - upsert: nb=10, start_id=dataset_size / 2
+        """
+        dataset_size = parser_data_size("10m")
+
+        # 1 extra vector fields, and `float_vector` is default vector field
+        all_other_fields = ["float_vector_1", 'json_1', 'json_2']
+        all_dynamic_fields = ['json_dynamic_1', 'json_dynamic_2']
+
+        concurrent_tasks = [
+            ConcurrentParams.params_search(
+                nq=10, top_k=1, search_param={"ef": 16}, output_fields=['*'], timeout=20,
+                expr=Expr.OR(Expr.GE(Expr.MOD('json_1', 10), 1), Expr.LIKE('json_dynamic_2["id"]', "%1")).value,
+                check_task=CheckTasks.checkSearchOutput,
+                check_items={"output_fields": all_other_fields + all_dynamic_fields + ['id', 'float_vector'], "nq": 10}
+            ),
+            ConcurrentParams.params_query(
+                expr="", timeout=20, output_fields=['id', 'float_vector', 'json_1', 'json_dynamic_1'], limit=10,
+                random_data=True, random_count=10, random_range=[0, 1000], field_type="int64",
+                field_name='json_2["id"]', check_task=CheckTasks.checkQueryOutput, check_items={"check_empty": False}
+            ),
+            ConcurrentParams.params_hybrid_search(
+                nq=1, top_k=1, timeout=20, output_fields=["*"],
+                reqs=[HybridSearchReqParams(anns_field="float_vector", search_param={"ef": 128}, top_k=100,
+                                            expr=Expr.OR(Expr.LT(Expr.MOD('json_2["id"]', 10), 5),
+                                                         Expr.GE(Expr.MOD('json_dynamic_2["id"]', 10), 4)).value),
+                      HybridSearchReqParams(anns_field="float_vector_1", search_param={"nprobe": 16},
+                                            expr=Expr.AND(Expr.GT('json_1', 500), Expr.GT('json_dynamic_1', 600)).value)
+                      ],
+                rerank=HybridSearchRerankParams(RRFRanker=[]), check_task=CheckTasks.checkSearchOutput,
+                check_items={"output_fields": all_other_fields + all_dynamic_fields + ['id', 'float_vector'], "nq": 1}
+            ),
+            ConcurrentParams.params_upsert(
+                nb=10, random_id=True, random_vector=True, start_id=int(dataset_size / 2),
+                data_organization=DataOrganization.row_insert, dynamic_fields=all_dynamic_fields)
+        ]
+
+        default_case_params = ConcurrentParams().params_scene_concurrent(
+            concurrent_tasks, dataset_size=dataset_size, ni_per=10000, other_fields=all_other_fields,
+            enable_dynamic_field=True, dynamic_fields=all_dynamic_fields, data_organization=DataOrganization.row_insert,
+            vectors_index=cdp.DefaultVectorIndexParams.IVF_SQ8_2048('float_vector_1'),
+            scalars_index=dict_merge([
+                cdp.DefaultScalarIndexParams.JSON_PARH_INVERTED(
+                    n, params=JsonPathIndexParams(JsonCastType.DOUBLE, json_path=n + '["id"]'))
+                for n in ['json_1', 'json_2', 'json_dynamic_1', 'json_dynamic_2']
+            ]),
+            scalars_params=dict_merge([
+                cdp.DefaultScalarParams.laion2b_multi('float_vector_1'),
+                *cdp.DefaultScalarParams.nullable_list(["json_1", "json_2"]),
+                *cdp.DefaultScalarParams.random_range_list(
+                    ["json_1", "json_dynamic_1"], specify_range=SpecifyRange(0, 1000), convert_data_type="int64",
+                    custom_insert_ratio=1),
+                *cdp.DefaultScalarParams.mixed_values_json_list(
+                    ["json_2", "json_dynamic_2"], json_key="id",
+                    json_value_types=['int64', 'varchar', 'double', 'bool', 'none', 'array_int64', 'array_varchar',
+                                      'array_double', 'array_bool', 'array_none'],
+                    specify_range=SpecifyRange(0, 1000), custom_insert_ratio=1),
+            ]),
+            concurrent_number=[20], during_time="3h", interval=20, **cdp.DefaultIndexParams.HNSW)
+
+        node_resources = [
+            NodeResource(nodes=[dataNode], replicas=6, cpu=6),
+            NodeResource(nodes=[streamingNode], cpu=2, mem=8),
+            NodeResource(nodes=[queryNode], cpu=16, mem=32)  # cpu = 16G, mem < 18G
+        ]
+
+        self.concurrency_template(
+            input_params=input_params, cpu=dp.min_cpu, mem=dp.min_mem, deploy_mode=deploy_mode,
+            old_version_format=self.get_report_version_format(False),
+            case_callable_obj=self.get_callable_object(ConcurrentClientBase().scene_concurrent_locust),
+            default_case_params=default_case_params, node_resources=node_resources, deploy_architecture=architecture)
 
     @pytest.mark.parametrize("deploy_mode", [CLUSTER])
     def test_json_path_locust_dql_ddl_cluster(self, input_params: InputParamsBase, deploy_mode):
@@ -7807,6 +8020,219 @@ class TestFeatureCases(PerfTemplate):
             old_version_format=self.get_report_version_format(False),
             case_callable_obj=self.get_callable_object(ConcurrentClientBase().scene_concurrent_locust),
             default_case_params=default_case_params, node_resources=node_resources)
+
+    @pytest.mark.parametrize("deploy_mode, architecture", [(CLUSTER, STREAMING)])
+    def test_json_path_locust_dql_ddl_streaming_cluster(self, input_params: InputParamsBase, deploy_mode, architecture):
+        """
+        concurrent test and calculation of RT and QPS
+
+        :purpose:  `primary key: INT64`, shards_num=2, enabled dynamic field, DQL & DDL
+                    2 fields of different vector types, json and dynamic fields
+
+        :test steps:
+            1. create collection with fields:
+                'float_vector': 128dim
+                'float_vector_1': 768dim
+                'id': primary key type is INT64
+
+                'json_1': scalar json field, random_range[0, 1000] & None value
+                'json_2': scalar json field, {'id': <all cast type>} & None value
+                'json_dynamic_1': dynamic field, random_range[0, 1000] & None value
+                'json_dynamic_2': dynamic field, {'id': <all cast type>} & None value
+            2. build indexes:
+                HNSW: 'float_vector'
+                IVF_SQ8: 'float_vector_1'
+
+                JsonPathIndex - 'DOUBLE': 'json_1', 'json_2["id"]', 'json_dynamic_1', 'json_dynamic_2["id"]'
+            3. insert 12 million data
+            4. flush collection
+            5. build indexes again using the same params
+            6. load collection
+            7. concurrent request:
+                - search
+                - query
+                - hybrid_search
+                - scene_test
+                    (collection: create->insert->flush->index->drop)
+                - scene_search_test
+                    (collection: create->insert->flush->index->load->search->drop)
+                - scene_hybrid_search_test: 4 vector fields, 2 scalar fields, dynamic field
+                    (collection: create->insert->flush->index->load->hybrid_search->drop)
+        """
+        dataset_size = parser_data_size("12m")
+
+        # 1 extra vector fields, and `float_vector` is default vector field
+        all_other_fields = ["float_vector_1", 'json_1', 'json_2']
+        all_dynamic_fields = ['json_dynamic_1', 'json_dynamic_2']
+
+        concurrent_tasks = [
+            ConcurrentParams.params_search(
+                nq=10, top_k=100, search_param={"ef": 128}, output_fields=['*'], timeout=120,
+                expr=Expr.OR(Expr.GE(Expr.MOD('json_1', 10), 1), Expr.LIKE('json_dynamic_2["id"]', "%1")).value,
+                check_task=CheckTasks.checkSearchOutput,
+                check_items={"output_fields": all_other_fields + all_dynamic_fields + ['id', 'float_vector'], "nq": 10}
+            ),
+            ConcurrentParams.params_query(
+                expr="", timeout=120, output_fields=['id', 'float_vector', 'json_1', 'json_dynamic_1'], limit=10,
+                random_data=True, random_count=10, random_range=[0, 1000], field_type="int64",
+                field_name='json_2["id"]', check_task=CheckTasks.checkQueryOutput, check_items={"check_empty": False}
+            ),
+            ConcurrentParams.params_hybrid_search(
+                nq=10, top_k=100, timeout=120, output_fields=["*"],
+                reqs=[HybridSearchReqParams(anns_field="float_vector", search_param={"ef": 128}, top_k=100,
+                                            expr=Expr.OR(Expr.LT(Expr.MOD('json_2["id"]', 10), 5),
+                                                         Expr.GE(Expr.MOD('json_dynamic_2["id"]', 10), 4)).value),
+                      HybridSearchReqParams(anns_field="float_vector_1", search_param={"nprobe": 128},
+                                            expr=Expr.AND(Expr.GT('json_1', 500), Expr.GT('json_dynamic_1', 600)).value)
+                      ],
+                rerank=HybridSearchRerankParams(RRFRanker=[]), check_task=CheckTasks.checkSearchOutput,
+                check_items={"output_fields": all_other_fields + all_dynamic_fields + ['id', 'float_vector'], "nq": 10}
+            ),
+            ConcurrentParams.params_scene_test(
+                enable_dynamic_field=True, data_organization=DataOrganization.row_insert, other_fields=all_other_fields,
+                dynamic_fields=all_dynamic_fields,
+                vectors_index=cdp.DefaultVectorIndexParams.IVF_SQ8_2048('float_vector_1'),
+                scalars_index=dict_merge([
+                    *cdp.DefaultScalarIndexParams.JSON_PARH_INVERTED_list(
+                        ['json_1', 'json_dynamic_1'], params=JsonPathIndexParams(JsonCastType.DOUBLE)),
+                    cdp.DefaultScalarIndexParams.JSON_PARH_INVERTED(
+                        'json_2', params=JsonPathIndexParams(JsonCastType.DOUBLE, json_path='json_2["id"]')),
+                    cdp.DefaultScalarIndexParams.JSON_PARH_INVERTED(
+                        'json_dynamic_2',
+                        params=JsonPathIndexParams(JsonCastType.DOUBLE, json_path='json_dynamic_2["id"]'))
+                ]),
+                scalars_params=dict_merge([
+                    *cdp.DefaultScalarParams.nullable_list(["json_1", "json_2"]),
+                    *cdp.DefaultScalarParams.random_range_list(
+                        ["json_1", "json_dynamic_1"], specify_range=SpecifyRange(0, 1000), convert_data_type="int64",
+                        custom_insert_ratio=1),
+                    *cdp.DefaultScalarParams.mixed_values_json_list(
+                        ["json_2", "json_dynamic_2"], json_key="id",
+                        json_value_types=['int64', 'varchar', 'double', 'bool', 'none', 'array_int64', 'array_varchar',
+                                          'array_double', 'array_bool', 'array_none'],
+                        specify_range=SpecifyRange(0, 1000), custom_insert_ratio=3),
+                ]),
+            ),
+            ConcurrentParams.params_scene_search_test(
+                shards_num=1, search_counts=10,
+                enable_dynamic_field=True, data_organization=DataOrganization.row_insert,
+                other_fields=['json_1', 'json_2'], dynamic_fields=['json_dynamic_1', 'json_dynamic_2'],
+                expr=Expr.And(Expr.Or(Expr.GT('json_1["id"]', 10), Expr.LIKE('json_2["id"]', "%0")).subset,
+                              Expr.OR(Expr.NOT(Expr.EQ('json_dynamic_1["id"]', True).subset),
+                                      Expr.GT(Expr.SUB('json_dynamic_2["id"]', 10), 10)).subset).value,
+                scalars_index=dict_merge([
+                    cdp.DefaultScalarIndexParams.JSON_PARH_INVERTED(
+                        'json_1', params=JsonPathIndexParams(JsonCastType.DOUBLE, json_path='json_1["id"]')),
+                    cdp.DefaultScalarIndexParams.JSON_PARH_INVERTED(
+                        'json_2', params=JsonPathIndexParams(JsonCastType.VARCHAR, json_path='json_2["id"]')),
+                    cdp.DefaultScalarIndexParams.JSON_PARH_INVERTED(
+                        'json_dynamic_1', params=JsonPathIndexParams(JsonCastType.BOOL,
+                                                                     json_path='json_dynamic_1["id"]')),
+                    cdp.DefaultScalarIndexParams.JSON_PARH_INVERTED(
+                        'json_dynamic_2', params=JsonPathIndexParams(JsonCastType.VARCHAR,
+                                                                     json_path='json_dynamic_2["id"]')),
+                ]),
+                scalars_params=dict_merge([
+                    *cdp.DefaultScalarParams.nullable_list(["json_1", "json_2"]),
+                    *cdp.DefaultScalarParams.mixed_values_json_list(
+                        ["json_1", "json_2", "json_dynamic_1", "json_dynamic_2"], json_key="id",
+                        json_value_types=['int64', 'varchar', 'double', 'bool', 'none', 'array_int64', 'array_varchar',
+                                          'array_double', 'array_bool', 'array_none'],
+                        specify_range=SpecifyRange(0, 1000), custom_insert_ratio=2),
+                ])
+            ),
+            ConcurrentParams.params_scene_hybrid_search_test(
+                nq=1, top_k=1, output_fields=["*"], timeout=600,
+                reqs=[HybridSearchReqParams(anns_field="float_vector", search_param={"nprobe": 128}, top_k=100,
+                                            expr=Expr.GT('json_1', 1500).value),
+                      HybridSearchReqParams(anns_field="binary_vector_scene_hybrid_search_test_1",
+                                            search_param={"nprobe": 32}, top_k=10,
+                                            expr=Expr.Or(Expr.NE(Expr.MOD('json_2["key_0"]["id"]', 10), 1),
+                                                         Expr.LIKE('json_2["key_1"]["id"]', "%9")).value),
+                      HybridSearchReqParams(anns_field="float16_vector_scene_hybrid_search_test_2",
+                                            search_param={"search_list": 30}, top_k=5,
+                                            expr=Expr.GE(Expr.SUB('json_dynamic_1', 50), 5).value),
+                      HybridSearchReqParams(anns_field="sparse_float_vector_scene_hybrid_search_test_3",
+                                            search_param={"drop_ratio_search": 0.1}, top_k=10,
+                                            expr=Expr.OR(Expr.like('json_dynamic_2["key_0"]["id"]', '1%'),
+                                                         Expr.EQ('json_dynamic_2["key_1"]["id"]', True)).value)
+                      ],
+                rerank=HybridSearchRerankParams(RRFRanker=[]), hybrid_search_counts=10,
+                shards_num=1, data_size=10000, enable_dynamic_field=True, data_organization=DataOrganization.row_insert,
+                dynamic_fields=['json_dynamic_1', 'json_dynamic_2'],
+                other_fields=["binary_vector_scene_hybrid_search_test_1", "float16_vector_scene_hybrid_search_test_2",
+                              "sparse_float_vector_scene_hybrid_search_test_3", "json_1", "json_2"],
+                scalars_params=dict_merge([
+                    cdp.DefaultScalarParams.binary("binary_vector_scene_hybrid_search_test_1"),
+                    cdp.DefaultScalarParams.local("float16_vector_scene_hybrid_search_test_2", 64),
+                    *cdp.DefaultScalarParams.nullable_list(["json_1", "json_2"]),
+                    *cdp.DefaultScalarParams.random_range_list(
+                        ["json_1", "json_dynamic_1"], specify_range=SpecifyRange(0, 100), convert_data_type="int64",
+                        custom_insert_ratio=1),
+                    *cdp.DefaultScalarParams.mixed_values_json_list(
+                        ["json_2", "json_dynamic_2"], json_key="id",
+                        json_value_types=['int64', 'varchar', 'double', 'bool', 'none', 'array_int64', 'array_varchar',
+                                          'array_double', 'array_bool', 'array_none'],
+                        specify_range=SpecifyRange(0, 100), custom_insert_ratio=2, json_repeat=5),
+                ]),
+                scalars_index=dict_merge([
+                    *cdp.DefaultScalarIndexParams.JSON_PARH_INVERTED_list(
+                        ['json_1', 'json_dynamic_1'], params=JsonPathIndexParams(JsonCastType.DOUBLE)),
+                    cdp.DefaultScalarIndexParams.JSON_PARH_INVERTED(
+                        'json_2', params=JsonPathIndexParams(JsonCastType.DOUBLE, json_path='json_2["key_0"]["id"]')),
+                    cdp.DefaultScalarIndexParams.JSON_PARH_INVERTED(
+                        'json_2', params=JsonPathIndexParams(JsonCastType.VARCHAR, json_path='json_2["key_1"]["id"]')),
+                    cdp.DefaultScalarIndexParams.JSON_PARH_INVERTED(
+                        'json_dynamic_2', params=JsonPathIndexParams(JsonCastType.VARCHAR,
+                                                                     json_path='json_dynamic_2["key_0"]["id"]')),
+                    cdp.DefaultScalarIndexParams.JSON_PARH_INVERTED(
+                        'json_dynamic_2', params=JsonPathIndexParams(JsonCastType.BOOL,
+                                                                     json_path='json_dynamic_2["key_1"]["id"]')),
+                ]),
+                vectors_index=dict_merge([
+                    cdp.DefaultVectorIndexParams.BIN_IVF_FLAT("binary_vector_scene_hybrid_search_test_1"),
+                    cdp.DefaultVectorIndexParams.DISKANN_IP("float16_vector_scene_hybrid_search_test_2"),
+                    cdp.DefaultVectorIndexParams.SPARSE_WAND("sparse_float_vector_scene_hybrid_search_test_3")])
+            )
+        ]
+
+        default_case_params = ConcurrentParams().params_scene_concurrent(
+            concurrent_tasks, dataset_size=dataset_size, ni_per=10000, other_fields=all_other_fields,
+            enable_dynamic_field=True, dynamic_fields=all_dynamic_fields, data_organization=DataOrganization.row_insert,
+            vectors_index=cdp.DefaultVectorIndexParams.IVF_SQ8_2048('float_vector_1'),
+            scalars_index=dict_merge([
+                *cdp.DefaultScalarIndexParams.JSON_PARH_INVERTED_list(
+                    ['json_1', 'json_dynamic_1'], params=JsonPathIndexParams(JsonCastType.DOUBLE)),
+                cdp.DefaultScalarIndexParams.JSON_PARH_INVERTED(
+                    'json_2', params=JsonPathIndexParams(JsonCastType.DOUBLE, json_path='json_2["id"]')),
+                cdp.DefaultScalarIndexParams.JSON_PARH_INVERTED(
+                    'json_dynamic_2', params=JsonPathIndexParams(JsonCastType.DOUBLE, json_path='json_dynamic_2["id"]'))
+            ]),
+            scalars_params=dict_merge([
+                cdp.DefaultScalarParams.laion2b_multi('float_vector_1'),
+                *cdp.DefaultScalarParams.nullable_list(["json_1", "json_2"]),
+                *cdp.DefaultScalarParams.random_range_list(
+                    ["json_1", "json_dynamic_1"], specify_range=SpecifyRange(0, 1000), convert_data_type="int64",
+                    custom_insert_ratio=1),
+                *cdp.DefaultScalarParams.mixed_values_json_list(
+                    ["json_2", "json_dynamic_2"], json_key="id",
+                    json_value_types=['int64', 'varchar', 'double', 'bool', 'none', 'array_int64', 'array_varchar',
+                                      'array_double', 'array_bool', 'array_none'],
+                    specify_range=SpecifyRange(0, 1000), custom_insert_ratio=1),
+            ]),
+            concurrent_number=[20], during_time="3h", interval=20, **cdp.DefaultIndexParams.HNSW)
+
+        node_resources = [
+            NodeResource(nodes=[dataNode], replicas=6, cpu=6),
+            NodeResource(nodes=[streamingNode], cpu=2, mem=8),
+            NodeResource(nodes=[queryNode], cpu=6, mem=32)  # cpu < 6, mem < 19G, load max mem ~ 27G
+        ]
+
+        self.concurrency_template(
+            input_params=input_params, cpu=dp.min_cpu, mem=dp.min_mem, deploy_mode=deploy_mode,
+            old_version_format=self.get_report_version_format(False),
+            case_callable_obj=self.get_callable_object(ConcurrentClientBase().scene_concurrent_locust),
+            default_case_params=default_case_params, node_resources=node_resources, deploy_architecture=architecture)
 
     @pytest.mark.parametrize("deploy_mode", [STANDALONE])
     def test_json_path_locust_dml_partitions_standalone(self, input_params: InputParamsBase, deploy_mode):
@@ -8047,6 +8473,143 @@ class TestFeatureCases(PerfTemplate):
             old_version_format=self.get_report_version_format(False),
             case_callable_obj=self.get_callable_object(ConcurrentClientBase().scene_concurrent_locust),
             default_case_params=default_case_params, node_resources=node_resources)
+
+    @pytest.mark.parametrize("deploy_mode, architecture", [(CLUSTER, STREAMING)])
+    def test_json_path_locust_dql_dml_partitions_streaming_cluster(
+            self, input_params: InputParamsBase, deploy_mode, architecture):
+        """
+        concurrent test and calculation of RT and QPS
+
+        :purpose:  `primary key: INT64`, shards_num=2, enabled dynamic field, DQL & DML & partitions
+                    2 fields of different vector types, json and dynamic fields
+
+        :test steps:
+            1. create collection with fields:
+                'float_vector': 128dim
+                'float_vector_1': 768dim
+                'id': primary key type is INT64
+
+                'json_1': scalar json field, random_range[0, 1000] & None value
+                'json_2': scalar json field, {'id': <all cast type>} & None value
+                'json_dynamic_1': dynamic field, random_range[0, 1000] & None value
+                'json_dynamic_2': dynamic field, {'id': <all cast type>} & None value
+            2. build indexes:
+                HNSW: 'float_vector'
+                IVF_SQ8: 'float_vector_1'
+
+                JsonPathIndex - 'DOUBLE': 'json_1', 'json_2["id"]', 'json_dynamic_1', 'json_dynamic_2["id"]'
+            3. insert 5 million data into 10 partitions
+            4. flush collection
+            5. build indexes again using the same params
+            6. load collection
+            7. concurrent request:
+                - search
+                - query
+                - hybrid_search
+                - scene_insert_partition
+                    (partition: create->insert->flush->release->drop)
+                - scene_test_partition
+                    (partition: create->insert->flush->index->load->search->release->search failed->drop)
+                - scene_test_partition_hybrid_search
+                    (partition: create->insert->flush->index->load->hybrid_search->release->hybrid_search failed->drop)
+        """
+        dataset_size = parser_data_size("5m")
+
+        # 1 extra vector fields, and `float_vector` is default vector field
+        all_other_fields = ["float_vector_1", 'json_1', 'json_2']
+        all_dynamic_fields = ['json_dynamic_1', 'json_dynamic_2']
+
+        # gen partition names
+        partition_names = [dv.default_partition_name]
+        partition_names.extend([f"{dv.partition_name_prefix}{i}" for i in range(1, 10)])
+
+        concurrent_tasks = [
+            ConcurrentParams.params_search(
+                weight=1, nq=10, top_k=100, search_param={"ef": 128}, output_fields=['*'], timeout=120,
+                partition_names=partition_names,
+                expr=Expr.OR(Expr.GE(Expr.MOD('json_1', 10), 1), Expr.LIKE('json_dynamic_2["id"]', "%1")).value,
+                check_task=CheckTasks.checkSearchOutput,
+                check_items={"output_fields": all_other_fields + all_dynamic_fields + ['id', 'float_vector'], "nq": 10}
+            ),
+            ConcurrentParams.params_query(
+                weight=1, expr="", timeout=120, output_fields=['id', 'float_vector', 'json_1', 'json_dynamic_1'],
+                limit=10, partition_names=partition_names,
+                random_data=True, random_count=10, random_range=[0, 1000], field_type="int64",
+                field_name='json_2["id"]', check_task=CheckTasks.checkQueryOutput, check_items={"check_empty": False}
+            ),
+            ConcurrentParams.params_hybrid_search(
+                weight=1, nq=100, top_k=10, timeout=120, output_fields=["*"], partition_names=partition_names,
+                reqs=[HybridSearchReqParams(anns_field="float_vector", search_param={"ef": 128}, top_k=100,
+                                            expr=Expr.OR(Expr.LT(Expr.MOD('json_2["id"]', 10), 5),
+                                                         Expr.GE(Expr.MOD('json_dynamic_2["id"]', 10), 4)).value),
+                      HybridSearchReqParams(anns_field="float_vector_1", search_param={"nprobe": 32},
+                                            expr=Expr.AND(Expr.GT('json_1', 500), Expr.GT('json_dynamic_1', 600)).value)
+                      ],
+                rerank=HybridSearchRerankParams(RRFRanker=[]), check_task=CheckTasks.checkSearchOutput,
+                check_items={"output_fields": all_other_fields + all_dynamic_fields + ['id', 'float_vector'], "nq": 100}
+            ),
+            ConcurrentParams.params_scene_insert_partition(
+                weight=1, data_size=3000, ni=1000, with_flush=True, timeout=600,
+                data_organization=DataOrganization.row_insert, dynamic_fields=all_dynamic_fields,
+                check_tasks=CheckTasksDefine.FlushIgnoreFlushRateLimitAndTimeout,
+            ),
+            ConcurrentParams.params_scene_test_partition(
+                weight=1, data_size=6000, ni=2000, search_param={"ef": 32}, limit=1, output_fields=["*"], timeout=600,
+                search_counts=5, expr=Expr.GT('json_1["id"]', 10).value,
+                data_organization=DataOrganization.row_insert, dynamic_fields=all_dynamic_fields,
+                check_tasks=CheckTasksDefine.FlushIgnoreFlushRateLimitAndTimeout,
+            ),
+            ConcurrentParams.params_scene_test_partition_hybrid_search(
+                weight=1, data_size=5000, ni=3000,
+                nq=1, top_k=1, output_fields=["*"], timeout=600, hybrid_search_counts=10,
+                reqs=[HybridSearchReqParams(anns_field="float_vector", search_param={"ef": 128}, top_k=100,
+                                            expr=Expr.LT('json_2["id"]', 2000).value),
+                      HybridSearchReqParams(anns_field="float_vector_1", search_param={"nprobe": 32}, top_k=10,
+                                            expr=Expr.EQ(Expr.MOD('json_dynamic_1["id"]', 10), 1).value)],
+                rerank=HybridSearchRerankParams(RRFRanker=[]),
+                data_organization=DataOrganization.row_insert, dynamic_fields=all_dynamic_fields,
+                check_tasks=CheckTasksDefine.FlushIgnoreFlushRateLimitAndTimeout,
+            )
+        ]
+
+        default_case_params = ConcurrentParams().params_scene_concurrent(
+            concurrent_tasks, dataset_size=dataset_size, ni_per=10000, other_fields=all_other_fields,
+            enable_dynamic_field=True, dynamic_fields=all_dynamic_fields, data_organization=DataOrganization.row_insert,
+            extra_partitions=cdp.DefaultDatasetParams.extra_partitions(partitions=partition_names, data_repeated=False),
+            vectors_index=cdp.DefaultVectorIndexParams.IVF_SQ8('float_vector_1'),
+            scalars_index=dict_merge([
+                *cdp.DefaultScalarIndexParams.JSON_PARH_INVERTED_list(
+                    ['json_1', 'json_dynamic_1'], params=JsonPathIndexParams(JsonCastType.DOUBLE)),
+                cdp.DefaultScalarIndexParams.JSON_PARH_INVERTED(
+                    'json_2', params=JsonPathIndexParams(JsonCastType.DOUBLE, json_path='json_2["id"]')),
+                cdp.DefaultScalarIndexParams.JSON_PARH_INVERTED(
+                    'json_dynamic_2', params=JsonPathIndexParams(JsonCastType.DOUBLE, json_path='json_dynamic_2["id"]'))
+            ]),
+            scalars_params=dict_merge([
+                cdp.DefaultScalarParams.laion2b_multi('float_vector_1'),
+                *cdp.DefaultScalarParams.nullable_list(["json_1", "json_2"]),
+                *cdp.DefaultScalarParams.random_range_list(
+                    ["json_1", "json_dynamic_1"], specify_range=SpecifyRange(0, 1000), convert_data_type="int64",
+                    custom_insert_ratio=1),
+                *cdp.DefaultScalarParams.mixed_values_json_list(
+                    ["json_2", "json_dynamic_2"], json_key="id",
+                    json_value_types=['int64', 'varchar', 'double', 'bool', 'none', 'array_int64', 'array_varchar',
+                                      'array_double', 'array_bool', 'array_none'],
+                    specify_range=SpecifyRange(0, 1000), custom_insert_ratio=1),
+            ]),
+            concurrent_number=[20], during_time="3h", interval=20, **cdp.DefaultIndexParams.HNSW)
+
+        node_resources = [
+            NodeResource(nodes=[dataNode], replicas=3, cpu=4),
+            NodeResource(nodes=[streamingNode], cpu=2, mem=8),
+            NodeResource(nodes=[queryNode], cpu=2, mem=14)  # mem < 8G
+        ]
+
+        self.concurrency_template(
+            input_params=input_params, cpu=dp.min_cpu, mem=dp.min_mem, deploy_mode=deploy_mode,
+            old_version_format=self.get_report_version_format(False),
+            case_callable_obj=self.get_callable_object(ConcurrentClientBase().scene_concurrent_locust),
+            default_case_params=default_case_params, node_resources=node_resources, deploy_architecture=architecture)
 
     @pytest.mark.parametrize("deploy_mode", [CLUSTER])
     def test_json_path_locust_resource_groups_reload_cluster(self, input_params: InputParamsBase, deploy_mode):
