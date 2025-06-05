@@ -1093,8 +1093,8 @@ class Base:
                                check_task=CheckTasks.checkResponse)
         self.search_partition(
             data=params.get_random_data, anns_field=params.anns_field, param=params.search_param, limit=params.limit,
-            partition_obj=partition_obj, check_task=CheckTasks.checkErrorResponse,
-            check_items={dv.code: 65535, dv.message: f"not loaded"}, log_level=log_level, **params.search_obj_params)
+            partition_obj=partition_obj, log_level=log_level,
+            **params.released_search_obj_params, **params.search_obj_params)
 
         # drop partition
         self.drop_partition(partition_obj, log_level=log_level)
@@ -1147,8 +1147,8 @@ class Base:
         self.release_partition(partition_obj, log_level=log_level, check_task=CheckTasks.checkResponse,
                                **params.obj_params)
         self.hybrid_search_partition(
-            reqs=params.get_random_data()[0], partition_obj=partition_obj, check_task=CheckTasks.checkErrorResponse,
-            check_items={dv.code: 65535, dv.message: f"not loaded"}, log_level=log_level, **params.search_obj_params)
+            reqs=params.get_random_data()[0], partition_obj=partition_obj, log_level=log_level,
+            **params.released_hybrid_search_obj_params, **params.search_obj_params)
 
         # drop partition
         self.drop_partition(partition_obj, log_level=log_level, **params.obj_params)

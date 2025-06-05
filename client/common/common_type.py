@@ -15,6 +15,9 @@ class Error:
 
         self.response = res
 
+    def check_result(self, code, message):
+        return (self.code is not None or self.message is not None) and (self.code == code or self.message in message)
+
 
 class CheckTasks:
     """ The name of the method used to check the result """

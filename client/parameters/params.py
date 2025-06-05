@@ -137,7 +137,7 @@ class ParamsFormat:
         dataset_params: {dataset_name: ([type(str())], MUST),
                          dim: ([type(int())], MUST),
                          dataset_size: ([type(str()), type(int())], MUST),
-                         ni_per: ([type(list()),  type(int())], MUST)},
+                         ni_per: ([type(list()), type(int())], MUST)},
     }, base)
 
     common_scene_build_index = update_dict_value({
@@ -1286,8 +1286,12 @@ class ConcurrentTaskSceneTestPartition(DataClassBase):
 
     def __post_init__(self):
         self.flush_obj_params = {"timeout": self.timeout, "check_task": None, "check_items": None}
+        self.released_search_obj_params = {
+            "check_task": CheckTasks.checkErrorResponse,
+            "check_items": {DefaultValue.code: 65535, DefaultValue.message: f"not loaded"}
+        }
 
-        for k, v in parser_check_tasks(check_tasks=self.check_tasks, requests=[flush]).items():
+        for k, v in parser_check_tasks(check_tasks=self.check_tasks, requests=[flush, released_search]).items():
             _obj = getattr(self, f"{k}_obj_params", None)
             if _obj and isinstance(_obj, dict) and isinstance(v, dict):
                 _obj.update({
@@ -1295,8 +1299,8 @@ class ConcurrentTaskSceneTestPartition(DataClassBase):
                     "check_items": v.get("check_items", _obj.get("check_items", None))
                 })
 
-        log.debug("[{0}] Init done, flush_obj_params: {1}".format(
-            "ConcurrentTaskSceneTestPartition", self.flush_obj_params))
+        log.debug("[{0}] Init done, flush_obj_params: {1}, released_search_obj_params: {2}".format(
+            "ConcurrentTaskSceneTestPartition", self.flush_obj_params, self.released_search_obj_params))
 
     @property
     def search_obj_params(self):
@@ -1388,8 +1392,12 @@ class ConcurrentTaskSceneTestPartitionHybridSearch(DataClassBase):
 
     def __post_init__(self):
         self.flush_obj_params = {"timeout": self.timeout, "check_task": None, "check_items": None}
+        self.released_hybrid_search_obj_params = {
+            "check_task": CheckTasks.checkErrorResponse,
+            "check_items": {DefaultValue.code: 65535, DefaultValue.message: f"not loaded"}
+        }
 
-        for k, v in parser_check_tasks(check_tasks=self.check_tasks, requests=[flush]).items():
+        for k, v in parser_check_tasks(check_tasks=self.check_tasks, requests=[flush, released_hybrid_search]).items():
             _obj = getattr(self, f"{k}_obj_params", None)
             if _obj and isinstance(_obj, dict) and isinstance(v, dict):
                 _obj.update({
@@ -1397,8 +1405,9 @@ class ConcurrentTaskSceneTestPartitionHybridSearch(DataClassBase):
                     "check_items": v.get("check_items", _obj.get("check_items", None))
                 })
 
-        log.debug("[{0}] Init done, flush_obj_params: {1}".format(
-            "ConcurrentTaskSceneTestPartitionHybridSearch", self.flush_obj_params))
+        log.debug("[{0}] Init done, flush_obj_params: {1}, released_hybrid_search_obj_params: {2}".format(
+            "ConcurrentTaskSceneTestPartitionHybridSearch", self.flush_obj_params,
+            self.released_hybrid_search_obj_params))
 
     def get_random_data(self):
         _reqs = self.reqs

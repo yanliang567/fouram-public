@@ -1,4 +1,4 @@
-from typing import Union, List
+from typing import Union, Optional, List, Dict
 
 from client.client_base import MilvusException, ExtraList
 from client.common.common_type import Error, CheckTasks, DefaultValue as dv
@@ -19,6 +19,8 @@ class InterfaceCheckTasks:
     insert = CheckTasks.base_check()
     upsert = CheckTasks.base_check()
     delete = CheckTasks.base_check()
+    released_search = CheckTasks.base_check()
+    released_hybrid_search = CheckTasks.base_check()
 
 
 def parser_check_items(check_items) -> List[Error]:
@@ -107,20 +109,26 @@ class ResponseChecker:
         assert actual is expect
         return actual is expect
 
-    def check_error_response(self, res, actual=True, check_items: Error = Error({})):
+    def check_error_response(self, res, actual=True, check_items: Union[List[dict], Dict] = {}):
         if not (actual is False):
             raise ValueError(f"[CheckFunc] `{self.func_name}` requests successful, check response error failed !!!")
 
         if isinstance(res, MilvusException):
             if isinstance(check_items, dict):
                 check_items = Error(check_items)
-                if (check_items.code is not None or check_items.message is not None) and (
-                        not (check_items.code == res.code or check_items.message in res.message)):
+                if not check_items.check_result(code=res.code, message=res.message):
                     raise ValueError(
                         '[CheckFunc] Check `{0}` response error failed: ({1} == {2} or "{3}" in "{4}")'.format(
                             self.func_name, check_items.code, res.code, check_items.message, res.message))
+            elif isinstance(check_items, list) and all(isinstance(i, dict) for i in check_items):
+                # check multi-result
+                if True not in [c.check_result(code=res.code, message=res.message) for c in
+                                [Error(check_item) for check_item in check_items]]:
+                    raise ValueError(
+                        '[CheckFunc] Check `{0}` response error failed: ({1}, "{2}") not in check items: {3}'.format(
+                            self.func_name, res.code, res.message, check_items))
             else:
-                log.warning("[CheckFunc] `check_items` is not a dict, please check !!!")
+                log.warning("[CheckFunc] `check_items` is not a dict or List[dict], please check !!!")
         else:
             log.error(f"[CheckFunc] Response of API is not an error of `MilvusException`: {type(res)}")
             assert False

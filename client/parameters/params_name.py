@@ -42,6 +42,10 @@ load_hybrid_search_release = "load_hybrid_search_release"
 scene_search_test = "scene_search_test"
 scene_hybrid_search_test = "scene_hybrid_search_test"
 
+# Special Requests
+released_search = "released_search"
+released_hybrid_search = "released_hybrid_search"
+
 # all used
 timeout = "timeout"
 

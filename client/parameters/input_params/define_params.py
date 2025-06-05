@@ -1073,11 +1073,17 @@ class Expr:
 class CheckItems:
     IgnoreFlushRateLimitAndTimeout = [{pn.message: ServerExceptionsMessage.RateLimitError},
                                       {pn.message: ServerExceptionsMessage.FlushTimeout}]
+    DqlReleasedPartition = [{pn.code: 65535, pn.message: f"not loaded"},
+                            {pn.code: 500, pn.message: f"channel not found"}]
 
 
 class CheckTasksDefine:
-    FlushIgnoreFlushRateLimitAndTimeout = {'flush': {"check_task": CheckTasks.checkIgnoreExpectedErrors,
-                                                     "check_items": CheckItems.IgnoreFlushRateLimitAndTimeout}}
+    FlushIgnoreFlushRateLimitAndTimeout = {pn.flush: {"check_task": CheckTasks.checkIgnoreExpectedErrors,
+                                                      "check_items": CheckItems.IgnoreFlushRateLimitAndTimeout}}
+    SearchReleasedPartition = {pn.released_search: {"check_task": CheckTasks.checkErrorResponse,
+                                                    "check_items": CheckItems.DqlReleasedPartition}}
+    HybridSearchReleasedPartition = {pn.released_hybrid_search: {"check_task": CheckTasks.checkErrorResponse,
+                                                                 "check_items": CheckItems.DqlReleasedPartition}}
 
 
 @dataclass

@@ -822,7 +822,7 @@ concurrent_tasks:
 
       # check request result
       # e.g.: {<flush>: {"check_task": <request check task>, "check_items": <items for task>} ... }
-      # only supports `flush`
+      # supports `flush`, `released_search`(search released partition)
 #      check_tasks:
 #        flush:
 #          check_task: check_ignore_expected_errors
@@ -859,7 +859,7 @@ concurrent_tasks:
 
       # check request result
       # e.g.: {<flush>: {"check_task": <request check task>, "check_items": <items for task>} ... }
-      # only supports `flush`
+      # supports `flush`, `released_hybrid_search`(hybrid_search released partition)
 #      check_tasks:
 #        flush:
 #          check_task: check_ignore_rate_limit

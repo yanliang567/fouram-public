@@ -6472,12 +6472,17 @@ class TestFeatureCases(PerfTemplate):
         concurrent_tasks = [
             ConcurrentParams.params_scene_insert_partition(data_size=3000, ni=1000, with_flush=True, timeout=600),
             ConcurrentParams.params_scene_test_partition(
-                data_size=3000, ni=3000, search_param={"nprobe": 64}, limit=1, output_fields=["*"], timeout=600),
+                data_size=3000, ni=3000, search_param={"nprobe": 64}, limit=1, output_fields=["*"], timeout=600,
+                check_tasks=dict_merge([CheckTasksDefine.FlushIgnoreFlushRateLimitAndTimeout,
+                                        CheckTasksDefine.SearchReleasedPartition]),
+            ),
             ConcurrentParams.params_scene_test_partition_hybrid_search(
                 data_size=3000, ni=3000, nq=1, top_k=1, output_fields=["*"], timeout=600,
                 reqs=[HybridSearchReqParams(anns_field="float_vector", search_param={"nprobe": 128}, top_k=100),
                       HybridSearchReqParams(anns_field="float_vector_1", search_param={"ef": 64}, top_k=10)],
-                rerank=HybridSearchRerankParams(RRFRanker=[])
+                rerank=HybridSearchRerankParams(RRFRanker=[]),
+                check_tasks=dict_merge([CheckTasksDefine.FlushIgnoreFlushRateLimitAndTimeout,
+                                        CheckTasksDefine.HybridSearchReleasedPartition]),
             ),
             ConcurrentParams.params_release_partitions(partitions=partition_names, timeout=180),
             ConcurrentParams.params_upsert(nb=1, random_id=True, random_vector=True, start_id=dataset_size)
@@ -8942,7 +8947,8 @@ class TestFeatureCases(PerfTemplate):
                 weight=10, data_size=6000, ni=2000, search_param={"ef": 32}, limit=1, output_fields=["*"], timeout=600,
                 search_counts=10, expr=Expr.GT('json_1["id"]', 10).value,
                 data_organization=DataOrganization.row_insert, dynamic_fields=all_dynamic_fields,
-                check_tasks=CheckTasksDefine.FlushIgnoreFlushRateLimitAndTimeout,
+                check_tasks=dict_merge([CheckTasksDefine.FlushIgnoreFlushRateLimitAndTimeout,
+                                        CheckTasksDefine.SearchReleasedPartition]),
             ),
             ConcurrentParams.params_scene_test_partition_hybrid_search(
                 weight=10, data_size=5000, ni=3000,
@@ -8953,7 +8959,8 @@ class TestFeatureCases(PerfTemplate):
                                             expr=Expr.EQ(Expr.MOD('json_dynamic_1["id"]', 10), 1).value)],
                 rerank=HybridSearchRerankParams(RRFRanker=[]),
                 data_organization=DataOrganization.row_insert, dynamic_fields=all_dynamic_fields,
-                check_tasks=CheckTasksDefine.FlushIgnoreFlushRateLimitAndTimeout,
+                check_tasks=dict_merge([CheckTasksDefine.FlushIgnoreFlushRateLimitAndTimeout,
+                                        CheckTasksDefine.HybridSearchReleasedPartition]),
             ),
             ConcurrentParams.params_release_partitions(weight=1, partitions=partition_names, timeout=600),
             ConcurrentParams.params_upsert(weight=10, nb=10, random_id=True, random_vector=True, start_id=dataset_size)

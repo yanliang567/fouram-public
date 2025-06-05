@@ -12,6 +12,10 @@ release       = ["check_response", "check_error_response", "check_ignore_expecte
 insert        = ["check_response", "check_error_response", "check_ignore_expected_errors"]
 upsert        = ["check_response", "check_error_response", "check_ignore_expected_errors"]
 delete        = ["check_response", "check_error_response", "check_ignore_expected_errors"]
+
+# Special Requests
+released_search        = ["check_response", "check_error_response", "check_ignore_expected_errors"]
+released_hybrid_search = ["check_response", "check_error_response", "check_ignore_expected_errors"]
 ```
 
 ### Instructions for use
