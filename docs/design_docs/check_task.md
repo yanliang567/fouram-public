@@ -49,16 +49,27 @@ check_task: check_response
 ```
 
 #### 2. `check_error_response`
-  - check if the request `failed`.
+  - Dist: check if the request `failed`
+  - List[Dict]: check that at least one result matches the response
 
 Judgment Logic:
 pass at least one of `code` and `message`
 - check (`code` == `actual response code`) or (`message` in `actual response message`)
 ```yaml
+# example 1
 check_task: check_error_response
 check_items:
   code: int
   message: str
+```
+```yaml
+# example 2
+check_task: check_error_response
+check_items:
+- code: int
+  message: str
+- code: int
+- message: str
 ```
 
 #### 3. `check_ignore_expected_errors`

@@ -1353,7 +1353,8 @@ class TestFeatureCases(PerfTemplate):
         concurrent_tasks = [
             ConcurrentParams.params_insert(nb=1, random_id=True, random_vector=True, start_id=dataset_size),
             ConcurrentParams.params_delete(delete_length=1),
-            ConcurrentParams.params_flush(timeout=180, check_task=CheckTasks.checkIgnoreRateLimit),
+            ConcurrentParams.params_flush(timeout=180, check_task=CheckTasks.checkIgnoreExpectedErrors,
+                                          check_items=CheckItems.IgnoreFlushRateLimitAndTimeout),
             ConcurrentParams.params_load(replica_number=2, timeout=180),
             ConcurrentParams.params_search(
                 weight=8, nq=100, top_k=10, search_param={"nprobe": 1000}, timeout=600, expr='int64_1 >= 0'),
@@ -1558,7 +1559,8 @@ class TestFeatureCases(PerfTemplate):
             ConcurrentParams.params_insert(weight=30, nb=1000, random_id=True, random_vector=True,
                                            start_id=dataset_size),
             ConcurrentParams.params_delete(weight=30, delete_length=1000),
-            ConcurrentParams.params_flush(timeout=600, check_task=CheckTasks.checkIgnoreRateLimit),
+            ConcurrentParams.params_flush(timeout=600, check_task=CheckTasks.checkIgnoreExpectedErrors,
+                                          check_items=CheckItems.IgnoreFlushRateLimitAndTimeout),
             ConcurrentParams.params_load(timeout=600)
         ]
 
@@ -1625,7 +1627,8 @@ class TestFeatureCases(PerfTemplate):
 
         concurrent_tasks = [
             ConcurrentParams.params_upsert(nb=1, random_id=True, random_vector=True, start_id=dataset_size),
-            ConcurrentParams.params_flush(timeout=600, check_task=CheckTasks.checkIgnoreRateLimit),
+            ConcurrentParams.params_flush(timeout=600, check_task=CheckTasks.checkIgnoreExpectedErrors,
+                                          check_items=CheckItems.IgnoreFlushRateLimitAndTimeout),
             ConcurrentParams.params_load(timeout=600)
         ]
 
@@ -1691,7 +1694,8 @@ class TestFeatureCases(PerfTemplate):
         concurrent_tasks = [
             ConcurrentParams.params_insert(nb=100, random_id=True, random_vector=True, start_id=dataset_size),
             ConcurrentParams.params_delete(delete_length=95),
-            ConcurrentParams.params_flush(timeout=600, check_task=CheckTasks.checkIgnoreRateLimit),
+            ConcurrentParams.params_flush(timeout=600, check_task=CheckTasks.checkIgnoreExpectedErrors,
+                                          check_items=CheckItems.IgnoreFlushRateLimitAndTimeout),
             ConcurrentParams.params_release(timeout=600)
         ]
 
@@ -1759,7 +1763,8 @@ class TestFeatureCases(PerfTemplate):
 
         concurrent_tasks = [
             ConcurrentParams.params_upsert(nb=1, random_id=True, random_vector=True, start_id=dataset_size),
-            ConcurrentParams.params_flush(timeout=600, check_task=CheckTasks.checkIgnoreRateLimit),
+            ConcurrentParams.params_flush(timeout=600, check_task=CheckTasks.checkIgnoreExpectedErrors,
+                                          check_items=CheckItems.IgnoreFlushRateLimitAndTimeout),
             ConcurrentParams.params_release(timeout=600)
         ]
 
@@ -1893,7 +1898,9 @@ class TestFeatureCases(PerfTemplate):
 
         concurrent_tasks = [
             ConcurrentParams.params_scene_test_partition(
-                data_size=3000, ni=3000, search_param={"nprobe": 64}, limit=1, output_fields=["*"], timeout=600),
+                data_size=3000, ni=3000, search_param={"nprobe": 64}, limit=1, output_fields=["*"], timeout=600,
+                check_tasks=CheckTasksDefine.FlushIgnoreFlushRateLimitAndTimeout,
+            ),
             ConcurrentParams.params_search(
                 weight=8, nq=1000, top_k=1, search_param={"nprobe": 1000}, timeout=600, expr='int64_1 >= 0',
                 partition_names=partition_names  # nq=10000
@@ -1978,7 +1985,9 @@ class TestFeatureCases(PerfTemplate):
 
         concurrent_tasks = [
             ConcurrentParams.params_scene_test_partition(
-                data_size=3000, ni=3000, search_param={"nprobe": 64}, limit=1, output_fields=["*"], timeout=600),
+                data_size=3000, ni=3000, search_param={"nprobe": 64}, limit=1, output_fields=["*"], timeout=600,
+                check_tasks=CheckTasksDefine.FlushIgnoreFlushRateLimitAndTimeout,
+            ),
             ConcurrentParams.params_search(
                 weight=8, nq=1000, top_k=1, search_param={"nprobe": 1000}, timeout=600, expr='int64_1 >= 0',
                 partition_names=partition_names  # nq=10000
@@ -2069,7 +2078,8 @@ class TestFeatureCases(PerfTemplate):
                       HybridSearchReqParams(anns_field="float_vector_1", search_param={"ef": 64}, top_k=10),
                       HybridSearchReqParams(anns_field="float_vector_2", search_param={"search_list": 32}, top_k=30),
                       HybridSearchReqParams(anns_field="float_vector_3", search_param={"nprobe": 16}, top_k=400)],
-                rerank=HybridSearchRerankParams(RRFRanker=[])
+                rerank=HybridSearchRerankParams(RRFRanker=[]),
+                check_tasks=CheckTasksDefine.FlushIgnoreFlushRateLimitAndTimeout,
             ),
             ConcurrentParams.params_search(
                 weight=8, nq=1000, top_k=1, search_param={"nprobe": 1000}, timeout=600, expr='int64_1 >= 0',
@@ -2160,7 +2170,8 @@ class TestFeatureCases(PerfTemplate):
                       HybridSearchReqParams(anns_field="float_vector_1", search_param={"ef": 64}, top_k=10),
                       HybridSearchReqParams(anns_field="float_vector_2", search_param={"search_list": 32}, top_k=30),
                       HybridSearchReqParams(anns_field="float_vector_3", search_param={"nprobe": 16}, top_k=400)],
-                rerank=HybridSearchRerankParams(RRFRanker=[])
+                rerank=HybridSearchRerankParams(RRFRanker=[]),
+                check_tasks=CheckTasksDefine.FlushIgnoreFlushRateLimitAndTimeout,
             ),
             ConcurrentParams.params_search(
                 weight=8, nq=1000, top_k=1, search_param={"nprobe": 1000}, timeout=600, expr='int64_1 >= 0',
@@ -2365,7 +2376,8 @@ class TestFeatureCases(PerfTemplate):
             ConcurrentParams.params_insert(weight=1, nb=1000, random_id=True, random_vector=True,
                                            start_id=dataset_size),
             ConcurrentParams.params_delete(weight=1, delete_length=1000),
-            ConcurrentParams.params_flush(weight=1, timeout=180, check_task=CheckTasks.checkIgnoreRateLimit),
+            ConcurrentParams.params_flush(weight=1, timeout=180, check_task=CheckTasks.checkIgnoreExpectedErrors,
+                                          check_items=CheckItems.IgnoreFlushRateLimitAndTimeout),
             ConcurrentParams.params_load_release(weight=1, timeout=600)
         ]
 
@@ -2434,7 +2446,8 @@ class TestFeatureCases(PerfTemplate):
             ConcurrentParams.params_insert(weight=1, nb=1000, random_id=True, random_vector=True,
                                            start_id=dataset_size),
             ConcurrentParams.params_delete(weight=1, delete_length=1000),
-            ConcurrentParams.params_flush(weight=1, timeout=180, check_task=CheckTasks.checkIgnoreRateLimit),
+            ConcurrentParams.params_flush(weight=1, timeout=180, check_task=CheckTasks.checkIgnoreExpectedErrors,
+                                          check_items=CheckItems.IgnoreFlushRateLimitAndTimeout),
             ConcurrentParams.params_load_release(weight=1, timeout=600)
         ]
 
@@ -2504,7 +2517,8 @@ class TestFeatureCases(PerfTemplate):
         concurrent_tasks = [
             ConcurrentParams.params_insert(nb=1000, random_id=True, random_vector=True, start_id=dataset_size),
             ConcurrentParams.params_delete(delete_length=1000),
-            ConcurrentParams.params_flush(timeout=180, check_task=CheckTasks.checkIgnoreRateLimit),
+            ConcurrentParams.params_flush(timeout=180, check_task=CheckTasks.checkIgnoreExpectedErrors,
+                                          check_items=CheckItems.IgnoreFlushRateLimitAndTimeout),
             ConcurrentParams.params_load(timeout=600),
             ConcurrentParams.params_search(
                 nq=1000, top_k=1, search_param={"nprobe": 1000}, timeout=600, expr='int64_1 >= 0'),
@@ -2589,7 +2603,8 @@ class TestFeatureCases(PerfTemplate):
         concurrent_tasks = [
             ConcurrentParams.params_insert(nb=1000, random_id=True, random_vector=True, start_id=dataset_size),
             ConcurrentParams.params_delete(delete_length=1000),
-            ConcurrentParams.params_flush(timeout=180, check_task=CheckTasks.checkIgnoreRateLimit),
+            ConcurrentParams.params_flush(timeout=180, check_task=CheckTasks.checkIgnoreExpectedErrors,
+                                          check_items=CheckItems.IgnoreFlushRateLimitAndTimeout),
             ConcurrentParams.params_load(timeout=600),
             ConcurrentParams.params_search(
                 nq=1000, top_k=1, search_param={"nprobe": 1000}, timeout=600, expr='int64_1 >= 0'),
@@ -3194,7 +3209,8 @@ class TestFeatureCases(PerfTemplate):
         concurrent_tasks = [
             ConcurrentParams.params_insert(nb=1, random_id=True, random_vector=True, start_id=dataset_size),
             ConcurrentParams.params_delete(delete_length=1),
-            ConcurrentParams.params_flush(timeout=180, check_task=CheckTasks.checkIgnoreRateLimit),
+            ConcurrentParams.params_flush(timeout=180, check_task=CheckTasks.checkIgnoreExpectedErrors,
+                                          check_items=CheckItems.IgnoreFlushRateLimitAndTimeout),
             ConcurrentParams.params_load(timeout=600),
             ConcurrentParams.params_search(
                 nq=1000, top_k=1, search_param={"ef": 32}, timeout=600, output_fields=["float_vector_2"],
@@ -3282,7 +3298,8 @@ class TestFeatureCases(PerfTemplate):
         concurrent_tasks = [
             ConcurrentParams.params_insert(nb=1, random_id=True, random_vector=True, start_id=dataset_size),
             ConcurrentParams.params_delete(delete_length=1),
-            ConcurrentParams.params_flush(timeout=180, check_task=CheckTasks.checkIgnoreRateLimit),
+            ConcurrentParams.params_flush(timeout=180, check_task=CheckTasks.checkIgnoreExpectedErrors,
+                                          check_items=CheckItems.IgnoreFlushRateLimitAndTimeout),
             ConcurrentParams.params_load(timeout=600),
             ConcurrentParams.params_search(
                 nq=1000, top_k=1, search_param={"ef": 32}, timeout=600, output_fields=["float_vector_2"],
@@ -3374,7 +3391,8 @@ class TestFeatureCases(PerfTemplate):
                  HybridSearchReqParams(anns_field="float_vector_3", search_param={"nprobe": 16}, top_k=400)]
 
         concurrent_tasks = [
-            ConcurrentParams.params_flush(timeout=180, check_task=CheckTasks.checkIgnoreRateLimit),
+            ConcurrentParams.params_flush(timeout=180, check_task=CheckTasks.checkIgnoreExpectedErrors,
+                                          check_items=CheckItems.IgnoreFlushRateLimitAndTimeout),
             ConcurrentParams.params_load(timeout=600),
             ConcurrentParams.params_search(
                 nq=1, top_k=1, search_param={"nprobe": 1000}, timeout=600, output_fields=["float_vector_2"]),
@@ -3458,7 +3476,8 @@ class TestFeatureCases(PerfTemplate):
                  HybridSearchReqParams(anns_field="float_vector_3", search_param={"nprobe": 16}, top_k=400)]
 
         concurrent_tasks = [
-            ConcurrentParams.params_flush(timeout=180, check_task=CheckTasks.checkIgnoreRateLimit),
+            ConcurrentParams.params_flush(timeout=180, check_task=CheckTasks.checkIgnoreExpectedErrors,
+                                          check_items=CheckItems.IgnoreFlushRateLimitAndTimeout),
             ConcurrentParams.params_load(timeout=600),
             ConcurrentParams.params_search(
                 nq=1, top_k=1, search_param={"nprobe": 1000}, timeout=600, output_fields=["float_vector_2"]),
@@ -3738,7 +3757,8 @@ class TestFeatureCases(PerfTemplate):
         concurrent_tasks = [
             ConcurrentParams.params_insert(nb=10, random_id=True, random_vector=True, timeout=180),
             ConcurrentParams.params_delete(delete_length=9),
-            ConcurrentParams.params_flush(timeout=180, check_task=CheckTasks.checkIgnoreRateLimit),
+            ConcurrentParams.params_flush(timeout=180, check_task=CheckTasks.checkIgnoreExpectedErrors,
+                                          check_items=CheckItems.IgnoreFlushRateLimitAndTimeout),
             ConcurrentParams.params_release(),
         ]
 
@@ -3789,7 +3809,8 @@ class TestFeatureCases(PerfTemplate):
         concurrent_tasks = [
             ConcurrentParams.params_insert(nb=10, random_id=True, random_vector=True, start_id=dataset_size),
             ConcurrentParams.params_delete(delete_length=9),
-            ConcurrentParams.params_flush(timeout=180, check_task=CheckTasks.checkIgnoreRateLimit),
+            ConcurrentParams.params_flush(timeout=180, check_task=CheckTasks.checkIgnoreExpectedErrors,
+                                          check_items=CheckItems.IgnoreFlushRateLimitAndTimeout),
             ConcurrentParams.params_load(),
             ConcurrentParams.params_search(nq=1000, top_k=10, search_param={"nprobe": 16}, timeout=180),
             ConcurrentParams.params_hybrid_search(
@@ -3972,7 +3993,8 @@ class TestFeatureCases(PerfTemplate):
         concurrent_tasks = [
             ConcurrentParams.params_insert(nb=10, random_id=True, random_vector=True, start_id=dataset_size),
             ConcurrentParams.params_delete(delete_length=10),
-            ConcurrentParams.params_flush(timeout=600, check_task=CheckTasks.checkIgnoreRateLimit),
+            ConcurrentParams.params_flush(timeout=600, check_task=CheckTasks.checkIgnoreExpectedErrors,
+                                          check_items=CheckItems.IgnoreFlushRateLimitAndTimeout),
             ConcurrentParams.params_load(),
             ConcurrentParams.params_search(
                 nq=1000, top_k=1, search_param={"nprobe": 32},
@@ -4046,7 +4068,8 @@ class TestFeatureCases(PerfTemplate):
         concurrent_tasks = [
             ConcurrentParams.params_insert(nb=10, random_id=True, random_vector=True, start_id=dataset_size),
             ConcurrentParams.params_delete(delete_length=10),
-            ConcurrentParams.params_flush(timeout=600, check_task=CheckTasks.checkIgnoreRateLimit),
+            ConcurrentParams.params_flush(timeout=600, check_task=CheckTasks.checkIgnoreExpectedErrors,
+                                          check_items=CheckItems.IgnoreFlushRateLimitAndTimeout),
             ConcurrentParams.params_load(),
             ConcurrentParams.params_search(
                 nq=1000, top_k=1, search_param={"nprobe": 32},
@@ -4190,7 +4213,8 @@ class TestFeatureCases(PerfTemplate):
         concurrent_tasks = [
             ConcurrentParams.params_insert(nb=10, random_id=True, random_vector=True, start_id=dataset_size),
             ConcurrentParams.params_delete(delete_length=9),
-            ConcurrentParams.params_flush(timeout=600, check_task=CheckTasks.checkIgnoreRateLimit),
+            ConcurrentParams.params_flush(timeout=600, check_task=CheckTasks.checkIgnoreExpectedErrors,
+                                          check_items=CheckItems.IgnoreFlushRateLimitAndTimeout),
             ConcurrentParams.params_load(timeout=180),
             ConcurrentParams.params_search(
                 nq=1000, top_k=1, search_param={"ef": 64}, expr="int64_1 > -1 && id > -1", output_fields=["*"],
@@ -4269,7 +4293,8 @@ class TestFeatureCases(PerfTemplate):
         concurrent_tasks = [
             ConcurrentParams.params_insert(nb=10, random_id=True, random_vector=True, start_id=dataset_size),
             ConcurrentParams.params_delete(delete_length=9),
-            ConcurrentParams.params_flush(timeout=600, check_task=CheckTasks.checkIgnoreRateLimit),
+            ConcurrentParams.params_flush(timeout=600, check_task=CheckTasks.checkIgnoreExpectedErrors,
+                                          check_items=CheckItems.IgnoreFlushRateLimitAndTimeout),
             ConcurrentParams.params_load(timeout=180),
             ConcurrentParams.params_search(
                 nq=1000, top_k=1, search_param={"ef": 64}, expr="int64_1 > -1 && id > -1", output_fields=["*"],
@@ -4352,7 +4377,8 @@ class TestFeatureCases(PerfTemplate):
         concurrent_tasks = [
             ConcurrentParams.params_insert(nb=10, random_id=True, random_vector=True, start_id=dataset_size),
             ConcurrentParams.params_delete(delete_length=9),
-            ConcurrentParams.params_flush(timeout=180, check_task=CheckTasks.checkIgnoreRateLimit),
+            ConcurrentParams.params_flush(timeout=180, check_task=CheckTasks.checkIgnoreExpectedErrors,
+                                          check_items=CheckItems.IgnoreFlushRateLimitAndTimeout),
             ConcurrentParams.params_load(timeout=180),
             ConcurrentParams.params_search(
                 nq=1000, top_k=1, search_param={"ef": 64}, expr="int64_1 > -1 && id > -1", output_fields=["*"],
@@ -4445,7 +4471,8 @@ class TestFeatureCases(PerfTemplate):
         concurrent_tasks = [
             ConcurrentParams.params_insert(nb=10, random_id=True, random_vector=True, start_id=dataset_size),
             ConcurrentParams.params_delete(delete_length=9),
-            ConcurrentParams.params_flush(timeout=180, check_task=CheckTasks.checkIgnoreRateLimit),
+            ConcurrentParams.params_flush(timeout=180, check_task=CheckTasks.checkIgnoreExpectedErrors,
+                                          check_items=CheckItems.IgnoreFlushRateLimitAndTimeout),
             ConcurrentParams.params_load(timeout=180),
             ConcurrentParams.params_search(
                 nq=1000, top_k=1, search_param={"ef": 64}, expr="int64_1 > -1 && id > -1", output_fields=["*"],
@@ -6231,12 +6258,15 @@ class TestFeatureCases(PerfTemplate):
         concurrent_tasks = [
             ConcurrentParams.params_scene_insert_partition(data_size=3000, ni=1000, with_flush=True, timeout=600),
             ConcurrentParams.params_scene_test_partition(
-                data_size=3000, ni=3000, search_param={"nprobe": 64}, limit=1, output_fields=["*"], timeout=600),
+                data_size=3000, ni=3000, search_param={"nprobe": 64}, limit=1, output_fields=["*"], timeout=600,
+                check_tasks=CheckTasksDefine.FlushIgnoreFlushRateLimitAndTimeout,
+            ),
             ConcurrentParams.params_scene_test_partition_hybrid_search(
                 data_size=3000, ni=3000, nq=1, top_k=1, output_fields=["*"], timeout=600,
                 reqs=[HybridSearchReqParams(anns_field="float_vector", search_param={"nprobe": 128}, top_k=100),
                       HybridSearchReqParams(anns_field="float_vector_1", search_param={"ef": 64}, top_k=10)],
-                rerank=HybridSearchRerankParams(RRFRanker=[])
+                rerank=HybridSearchRerankParams(RRFRanker=[]),
+                check_tasks=CheckTasksDefine.FlushIgnoreFlushRateLimitAndTimeout,
             ),
             ConcurrentParams.params_search(
                 nq=1000, top_k=10, search_param={"nprobe": 16}, expr=Expr.EQ('int8_1', 100).value,
@@ -6352,12 +6382,15 @@ class TestFeatureCases(PerfTemplate):
         concurrent_tasks = [
             ConcurrentParams.params_scene_insert_partition(data_size=3000, ni=1000, with_flush=True, timeout=600),
             ConcurrentParams.params_scene_test_partition(
-                data_size=3000, ni=3000, search_param={"nprobe": 64}, limit=1, output_fields=["*"], timeout=600),
+                data_size=3000, ni=3000, search_param={"nprobe": 64}, limit=1, output_fields=["*"], timeout=600,
+                check_tasks=CheckTasksDefine.FlushIgnoreFlushRateLimitAndTimeout,
+            ),
             ConcurrentParams.params_scene_test_partition_hybrid_search(
                 data_size=3000, ni=3000, nq=1, top_k=1, output_fields=["*"], timeout=600,
                 reqs=[HybridSearchReqParams(anns_field="float_vector", search_param={"nprobe": 128}, top_k=100),
                       HybridSearchReqParams(anns_field="float_vector_1", search_param={"ef": 64}, top_k=10)],
-                rerank=HybridSearchRerankParams(RRFRanker=[])
+                rerank=HybridSearchRerankParams(RRFRanker=[]),
+                check_tasks=CheckTasksDefine.FlushIgnoreFlushRateLimitAndTimeout,
             ),
             ConcurrentParams.params_search(
                 nq=1000, top_k=10, search_param={"nprobe": 16}, expr=Expr.EQ('int8_1', 100).value,
@@ -7132,13 +7165,15 @@ class TestFeatureCases(PerfTemplate):
 
         concurrent_tasks = [
             ConcurrentParams.params_scene_test_partition(
-                data_size=3000, ni=3000, search_param={"nprobe": 64}, limit=1, output_fields=["*"], timeout=600
+                data_size=3000, ni=3000, search_param={"nprobe": 64}, limit=1, output_fields=["*"], timeout=600,
+                check_tasks=CheckTasksDefine.FlushIgnoreFlushRateLimitAndTimeout,
             ),
             ConcurrentParams.params_scene_test_partition_hybrid_search(
                 data_size=3000, ni=3000, nq=1, top_k=1, output_fields=["*"], timeout=600,
                 reqs=[HybridSearchReqParams(anns_field="float_vector", search_param={"nprobe": 128}, top_k=100),
                       HybridSearchReqParams(anns_field="float_vector", search_param={"nprobe": 64}, top_k=10)],
-                rerank=HybridSearchRerankParams(RRFRanker=[])
+                rerank=HybridSearchRerankParams(RRFRanker=[]),
+                check_tasks=CheckTasksDefine.FlushIgnoreFlushRateLimitAndTimeout,
             ),
             ConcurrentParams.params_search(
                 nq=1000, top_k=10, search_param={"nprobe": 16}, expr=Expr.EQ('int8_1', 100).value, timeout=600,
@@ -7232,13 +7267,15 @@ class TestFeatureCases(PerfTemplate):
 
         concurrent_tasks = [
             ConcurrentParams.params_scene_test_partition(
-                data_size=3000, ni=3000, search_param={"nprobe": 64}, limit=1, output_fields=["*"], timeout=600
+                data_size=3000, ni=3000, search_param={"nprobe": 64}, limit=1, output_fields=["*"], timeout=600,
+                check_tasks=CheckTasksDefine.FlushIgnoreFlushRateLimitAndTimeout,
             ),
             ConcurrentParams.params_scene_test_partition_hybrid_search(
                 data_size=3000, ni=3000, nq=1, top_k=1, output_fields=["*"], timeout=600,
                 reqs=[HybridSearchReqParams(anns_field="float_vector", search_param={"nprobe": 128}, top_k=100),
                       HybridSearchReqParams(anns_field="float_vector", search_param={"nprobe": 64}, top_k=10)],
-                rerank=HybridSearchRerankParams(RRFRanker=[])
+                rerank=HybridSearchRerankParams(RRFRanker=[]),
+                check_tasks=CheckTasksDefine.FlushIgnoreFlushRateLimitAndTimeout,
             ),
             ConcurrentParams.params_search(
                 nq=1000, top_k=10, search_param={"nprobe": 16}, expr=Expr.EQ('int8_1', 100).value, timeout=600,

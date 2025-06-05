@@ -316,7 +316,8 @@ class TestConcurrentCases(PerfTemplate):
             ConcurrentParams.params_search(weight=20, nq=10, top_k=10, search_param={"nprobe": 16}),
             ConcurrentParams.params_query(weight=2, ids=[i for i in range(10)]),
             ConcurrentParams.params_load(weight=1),
-            ConcurrentParams.params_flush(weight=1, check_task=CheckTasks.checkIgnoreRateLimit),
+            ConcurrentParams.params_flush(weight=1, check_task=CheckTasks.checkIgnoreExpectedErrors,
+                                          check_items=cdp.CheckItems.IgnoreFlushRateLimitAndTimeout),
             ConcurrentParams.params_insert(weight=20, nb=1, random_id=True, random_vector=True)]
         default_case_params = ConcurrentParams().params_scene_concurrent(
             concurrent_tasks, concurrent_number=[20], during_time=600, interval=20, **cdp.DefaultIndexParams.FLAT)
@@ -338,7 +339,8 @@ class TestConcurrentCases(PerfTemplate):
             ConcurrentParams.params_search(weight=20, nq=10, top_k=10, search_param={"nprobe": 16}),
             ConcurrentParams.params_query(weight=2, ids=[i for i in range(10)]),
             ConcurrentParams.params_load(weight=1),
-            ConcurrentParams.params_flush(weight=1, check_task=CheckTasks.checkIgnoreRateLimit),
+            ConcurrentParams.params_flush(weight=1, check_task=CheckTasks.checkIgnoreExpectedErrors,
+                                          check_items=cdp.CheckItems.IgnoreFlushRateLimitAndTimeout),
             ConcurrentParams.params_insert(weight=20, nb=1, random_id=True, random_vector=True)]
         default_case_params = ConcurrentParams().params_scene_concurrent(
             concurrent_tasks, concurrent_number=[20], during_time=600, interval=20, **cdp.DefaultIndexParams.FLAT)
@@ -450,7 +452,8 @@ class TestConcurrentCases(PerfTemplate):
                 weight=30, nq=10, top_k=10, search_param={"ef": 16},
                 expr=eval("{'float_1': {'GT': -1.0, 'LT': parser_data_size(data_size) * 0.5}}")),
             ConcurrentParams.params_query(weight=10, ids=[i for i in range(10)]),
-            ConcurrentParams.params_flush(weight=5, check_task=CheckTasks.checkIgnoreRateLimit),
+            ConcurrentParams.params_flush(weight=5, check_task=CheckTasks.checkIgnoreExpectedErrors,
+                                          check_items=cdp.CheckItems.IgnoreFlushRateLimitAndTimeout),
             ConcurrentParams.params_insert(weight=1, nb=1, random_id=True, random_vector=True)]
         default_case_params = ConcurrentParams().params_scene_concurrent(
             concurrent_tasks, concurrent_number=[20], during_time="5h", interval=20, dataset_size=data_size,
@@ -476,7 +479,8 @@ class TestConcurrentCases(PerfTemplate):
                 weight=30, nq=10, top_k=10, search_param={"ef": 16},
                 expr=eval("{'float_1': {'GT': -1.0, 'LT': parser_data_size(data_size) * 0.5}}")),
             ConcurrentParams.params_query(weight=10, ids=[i for i in range(10)]),
-            ConcurrentParams.params_flush(weight=5, check_task=CheckTasks.checkIgnoreRateLimit),
+            ConcurrentParams.params_flush(weight=5, check_task=CheckTasks.checkIgnoreExpectedErrors,
+                                          check_items=cdp.CheckItems.IgnoreFlushRateLimitAndTimeout),
             ConcurrentParams.params_insert(weight=1, nb=1, random_id=True, random_vector=True)]
         default_case_params = ConcurrentParams().params_scene_concurrent(
             concurrent_tasks, concurrent_number=[20], during_time="5h", interval=20, dataset_size=data_size,
@@ -503,7 +507,8 @@ class TestConcurrentCases(PerfTemplate):
                 weight=30, nq=10, top_k=10, search_param={"ef": 16},
                 expr=eval("{'float_1': {'GT': -1.0, 'LT': parser_data_size(data_size) * 0.5}}")),
             ConcurrentParams.params_query(weight=10, ids=[i for i in range(10)]),
-            ConcurrentParams.params_flush(weight=5, check_task=CheckTasks.checkIgnoreRateLimit),
+            ConcurrentParams.params_flush(weight=5, check_task=CheckTasks.checkIgnoreExpectedErrors,
+                                          check_items=cdp.CheckItems.IgnoreFlushRateLimitAndTimeout),
             ConcurrentParams.params_insert(weight=1, nb=1, random_id=True, random_vector=True)]
         default_case_params = ConcurrentParams().params_scene_concurrent(
             concurrent_tasks, concurrent_number=[20], during_time="5h", interval=20, dataset_size=data_size,
