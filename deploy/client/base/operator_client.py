@@ -4,7 +4,9 @@ from pprint import pformat
 from deploy.client.base.base_client import BaseClient
 from deploy.client.base.dynamic_client import DynamicClient
 from deploy.configs import get_config_obj
-from deploy.commons.common_params import CLUSTER, STANDALONE, Milvus, PersistentVolumeClaim, Pod, Operator
+from deploy.commons.common_params import (
+    CLUSTER, STANDALONE, Milvus, PersistentVolumeClaim, Pod, Operator, OperatorDeployLabels
+)
 from deploy.commons.common_func import (
     update_dict_value, utc_conversion, format_dict_output, get_api_version, parser_op_item, check_multi_keys_exist,
     gen_deploy_config_name
@@ -294,20 +296,14 @@ class OperatorClient(BaseClient):
         for pvc_name in release_pvc:
             # _tt = utc_conversion(release_pvc[pvc_name]["metadata"]["creationTimestamp"])
             _tt = utc_conversion(check_multi_keys_exist(release_pvc, [pvc_name, "metadata", "creationTimestamp"]))
-            pvc_storage.append({"NAME": pvc_name,
-                                "STATUS": check_multi_keys_exist(release_pvc, [pvc_name, "status", "phase"]),
-                                "VOLUME": check_multi_keys_exist(release_pvc, [pvc_name, "spec", "volumeName"]),
-                                "CAPACITY": check_multi_keys_exist(release_pvc,
-                                                                   [pvc_name, "status", "capacity", "storage"]),
-                                "STORAGECLASS": check_multi_keys_exist(release_pvc,
-                                                                       [pvc_name, "spec", "storageClassName"]),
-                                "AGE": _tt})
-            # pvc_storage.append({"NAME": pvc_name,
-            #                     "STATUS": release_pvc[pvc_name]["status"]["phase"],
-            #                     "VOLUME": release_pvc[pvc_name]["spec"]["volumeName"],
-            #                     "CAPACITY": release_pvc[pvc_name]["status"]["capacity"]["storage"],
-            #                     "STORAGECLASS": release_pvc[pvc_name]["spec"]["storageClassName"],
-            #                     "AGE": _tt})
+            pvc_storage.append({
+                "NAME": pvc_name,
+                "STATUS": check_multi_keys_exist(release_pvc, [pvc_name, "status", "phase"]),
+                "VOLUME": check_multi_keys_exist(release_pvc, [pvc_name, "spec", "volumeName"]),
+                "CAPACITY": check_multi_keys_exist(release_pvc, [pvc_name, "status", "capacity", "storage"]),
+                "STORAGECLASS": check_multi_keys_exist(release_pvc, [pvc_name, "spec", "storageClassName"]),
+                "AGE": _tt
+            })
         log.info("[get_pvc] pvc storage class of release({0}): ".format(release_name))
         return format_dict_output(("NAME", "STATUS", "VOLUME", "CAPACITY", "STORAGECLASS", "AGE"), pvc_storage)
         # return pformat(pvc_storage)
@@ -317,15 +313,15 @@ class OperatorClient(BaseClient):
         release_name = release_name or self.release_name
         namespace = namespace or self.namespace
 
-        label_selectors = ["app.kubernetes.io/instance={0}".format(release_name),
-                           "app.kubernetes.io/instance={0}-etcd".format(release_name),
-                           "release={0}-pulsar".format(release_name),
-                           "app.kubernetes.io/instance={0}-kafka".format(release_name),
-                           # "release={0}-kafka".format(release_name),
-                           "release={0}-minio".format(release_name)]
+        # label_selectors = ["app.kubernetes.io/instance={0}".format(release_name),
+        #                    "app.kubernetes.io/instance={0}-etcd".format(release_name),
+        #                    "release={0}-pulsar".format(release_name),
+        #                    "app.kubernetes.io/instance={0}-kafka".format(release_name),
+        #                    # "release={0}-kafka".format(release_name),
+        #                    "release={0}-minio".format(release_name)]
 
         pod_details_list = []
-        for label in label_selectors:
+        for label in OperatorDeployLabels(release_name).pod_labels_obj.get_unique_labels:
             res = self.dc_pod.get(namespace=namespace, label_selector=label)
             parser_res = self.dc_pod.result_to_dict(res)
             if "items" in parser_res:

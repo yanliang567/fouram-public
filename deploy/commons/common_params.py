@@ -321,3 +321,53 @@ class VDCBodyConfig:
     @property
     def serverless_upgrade_config(self) -> dict:
         return {n: getattr(self, n) for n in ["server_resource", "milvus_config"]}
+
+
+""" Deploy Pod Labels """
+
+
+@dataclass
+class BasePodLabels:
+    Milvus: str = ""
+    Etcd: str = ""
+    Minio: str = ""
+    Pulsar: str = ""
+    Kafka: str = ""
+
+    @property
+    def get_unique_labels(self):
+        return list(set(vars(self).values()))
+
+
+class HelmDeployLabels:
+
+    def __init__(self, release_name: str):
+        self.release_name = release_name
+
+        self.pod_labels_obj = self._get_all_labels()
+
+    def _get_all_labels(self):
+        return BasePodLabels(
+            Milvus=f"app.kubernetes.io/instance={self.release_name}",
+            Etcd=f"app.kubernetes.io/instance={self.release_name}",
+            Minio=f"release={self.release_name}",
+            Pulsar=f"release={self.release_name}",
+            Kafka=f"app.kubernetes.io/instance={self.release_name}",
+        )
+
+
+class OperatorDeployLabels:
+
+    def __init__(self, release_name: str):
+        self.release_name = release_name
+
+        self.pod_labels_obj = self._get_all_labels()
+
+    def _get_all_labels(self):
+        return BasePodLabels(
+            Milvus=f"app.kubernetes.io/instance={self.release_name}",
+            Etcd=f"app.kubernetes.io/instance={self.release_name}-etcd",
+            Minio=f"release={self.release_name}-minio",
+            Pulsar=f"release={self.release_name}-pulsar",
+            Kafka=f"app.kubernetes.io/instance={self.release_name}-kafka",
+        )
