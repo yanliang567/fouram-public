@@ -31,6 +31,11 @@ except ImportError as e:
     ExtraList = BaseWrapper
 
 try:
+    from pymilvus.client.types import HybridExtraList
+except ImportError as e:
+    HybridExtraList = BaseWrapper
+
+try:
     from pymilvus.exceptions import MilvusException
 except ImportError as e:
     MilvusException = BaseWrapper

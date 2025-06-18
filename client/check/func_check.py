@@ -1,6 +1,6 @@
 from typing import Union, Optional, List, Dict
 
-from client.client_base import MilvusException, ExtraList
+from client.client_base import MilvusException, ExtraList, HybridExtraList
 from client.common.common_type import Error, CheckTasks, DefaultValue as dv
 import client.check.param_check as pc
 from client.check.exception_message import ServerExceptionsMessage
@@ -231,7 +231,7 @@ class ResponseChecker:
         self.assert_success(actual_res_check, True)
         check_items = check_items if isinstance(check_items, dict) else {}
 
-        if isinstance(actual_res, ExtraList):
+        if isinstance(actual_res, (ExtraList, HybridExtraList)):
             # check `expect_length`
             expect_length = check_items.get("expect_length", None)
             if isinstance(expect_length, int):
@@ -276,7 +276,8 @@ class ResponseChecker:
 
             return True
 
-        raise ValueError("[CheckFunc] Response of API:%s is not a `ExtraList`: %s" % (self.func_name, type(actual_res)))
+        raise ValueError("[CheckFunc] Response of API:%s is not a `ExtraList` or `HybridExtraList`: %s" % (
+            self.func_name, type(actual_res)))
 
     def check_search_output(self, actual_res, actual_res_check, check_items: dict = {}):
         """
