@@ -1,6 +1,8 @@
 from deploy.client.base import get_client_obj
 from deploy.commons.common_func import gen_release_name
-from deploy.commons.common_params import Helm, CLUSTER, Operator, VDC, STANDALONE, APIVERSION, Milvus
+from deploy.commons.common_params import (
+    Helm, CLUSTER, Operator, VDC, STANDALONE, APIVERSION, Milvus, ChaosMeshRequiredParams
+)
 
 from commons.common_params import EnvVariable
 from parameters.input_params import param_info
@@ -101,3 +103,7 @@ class DefaultClient:
     def set_global_params(self, release_name=""):
         release_name = release_name or self.release_name
         return self.obj.set_global_params(release_name)
+
+    def get_server_params(self, release_name="") -> ChaosMeshRequiredParams:
+        release_name = release_name or self.release_name
+        return self.obj.get_server_params(release_name=release_name)

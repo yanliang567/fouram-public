@@ -80,6 +80,20 @@ def write_shell_file(file_path, input_content: str = ''):
         f.close()
 
 
+def parser_cmd_json_params(json_str):
+    if json_str is None or json_str == "":
+        return json_str
+    elif isinstance(json_str, str):
+        try:
+            return json.loads(json_str, strict=False)
+        except Exception as e:
+            log.warning(f'[parser_cmd_json_params] Can not parser data: {json_str}, error: {e}')
+            return json_str
+
+    log.warning(f'[parser_cmd_json_params] Can not parser data: {json_str}, type: {type(json_str)}')
+    return json_str
+
+
 def read_json_str(json_str: str, out_put=True):
     try:
         return json.loads(json_str, strict=False)
@@ -424,3 +438,9 @@ def accept_kwargs(func) -> bool:
         if param.kind == param.VAR_KEYWORD:
             return True
     return False
+
+
+def lowercase_first_letter(data):
+    if isinstance(data, str) and data:
+        return data[0].lower() + data[1:]
+    return data

@@ -50,3 +50,7 @@ class BaseClient(metaclass=abc.ABCMeta):
 
     def set_global_params(self, *args, **kwargs):
         pass
+
+    @abc.abstractmethod
+    def get_server_params(self, *args, **kwargs):
+        pass

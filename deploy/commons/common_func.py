@@ -13,7 +13,8 @@ from typing import Union, List
 
 from deploy.commons.common_params import (
     CLUSTER, STANDALONE, dataNode, queryNode, indexNode, proxy, APIVERSION, DefaultApiVersion, ClassID, RMNodeCategory,
-    Helm, Operator, OP, VDC, HelmStreaming, OperatorStreaming, ComponentsLabel, HelmSetParams
+    Helm, Operator, OP, VDC, HelmStreaming, OperatorStreaming, ComponentsLabel, HelmSetParams, MilvusContainers,
+    standalone, querynode
 )
 
 from utils.util_log import log
@@ -763,3 +764,20 @@ def get_cpu(data: dict, names: List[str], default_value: Union[int, float]) -> f
 
 def get_mem(data: dict, names: List[str], default_value: str, tail: str) -> float:
     return is_number(str(get_dict_value(data, names, default_value)).rstrip(tail))
+
+
+def get_default_component(deploy_mode) -> str:
+    if deploy_mode == STANDALONE:
+        return standalone
+    elif deploy_mode == CLUSTER:
+        return querynode
+    return standalone
+
+
+def parser_pod_names_get_containers(pods: List[str]) -> List[str]:
+    res, all_containers = [], MilvusContainers.all_properties()
+    for p in pods:
+        _s = str(p).split('milvus-')[-1].split('-')[0]
+        if _s in all_containers:
+            res.append(_s)
+    return res

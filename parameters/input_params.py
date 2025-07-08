@@ -46,6 +46,9 @@ class ParamInfo:
         self.vdc_serverless_host = ""
         self.go_bench_type = "parallel"
         self.concurrency_type = ""
+        self.chaos_client_type = None
+        self.chaos_kind = None
+        self.chaos_watch_time = None
 
     def prepare_param_info(
             self, client_version, host, port,
@@ -56,7 +59,9 @@ class ParamInfo:
             deploy_force_delete=False, deploy_architecture=None,
             client_test_skip=False, client_ignore_default_params=False, replica_num=1,
             run_id=None, sync_report=False, async_report=False,
-            locust_patch_switch=False, go_bench_type="", concurrency_type=""):
+            locust_patch_switch=False, go_bench_type="", concurrency_type="",
+            chaos_client_type=None, chaos_kind=None, chaos_watch_time=None,
+    ):
         self.client_version = client_version
         self.param_host = host
         self.param_port = port
@@ -107,6 +112,11 @@ class ParamInfo:
         # concurrency type
         self.concurrency_type = concurrency_type or self.concurrency_type
 
+        # chaos mesh
+        self.chaos_client_type = chaos_client_type or self.chaos_client_type
+        self.chaos_kind = chaos_kind or self.chaos_kind
+        self.chaos_watch_time = chaos_watch_time or self.chaos_watch_time
+
     def to_dict(self):
         return vars(self)
 
@@ -127,3 +137,4 @@ class InputParamsBase:
     case_skip_prepare_clean: Optional[bool] = False
     case_rebuild_index: Optional[bool] = False
     case_skip_clean_collection: Optional[bool] = False
+    chaos_config: Union[str, dict] = ""

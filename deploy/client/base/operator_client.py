@@ -5,7 +5,7 @@ from deploy.client.base.base_client import BaseClient
 from deploy.client.base.dynamic_client import DynamicClient
 from deploy.configs import get_config_obj
 from deploy.commons.common_params import (
-    CLUSTER, STANDALONE, Milvus, PersistentVolumeClaim, Pod, Operator, OperatorDeployLabels
+    CLUSTER, STANDALONE, Milvus, PersistentVolumeClaim, Pod, Operator, OperatorDeployLabels, ChaosMeshRequiredParams
 )
 from deploy.commons.common_func import (
     update_dict_value, utc_conversion, format_dict_output, get_api_version, parser_op_item, check_multi_keys_exist,
@@ -336,3 +336,14 @@ class OperatorClient(BaseClient):
 
         # set endpoint
         param_info.param_host, param_info.param_port = str(self.endpoint(release_name=release_name)).split(':')
+
+    def get_server_params(self, release_name="") -> ChaosMeshRequiredParams:
+        release_name = release_name or self.release_name
+        return ChaosMeshRequiredParams(
+            kubeconfig=self.kubeconfig,
+            namespace=self.namespace,
+            release_name=release_name,
+            pod_labels=OperatorDeployLabels(release_name=release_name),
+            deploy_tool=Operator,
+            deploy_mode=self.deploy_mode,
+        )

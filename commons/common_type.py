@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from client.common.common_type import DefaultValue as dv
 
 try:
@@ -58,3 +59,13 @@ class TeardownType:
 class ConcurrencyType:
     Locust = "Locust"
     GoBench = "goBench"
+
+
+@dataclass
+class CommonCallable:
+    func: callable
+    kwargs: dict
+
+    def init_func(self, **kwargs):
+        self.kwargs.update(kwargs)
+        return self.func(**self.kwargs)

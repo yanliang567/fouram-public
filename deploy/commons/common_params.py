@@ -69,6 +69,24 @@ default_namespace = "qa-milvus"
 ephemeral_storage = "ephemeral-storage"
 
 
+class MilvusContainers:
+    standalone = "standalone"
+    querynode = "querynode"
+    datanode = "datanode"
+    indexnode = "indexnode"
+    streamingnode = "streamingnode"
+    proxy = "proxy"
+    rootcoord = "rootcoord"
+    datacoord = "datacoord"
+    indexcoord = "indexcoord"
+    querycoord = "querycoord"
+    mixcoord = "mixcoord"
+
+    @staticmethod
+    def all_properties():
+        return [v for k, v in vars(MilvusContainers).items() if not str(k).startswith('_') and isinstance(v, str)]
+
+
 class HelmComponents:
     mixCoord = "mixCoordinator"
     rootCoord = "rootCoordinator"
@@ -336,15 +354,31 @@ class BasePodLabels:
 
     @property
     def get_unique_labels(self):
-        return list(set(vars(self).values()))
+        return [i for i in list(set(vars(self).values())) if i != ""]
+
+    @property
+    def get_grep_labels(self):
+        _labels = "NAME"
+
+        for i in self.get_unique_labels:
+            _labels += f"|{i}"
+
+        return _labels
 
 
-class HelmDeployLabels:
+class DeployLabelsBase:
+    def __init__(self, release_name: str = ""):
+        self.release_name = release_name
+        self.pod_labels_obj = self._get_all_labels()
+
+    def _get_all_labels(self):
+        return BasePodLabels()
+
+
+class HelmDeployLabels(DeployLabelsBase):
 
     def __init__(self, release_name: str):
-        self.release_name = release_name
-
-        self.pod_labels_obj = self._get_all_labels()
+        super().__init__(release_name)
 
     def _get_all_labels(self):
         return BasePodLabels(
@@ -356,12 +390,10 @@ class HelmDeployLabels:
         )
 
 
-class OperatorDeployLabels:
+class OperatorDeployLabels(DeployLabelsBase):
 
     def __init__(self, release_name: str):
-        self.release_name = release_name
-
-        self.pod_labels_obj = self._get_all_labels()
+        super().__init__(release_name)
 
     def _get_all_labels(self):
         return BasePodLabels(
@@ -371,3 +403,27 @@ class OperatorDeployLabels:
             Pulsar=f"release={self.release_name}-pulsar",
             Kafka=f"app.kubernetes.io/instance={self.release_name}-kafka",
         )
+
+
+class VDCDeployLabels(DeployLabelsBase):
+    def __init__(self, release_name: str):
+        super().__init__(release_name)
+
+    def _get_all_labels(self):
+        return BasePodLabels(
+            Milvus=f"app.kubernetes.io/instance={self.release_name}",
+            Etcd=f"app.kubernetes.io/instance={self.release_name}-etcd",
+        )
+
+
+""" Define Params Required For Chaos Mesh """
+
+
+@dataclass
+class ChaosMeshRequiredParams:
+    kubeconfig: str
+    namespace: str
+    release_name: str
+    pod_labels: DeployLabelsBase
+    deploy_tool: str
+    deploy_mode: str

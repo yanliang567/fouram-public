@@ -2,7 +2,9 @@ from pymilvus import DefaultConfig
 
 from deploy.client.base.base_client import BaseClient
 from deploy.commons.common_func import gen_release_name, check_file_exist
-from deploy.commons.common_params import default_namespace, HelmSetParams
+from deploy.commons.common_params import (
+    default_namespace, HelmSetParams, ChaosMeshRequiredParams, HelmDeployLabels, Helm, STANDALONE
+)
 
 from parameters.input_params import param_info
 from utils.util_cmd import CmdExe
@@ -16,10 +18,14 @@ class CliClient(BaseClient):
     def __init__(self, kubeconfig=None, namespace=None, chart="milvus/milvus", release_name="", **kwargs):
         """ common params and check env """
         super().__init__()
+        self._kubeconfig = kubeconfig
+        self._namespace = namespace
+
         self.namespace, self.kubeconfig, self.ns = self.set_params(namespace, kubeconfig)
         self.chart = chart
 
         self.release_name = release_name
+        self.deploy_mode = kwargs.get("deploy_mode", STANDALONE)
 
     @staticmethod
     def set_params(namespace=None, kubeconfig=None):
@@ -164,3 +170,14 @@ class CliClient(BaseClient):
 
         # set endpoint
         param_info.param_host, param_info.param_port = str(self.endpoint(release_name=release_name)).split(':')
+
+    def get_server_params(self, release_name="") -> ChaosMeshRequiredParams:
+        release_name = release_name or self.release_name
+        return ChaosMeshRequiredParams(
+            kubeconfig=self._kubeconfig,
+            namespace=self._namespace,
+            release_name=release_name,
+            pod_labels=HelmDeployLabels(release_name=release_name),
+            deploy_tool=Helm,
+            deploy_mode=self.deploy_mode,
+        )

@@ -4,7 +4,9 @@ from urllib import parse
 from deploy.client.base.base_client import BaseClient
 from deploy.client.base.vdc_client_base import VDCClientBase
 from deploy.commons.status_code import InstanceType
-from deploy.commons.common_params import ClassID, ParserExtraConfig, VDCBodyConfig
+from deploy.commons.common_params import (
+    ClassID, ParserExtraConfig, VDCBodyConfig, ChaosMeshRequiredParams, VDCDeployLabels, VDC
+)
 from deploy.commons.common_func import gen_release_name, get_class_key_name
 
 from parameters.input_params import param_info
@@ -255,3 +257,16 @@ class VDCClient(BaseClient):
         elif self.INSTANCE_TYPE in [InstanceType.FreeTier, InstanceType.ElasticServerless]:
             param_info.param_uri = self.client.get_serverless_endpoint()
             param_info.param_db_name = parse.urlparse(param_info.param_uri).path.strip("/")
+
+    def get_server_params(self, release_name="") -> ChaosMeshRequiredParams:
+        release_name = release_name or self.release_name
+        self.check_server_and_set_params(release_name=release_name)
+
+        return ChaosMeshRequiredParams(
+            kubeconfig=self.kubeconfig,
+            namespace=self.client.ns,
+            release_name=self.client.real_instance_id,
+            pod_labels=VDCDeployLabels(release_name=self.client.real_instance_id),
+            deploy_tool=VDC,
+            deploy_mode=self.deploy_class_id,
+        )

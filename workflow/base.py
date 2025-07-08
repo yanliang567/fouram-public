@@ -1,7 +1,9 @@
 from deploy.configs.default_configs import DefaultConfigs
-from deploy.commons.common_params import CLUSTER, STANDALONE, Helm, Operator, DefaultRepository
+from deploy.commons.common_params import CLUSTER, STANDALONE, Helm, Operator, DefaultRepository, ChaosMeshRequiredParams
 from deploy.client.default_client import DefaultClient
 from client.cases import ConcurrentClientBase, GoBenchCases
+from chaos_mesh.client.default_client import ChaosClient
+from chaos_mesh.commons.common_parser import ParserChaosMeshConfig
 
 from utils.util_log import log
 from parameters.input_params import param_info
@@ -9,7 +11,7 @@ from commons.common_func import (
     parser_input_config, execute_funcs, update_dict_value, check_deploy_config, write_shell_file, waiting_all_threads)
 from commons.auto_get import AutoGetTag
 from commons.common_params import EnvVariable
-from commons.common_type import TeardownType, ConcurrencyType
+from commons.common_type import TeardownType, ConcurrencyType, CommonCallable
 from data_report.metrics import Report_Metric_Object
 
 
@@ -24,6 +26,7 @@ class Base:
     deploy_initial_state = ""
     deploy_end_state = ""
     method_name = ""
+    chaos_client = None
 
     def setup_class(self):
         log.info(" Start setup class ".center(100, "~"))
@@ -52,6 +55,9 @@ class Base:
         # record deploy status
         self.deploy_initial_state = ""
         self.deploy_end_state = ""
+
+        # chaos mesh
+        self.chaos_client = None
 
         # reset data report object
         Report_Metric_Object.reset()
@@ -319,3 +325,41 @@ class Base:
         return callable_obj(params=case_parameters, prepare=case_prepare, prepare_clean=case_prepare_clean,
                             rebuild_index=case_rebuild_index, clean_collection=case_clean_collection,
                             sub_callable_obj=sub_callable_obj)
+
+    @staticmethod
+    def _parser_default_chaos_config(config, server_config: ChaosMeshRequiredParams):
+        if isinstance(config, CommonCallable):
+            return config.init_func(server_config=server_config)
+        elif config is not None:
+            log.debug(f'[Base] Can not parser default chaos config: {config}')
+        return {}
+
+    def chaos_default(self, release_name=None, deploy_tool=Operator, deploy_mode=STANDALONE, deploy_architecture=None,
+                      chaos_client_type=None, chaos_kind=None, chaos_config=None, chaos_watch_time=None,
+                      default_chaos_config: CommonCallable = None):
+        release_name = release_name or self.deploy_release_name or param_info.release_name
+        if not release_name:
+            raise Exception(f"[Base] Can not inject chaos into empty release name: {release_name}, please check.")
+
+        # init `server` client
+        self.deploy_client = DefaultClient(deploy_tool=deploy_tool, deploy_mode=deploy_mode,
+                                           release_name=release_name, deploy_architecture=deploy_architecture)
+        server_config = self.deploy_client.get_server_params()
+
+        # parser chaos config pass in from outside
+        _input_chaos_config = parser_input_config(input_content=chaos_config)
+        _default_config = self._parser_default_chaos_config(default_chaos_config, server_config)
+        # update chaos params
+        _merge_chaos_config = update_dict_value(_input_chaos_config, _default_config)
+
+        # parser chaos configs
+        final_chaos_config = ParserChaosMeshConfig(
+            config=_merge_chaos_config, chaos_client_type=chaos_client_type, chaos_kind=chaos_kind,
+            chaos_watch_time=chaos_watch_time, release_name=server_config.release_name)
+        # init `chaos` client
+        self.chaos_client = ChaosClient(server_params=server_config, chaos_config=final_chaos_config)
+
+        # inject chaos -> watch server status -> delete chaos
+        self.chaos_client.create()
+        self.chaos_client.watch(timeout=final_chaos_config.duration)
+        self.chaos_client.delete()

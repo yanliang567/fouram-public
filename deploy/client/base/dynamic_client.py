@@ -88,35 +88,42 @@ class DynamicClient:
             return _res
 
     @func_catch()
-    def create(self, body, namespace=None):
-        return self.api.create(body=body, namespace=(namespace or self.namespace))
+    def create(self, body, namespace=None, **kwargs):
+        return self.api.create(body=body, namespace=(namespace or self.namespace), **kwargs)
 
     @func_catch()
-    def get(self, namespace=None, label_selector=None):
+    def get(self, namespace=None, label_selector=None, **kwargs):
         """
         :param namespace: str
         :param label_selector: label_selector="release=<release_name>"
         :return: ResourceInstance
         """
-        return self.api.get(namespace=(namespace or self.namespace), label_selector=label_selector)
+        return self.api.get(namespace=(namespace or self.namespace), label_selector=label_selector, **kwargs)
 
     @func_catch()
-    def patch(self, body, namespace=None, content_type="application/merge-patch+json"):
-        return self.api.patch(body=body, namespace=(namespace or self.namespace), content_type=content_type)
+    def patch(self, body, namespace=None, content_type="application/merge-patch+json", **kwargs):
+        return self.api.patch(body=body, namespace=(namespace or self.namespace), content_type=content_type, **kwargs)
 
     @func_catch()
-    def delete(self, name, namespace=None):
-        return self.api.delete(name=name, namespace=(namespace or self.namespace))
+    def delete(self, name, namespace=None, **kwargs):
+        return self.api.delete(name=name, namespace=(namespace or self.namespace), **kwargs)
 
     @func_catch()
-    def watch(self, namespace=None, timeout=5):
+    def watch(self, namespace=None, timeout=5, **kwargs):
         """
         todo: update func
         :param namespace: The namespace to query
         :param timeout: The amount of time in seconds to wait before terminating the stream
+        :kwargs:
+            name: The name of the resource instance to query
+            label_selector: The label selector with which to filter results
+            field_selector: The field selector with which to filter results
+            resource_version: The version with which to filter results. Only events with
+                                 a resource_version greater than this value will be returned
+            watcher: The Watcher object that will be used to stream the resource
         :return: Event object with these keys:
                    'type': The type of event such as "ADDED", "DELETED", etc.
                    'raw_object': a dict representing the watched object.
                    'object': A ResourceInstance wrapping raw_object.
         """
-        return self.api.watch(namespace=(namespace or self.namespace), timeout=timeout)
+        return self.api.watch(namespace=(namespace or self.namespace), timeout=timeout, **kwargs)

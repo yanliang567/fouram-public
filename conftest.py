@@ -99,6 +99,26 @@ def pytest_addoption(parser):
                                 This is used to quickly verify compatibility with different deployment architecture!!
                              """)
 
+    # chaos
+    parser.addoption("--chaos_config", action="store", default="",
+                     help="str: chaos detail config, support json string, json file, yaml file")
+    parser.addoption("--chaos_client_type", action="store", default=None, help="str, only supports `api` or `kubectl`")
+    parser.addoption("--chaos_kind", action="store", default=None, help="str, `kind` for chaos, e.g.: PodChaos")
+    parser.addoption("--chaos_watch_time", action="store", default=None,
+                     help="""server observation time, unit: s, m, h, d
+
+                             Inject chaos, the `duration` of chaos is configured in the chaos config.
+                             This parameter is used to watch the server after the chaos is injected.
+                             After the watch is finished, the injected chaos will be deleted.
+
+                             If not set, the `duration` in the config is used as the watch time.
+                             If there is no duration in the config, the default 30 minutes is used as the watch time.
+                             """)
+    # chaos extra params
+    parser.addoption("--chaos_component", action="store", default=None,
+                     help="json string: str, List[str], set different values in different cases")
+    parser.addoption("--chaos_container", action="store", default=None, help="json string: List[str]")
+
 
 @pytest.fixture
 def host(request):
@@ -113,6 +133,16 @@ def port(request):
 @pytest.fixture
 def upgrade_waiting_time(request):
     return request.config.getoption("--upgrade_waiting_time")
+
+
+@pytest.fixture
+def chaos_component(request):
+    return request.config.getoption("--chaos_component")
+
+
+@pytest.fixture
+def chaos_container(request):
+    return request.config.getoption("--chaos_container")
 
 
 """ fixture func """
@@ -186,7 +216,12 @@ def initialize_env(request):
         go_bench_type=request.config.getoption("--go_bench_type"),
 
         # concurrency type
-        concurrency_type=request.config.getoption("--concurrency_type")
+        concurrency_type=request.config.getoption("--concurrency_type"),
+
+        # chaos mesh
+        chaos_client_type=request.config.getoption("--chaos_client_type"),
+        chaos_kind=request.config.getoption("--chaos_kind"),
+        chaos_watch_time=request.config.getoption("--chaos_watch_time")
     )
     log.info("[initialize_milvus] Global parameters: {0}".format(param_info.to_dict()))
     # yield
@@ -213,7 +248,8 @@ def input_params(request) -> InputParamsBase:
         "case_skip_prepare": request.config.getoption("--case_skip_prepare"),
         "case_skip_prepare_clean": request.config.getoption("--case_skip_prepare_clean"),
         "case_rebuild_index": request.config.getoption("--case_rebuild_index"),
-        "case_skip_clean_collection": request.config.getoption("--case_skip_clean_collection")
+        "case_skip_clean_collection": request.config.getoption("--case_skip_clean_collection"),
+        "chaos_config": request.config.getoption("--chaos_config"),
     })
 
 
