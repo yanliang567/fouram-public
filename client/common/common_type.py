@@ -196,5 +196,15 @@ class ConcurrentGlobalParams:
             id_list.append(i)
         return id_list, filling_len
 
+    def get_q_size(self):
+        return {
+            "concurrent_insert_ids": self.concurrent_insert_ids.qsize(),
+            "concurrent_insert_delete_flush": self.concurrent_insert_delete_flush.qsize(),
+        }
+
+    def clear_queue(self):
+        self.concurrent_insert_ids = queue.Queue(self.queue_length)
+        self.concurrent_insert_delete_flush = queue.Queue(self.queue_length)
+
 
 concurrent_global_params = ConcurrentGlobalParams()

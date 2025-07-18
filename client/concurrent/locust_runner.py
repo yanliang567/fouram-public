@@ -8,7 +8,7 @@ from client.concurrent.locust_common import print_stats, print_percentile_stats
 
 from client.cases.case_report import CasesReport
 from client.common.common_func import get_spawn_rate
-from client.common.common_type import Precision
+from client.common.common_type import Precision, concurrent_global_params
 from client.parameters.params import ConcurrentTasksParams, ConcurrentObjParams, DataClassBase
 from client.concurrent.locust_client import ClientTask, MyTaskSet
 from utils.util_log import log
@@ -121,7 +121,15 @@ class LocustRunner:
         log.debug(
             f"[LocustRunner] Reset tasks: {MyUser.tasks}, client: {MyUser.client}, tasks_params: {MyUser.tasks_params}")
 
+    @staticmethod
+    def reset_global_params():
+        log.debug(f'[LocustRunner] Current concurrent global params: {concurrent_global_params.get_q_size()}')
+        concurrent_global_params.clear_queue()
+        log.debug(f'[LocustRunner] After resetting concurrent global params: {concurrent_global_params.get_q_size()}')
+
     def start_runner(self, report_obj: CasesReport = CasesReport()):
+        self.reset_global_params()
+
         self.reset_my_user_params()
         MyUser.client = ClientTask(self.obj, request_type=self.request_type)
         MyUser.tasks_params = self.obj_params
