@@ -7,7 +7,9 @@ import copy
 from typing import List
 import inspect
 
-from deploy.commons.common_params import Helm, Operator, OP, VDC, CLUSTER, STANDALONE, ClassID, HelmSetParams, STREAMING
+from deploy.commons.common_params import (
+    Helm, Operator, OP, VDC, CLUSTER, STANDALONE, ClassID, HelmSetParams, STREAMING, ClassIDBase
+)
 
 from utils.util_log import log
 from utils.util_catch import func_request
