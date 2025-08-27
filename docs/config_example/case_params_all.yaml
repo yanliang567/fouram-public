@@ -505,6 +505,22 @@ concurrent_tasks:
       # true: randomly generate search vectors every time
       random_data: Optional[bool] = False
 
+      # other params
+      # expr_random_data=true will enable random expr, append it to the `expr` above
+      # `expr` above can be set to "", or endswith "&&" and "||", only when expr_random_data is enabled
+      expr_random_data: Optional[bool] = False
+      # select `random_count` elements from `random_range` and generate an expr
+      random_count: Optional[int] = 0
+      # length of `random_range` must be equal to 2
+      random_range: Optional[list] = [0, 1]
+      field_name: Optional[str] = id
+      # `field_type` only support "int64" and "varchar"
+      field_type: Optional[str] = int64
+
+      # custom expr
+      custom_expr: Optional[str] = None
+      custom_range: Optional[list] = [ 0, 1 ]
+
       # check request result
       # supports: `check_response`, `check_error_response`, `check_ignore_expected_errors`
       check_task: Optional[str] = "check_response"

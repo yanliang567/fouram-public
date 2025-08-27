@@ -876,7 +876,7 @@ class Base:
     def concurrent_search(self, params: ConcurrentTaskSearch):
         _data = gen_vectors(nb=check_vector_length(params.data), dim=params.dim, field_name=params.anns_field,
                             sparse_range=params.sparse_range) if params.random_data else params.data
-        return self.collection_wrap.search(data=_data, **params.obj_params)
+        return self.collection_wrap.search(data=_data, expr=params.search_expr, **params.obj_params)
 
     def concurrent_hybrid_search(self, params: ConcurrentTaskHybridSearch):
         log_level = LogLevel.DEBUG

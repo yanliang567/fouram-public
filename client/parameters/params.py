@@ -270,6 +270,17 @@ class ConcurrentInputParamsSearch(DataClassBase):
     timeout: Optional[int] = DefaultValue.default_timeout
     random_data: Optional[bool] = False
 
+    # other params
+    expr_random_data: Optional[bool] = False
+    random_count: Optional[int] = 0
+    random_range: Optional[list] = field(default_factory=lambda: [0, 1])
+    field_name: Optional[str] = DefaultValue.default_query_field
+    field_type: Optional[str] = DefaultValue.default_int64_field_name
+
+    # custom expr
+    custom_expr: Optional[str] = None
+    custom_range: Optional[list] = field(default_factory=lambda: [0, 1])
+
     # check request result
     check_task: Optional[str] = CheckTasks.checkResponse
     check_items: Union[dict, list] = field(default_factory=lambda: {})
@@ -294,8 +305,21 @@ class ConcurrentTaskSearch(DataClassBase):
     random_data: Optional[bool] = False
     sparse_range: Optional[List[int]] = field(default_factory=lambda: DefaultValue.default_sparse_range)
 
+    # other params
+    expr_random_data: Optional[bool] = False
+    random_count: Optional[int] = 0
+    random_range: Optional[list] = field(default_factory=lambda: [0, 1])
+    field_name: Optional[str] = DefaultValue.default_query_field
+    field_type: Optional[str] = DefaultValue.default_int64_field_name
+
+    # custom expr
+    custom_expr: Optional[str] = None
+    custom_range: Optional[list] = field(default_factory=lambda: [0, 1])
+
     # save obj_params
     obj_params: Optional[dict] = None
+    # other
+    _prepare_symbol: Optional[str] = " "
 
     # check request result
     check_task: Optional[str] = CheckTasks.checkResponse
@@ -313,7 +337,7 @@ class ConcurrentTaskSearch(DataClassBase):
             "anns_field": self.anns_field,
             "param": self.param,
             "limit": self.limit,
-            "expr": self.expr,
+            # "expr": self.expr,
             "partition_names": self.partition_names,
             "guarantee_timestamp": self.guarantee_timestamp,
             "output_fields": self.output_fields,
@@ -330,7 +354,28 @@ class ConcurrentTaskSearch(DataClassBase):
             del _p["ignore_growing"]
         self.obj_params = _p
 
+        # parser prepare_symbol
+        _expr = self.expr.strip() if isinstance(self.expr, str) else ""
+        if not (_expr == "" or _expr.endswith("&&") or _expr.endswith("||")):
+            self._prepare_symbol = " || "
+
+        # compatible with higher versions of randint processing
+        self.custom_range = [int(i) for i in self.custom_range]
+
         log.debug("[{0}] Init done, search obj_params:{1}".format("ConcurrentTaskSearch", self.obj_params))
+
+    @property
+    def search_expr(self):
+        _extra_expr = ""
+        if self.expr_random_data:
+            _extra_expr += gen_random_query_data(
+                random_count=self.random_count, random_range=self.random_range,
+                query_field_name=self.field_name, query_field_type=self.field_type)
+        if self.custom_expr:
+            if _extra_expr != "":
+                _extra_expr += " || "
+            _extra_expr += self.custom_expr.format(random.randint(*self.custom_range))
+        return self.expr if _extra_expr == "" else self.expr + self._prepare_symbol + _extra_expr
 
 
 @dataclass
@@ -344,6 +389,33 @@ class ConcurrentGoBenchParamsSearch(DataClassBase):
     output_fields: Optional[list] = field(default_factory=lambda: [])
     partition_names: Optional[list] = None
     random_data: Optional[bool] = False
+
+    # other params
+    expr_random_data: Optional[bool] = False
+    random_count: Optional[int] = 0
+    random_range: Optional[list] = field(default_factory=lambda: [0, 1])
+    field_name: Optional[str] = DefaultValue.default_query_field
+    field_type: Optional[str] = DefaultValue.default_int64_field_name
+
+    # custom expr
+    custom_expr: Optional[str] = None
+    custom_range: Optional[list] = field(default_factory=lambda: [0, 1])
+
+    def __post_init__(self):
+        _expr = self.expr.strip()
+        _prepare_symbol = " || " if not (_expr == "" or _expr.endswith("&&") or _expr.endswith("||")) else " "
+
+        if self.expr_random_data or self.custom_expr:
+            self.expr += _prepare_symbol
+
+        # params reset
+        if not self.expr_random_data:
+            self.random_count = None
+            self.random_range = None
+            self.field_name = None
+            self.field_type = None
+        if not self.custom_expr:
+            self.custom_range = None
 
 
 @dataclass
@@ -521,7 +593,7 @@ class ConcurrentTaskQuery(DataClassBase):
             self.obj_params["consistency_level"] = self.consistency_level
 
         # parser prepare_symbol
-        _expr = self.expr.strip()
+        _expr = self.expr.strip() if isinstance(self.expr, str) else ""
         if not (_expr == "" or _expr.endswith("&&") or _expr.endswith("||")):
             self._prepare_symbol = " || "
 
