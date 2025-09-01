@@ -709,6 +709,9 @@ class Query(CommonCases):
         all_fields_params = ParserFieldsParams(self.params_obj.dataset_params, self.params_obj.collection_params,
                                                main_field_name=vector_default_field_name)
 
+        # release prepare params
+        _release_of_reload = self.params_obj.release_params.pop(pn.release_of_reload, False)
+
         # prepare data
         self.prepare_collection(vector_default_field_name, input_params.prepare, input_params.prepare_clean)
         if input_params.prepare:
@@ -727,6 +730,9 @@ class Query(CommonCases):
                            metric_type=self.params_obj.dataset_params[pn.metric_type],
                            clean_index_before=input_params.rebuild_index)
         self.count_entities()
+
+        if _release_of_reload:
+            self.prepare_release(**self.params_obj.release_params)
 
         # load collection
         self.prepare_load(**self.params_obj.load_params)
@@ -806,6 +812,9 @@ class Search(CommonCases):
         all_fields_params = ParserFieldsParams(self.params_obj.dataset_params, self.params_obj.collection_params,
                                                main_field_name=vector_default_field_name)
 
+        # release prepare params
+        _release_of_reload = self.params_obj.release_params.pop(pn.release_of_reload, False)
+
         # prepare data
         self.prepare_collection(vector_default_field_name, input_params.prepare, input_params.prepare_clean)
         if input_params.prepare is True:
@@ -829,6 +838,9 @@ class Search(CommonCases):
                 self.prepare_index(vector_field_name=vector_default_field_name,
                                    metric_type=self.params_obj.dataset_params[pn.metric_type],
                                    clean_index_before=input_params.rebuild_index, extra_setting=False)
+
+            if _release_of_reload:
+                self.prepare_release(**self.params_obj.release_params)
 
         # setting alter_index again to cover not prepare scene
         self.set_alter_index(params=self.params_obj.common_params.get(pn.alter_index, None))
@@ -1026,6 +1038,9 @@ class HybridSearch(CommonCases):
         all_fields_params = ParserFieldsParams(self.params_obj.dataset_params, self.params_obj.collection_params,
                                                main_field_name=vector_default_field_name)
 
+        # release prepare params
+        _release_of_reload = self.params_obj.release_params.pop(pn.release_of_reload, False)
+
         # prepare data
         self.prepare_collection(vector_default_field_name, input_params.prepare, input_params.prepare_clean)
         if input_params.prepare is True:
@@ -1049,6 +1064,9 @@ class HybridSearch(CommonCases):
                 self.prepare_index(vector_field_name=vector_default_field_name,
                                    metric_type=self.params_obj.dataset_params[pn.metric_type],
                                    clean_index_before=input_params.rebuild_index, extra_setting=False)
+
+            if _release_of_reload:
+                self.prepare_release(**self.params_obj.release_params)
 
         # setting alter_index again to cover not prepare scene
         self.set_alter_index(params=self.params_obj.common_params.get(pn.alter_index, None))

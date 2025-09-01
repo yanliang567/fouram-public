@@ -328,7 +328,7 @@ load_params:
   prepare_load: false / <bool>
 
 release_params:
-  # whether to release collection when case_skip_prepare. support for `GoBenchCases`, `ConcurrentClientBase`, FunctionalCases
+  # whether to release collection when case_skip_prepare. support for `GoBenchCases`, `ConcurrentClientBase`, `FunctionalCases`, `Query`, `Search`, `HybridSearch`
   # Notice: By default, collection will be loaded after preparing
   release_of_reload: false / <bool>
 

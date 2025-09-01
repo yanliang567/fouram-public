@@ -162,11 +162,13 @@ class ParamsFormat:
 
     common_scene_query_ids = update_dict_value({
         dataset_params: {req_run_counts: ([type((int()))], MUST)},
+        release_params: {release_of_reload: ([type(bool())], OPTION)},
         query_params: {ids: ([type(list())], MUST)}
     }, common_scene_load)
 
     common_scene_query_expr = update_dict_value({
         dataset_params: {req_run_counts: ([type((int()))], MUST)},
+        release_params: {release_of_reload: ([type(bool())], OPTION)},
         query_params: {expr: ([type(str()), type(list())], MUST)}
     }, common_scene_load)
 
@@ -178,6 +180,7 @@ class ParamsFormat:
                         },
         index_params: {index_type: ([type(str())], OPTION),
                        index_param: ([type(dict())], OPTION)},
+        release_params: {release_of_reload: ([type(bool())], OPTION)},
     }, common_scene_build_index)
 
     common_scene_search_recall = update_dict_value({
@@ -210,6 +213,7 @@ class ParamsFormat:
                                },
         index_params: {index_type: ([type(str())], OPTION),
                        index_param: ([type(dict())], OPTION)},
+        release_params: {release_of_reload: ([type(bool())], OPTION)},
     }, common_scene_build_index)
 
     common_concurrent = update_dict_value({
