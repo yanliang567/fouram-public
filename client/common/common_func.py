@@ -15,10 +15,11 @@ from sklearn import preprocessing
 import pyarrow.parquet as pq
 from itertools import product, zip_longest, cycle
 from scipy.sparse import csr_matrix, isspmatrix
+from datetime import datetime, timezone
 
 from client.client_base import ApiCollectionSchemaWrapper, ApiFieldSchemaWrapper, AnnSearchRequest, DataType
 from client.parameters import params_name as pn
-from client.common.common_type import NAS, SimilarityMetrics, AccMetrics, Precision, DefaultValue as dv
+from client.common.common_type import NAS, SimilarityMetrics, AccMetrics, Precision, DefaultValue as dv, GeometryWKTType
 from client.common.common_param import GoBenchIndex, SegmentsAnalysis, RNG
 from client.check.func_check import InterfaceCheckTasks
 
@@ -87,6 +88,15 @@ def get_array_element_type(data_type: str):
     raise ValueError(f"[get_array_data_type] Data type is not start with array: {data_type}")
 
 
+def get_geometry_wkt_type(data_type: str) -> str:
+    if hasattr(DataType, "GEOMETRY") and data_type.startswith(pn.GEOMETRY):
+        wkt_type = data_type.lstrip(pn.GEOMETRY).lstrip("_")
+        for _field in GeometryWKTType.to_dict().values():
+            if wkt_type.startswith(_field.lower()):
+                return _field
+    return GeometryWKTType.POINT
+
+
 def gen_field_schema(name: str, dtype=None, description=dv.default_desc, is_primary=False, scalars_params={}, **kwargs):
     field_types = FieldTypes.to_dict
     if dtype is None:
@@ -102,7 +112,7 @@ def gen_field_schema(name: str, dtype=None, description=dv.default_desc, is_prim
 
                 if _field_element in ["STRING", "VARCHAR"]:
                     _kwargs.update({"max_length": kwargs.get("max_length", dv.default_max_length)})
-                elif _field_element in ["BINARY_VECTOR", "FLOAT_VECTOR", "FLOAT16_VECTOR", "BFLOAT16_VECTOR"]:
+                elif _field_element in dv.default_all_vector_types:
                     _kwargs.update({"dim": kwargs.get("dim", dv.default_dim)})
 
                 _kwargs.update(scalars_params.get(name, {}).get("params", {}))
@@ -212,6 +222,8 @@ def get_default_field_name(data_type=DataType.FLOAT_VECTOR, default_field_name: 
         field_name = dv.default_bfloat16_vector_name
     elif data_type == DataType.SPARSE_FLOAT_VECTOR:
         field_name = dv.default_sparse_float_vector_name
+    elif data_type == DataType.INT8_VECTOR:
+        field_name = dv.default_int8_vector_name
     elif data_type == DataType.INT64:
         field_name = dv.default_int64_field_name
     elif data_type == DataType.FLOAT:
@@ -326,6 +338,8 @@ def gen_vectors(nb, dim, field_name: str = None, sparse_range=dv.default_sparse_
         return gen_bfloat16_vectors(nb, dim)
     elif field_name and str(field_name).startswith("sparse_float_vector"):
         return gen_sparse_float_vectors(nb, dim, sparse_range=(sparse_range or dv.default_sparse_range))
+    elif field_name and str(field_name).startswith("int8_vector"):
+        return gen_int8_vectors(nb, dim)
     return gen_float_vectors(nb, dim)
 
 
@@ -350,6 +364,11 @@ def gen_bfloat16_vectors(nb, dim):
     return [RNG.uniform(size=dim).astype(bfloat16) for _ in range(int(nb))]
 
 
+def gen_int8_vectors(nb, dim):
+    log.debug(f"[gen_int8_vectors] nb: {nb}, dim: {dim}")
+    return [np.array([random.randint(-128, 127) for _ in range(int(dim))], dtype=np.int8) for _ in range(int(nb))]
+
+
 def gen_unique_uint32_list(list_length: int, dim: int):
     _list = []
     while len(_list) < list_length:
@@ -372,6 +391,66 @@ def gen_sparse_float_vectors(nb: int, dim: int, sparse_range: List[int] = [1, 10
 def gen_ids(start_id, end_id):
     log.debug("[gen_ids] Start id: %s, end id: %s" % (start_id, end_id))
     return [k for k in range(start_id, end_id)]
+
+
+def gen_utc_str_time():
+    return datetime.now(timezone.utc).isoformat()
+
+
+def gen_point_values(bounds) -> str:
+    return f"{random.uniform(*bounds[0]):.2f} {random.uniform(*bounds[1]):.2f}"
+
+
+def gen_multi_points(bounds, counts: int):
+    return [f"({gen_point_values(bounds)})" for _ in range(counts)]
+
+
+def gen_lines(bounds, points_num):
+    return ', '.join([gen_point_values(bounds) for _ in range(random.randint(*points_num))])
+
+
+def gen_multi_lines(bounds, points_num, lines_num):
+    return [f'({gen_lines(bounds, points_num)})' for _ in range(lines_num)]
+
+
+def gen_triangle(bounds):
+    return "({0}, {1}, {2}, {0})".format(*[gen_point_values(bounds) for _ in range(3)])
+
+
+def gen_rectangle(bounds):
+    x, y = random.uniform(*bounds[0]), random.uniform(*bounds[1])
+    w, h = random.uniform(*bounds[0]) or 1, random.uniform(*bounds[1]) or 1
+    return f"({x:.2f} {y:.2f}, {x + w:.2f} {y:.2f}, {x + w:.2f} {y + h:.2f}, {x:.2f} {y + h:.2f}, {x:.2f} {y:.2f})"
+
+
+def gen_geometry_data(wkt_type: str, bounds: List[list], points_num: List[int] = dv.default_geo_point_num_range):
+    if wkt_type == GeometryWKTType.POINT:
+        return f"POINT({gen_point_values(bounds)})"
+
+    elif wkt_type == GeometryWKTType.LINESTRING:
+        return f"LINESTRING({gen_lines(bounds, points_num)})"
+
+    elif wkt_type == GeometryWKTType.POLYGON:
+        return f"POLYGON({gen_triangle(bounds)})"
+
+    elif wkt_type == GeometryWKTType.MULTIPOINT:
+        return f"MULTIPOINT({', '.join(gen_multi_points(bounds, random.randint(*points_num)))})"
+
+    elif wkt_type == GeometryWKTType.MULTILINESTRING:
+        return f"MULTILINESTRING({', '.join(gen_multi_lines(bounds, points_num, random.randint(*points_num)))})"
+
+    elif wkt_type == GeometryWKTType.MULTIPOLYGON:
+        return f"MULTIPOLYGON({', '.join([f'({gen_rectangle(bounds)})' for _ in range(random.randint(*points_num))])})"
+
+    elif wkt_type == GeometryWKTType.GEOMETRYCOLLECTION:
+        geoms = [
+            f"POINT({gen_point_values(bounds)})",
+            f"LINESTRING({gen_lines(bounds, points_num)})",
+            f"POLYGON({gen_triangle(bounds)})"
+        ]
+        return f"GEOMETRYCOLLECTION({', '.join(geoms)})"
+
+    raise ValueError(f"[gen_geometry_data] Not support WTK type: {wkt_type}")
 
 
 def gen_values(data_type, vectors, ids, varchar_filled=False, field: dict = {}, default_value=None, other_params={},
@@ -402,6 +481,9 @@ def gen_values(data_type, vectors, ids, varchar_filled=False, field: dict = {}, 
         _sparse_range = other_params.get("sparse_range", dv.default_sparse_range)
         values = vectors if anns_field_bool else gen_sparse_float_vectors(
             nb=len(ids), dim=_dim, sparse_range=_sparse_range)
+    elif _field_element in [DataType.INT8_VECTOR]:
+        _dim = field.get("params", {}).get("dim")
+        values = vectors if anns_field_bool else gen_int8_vectors(nb=len(ids), dim=_dim)
     elif _field_element in [DataType.INT8]:
         # int8: [-128, 127]
         values = [i % 128 for i in ids]
@@ -428,6 +510,12 @@ def gen_values(data_type, vectors, ids, varchar_filled=False, field: dict = {}, 
         values = [bool(sum(np.fromstring(str(_id), dtype=np.uint8, sep=' ')) & 1) for _id in ids]
     elif hasattr(DataType, "JSON") and _field_element in [DataType.JSON]:
         values = [{"id": i} for i in ids]
+    elif _field_element in [DataType.TIMESTAMPTZ]:
+        values = [gen_utc_str_time() for _ in ids]
+    elif _field_element in [DataType.GEOMETRY]:
+        wkt_type = get_geometry_wkt_type(field["name"])
+        bounds = other_params.get("bounds", dv.default_bounds)
+        values = [gen_geometry_data(wkt_type, bounds) for _ in ids]
 
     if str(field["name"]).lower().startswith(pn.ARRAY):
         values = [[v] * int(field["params"]["max_capacity"]) for v in values]
@@ -1020,6 +1108,33 @@ def iter_insert_value_after_ratio_elements(data: list, ratio: int = 0, insert_va
         c = cycle(data)
         while True:
             yield [next(c) for _ in range(ratio)] + [insert_value]
+
+
+def check_bounds(bounds):
+    def _check_bounds_value(bounds):
+        if not isinstance(bounds, list) or len(bounds) != 2 or not all([isinstance(b, list) for b in bounds]):
+            return False
+        for bound in bounds:
+            if len(bound) != 2 or not all([isinstance(b, int) for b in bound]) or not (0 <= bound[0] < bound[1]):
+                return False
+        return True
+
+    if _check_bounds_value(bounds):
+        return bounds
+    raise ValueError(f"[check_bounds] Check `bounds` value failed: {bounds}")
+
+
+def check_points_num(points_num):
+    def _check_points_num_value(points_num):
+        if not isinstance(points_num, list) or len(points_num) != 2:
+            return False
+        if not all([isinstance(p, int) for p in points_num]) or not (2 <= points_num[0] <= points_num[1]):
+            return False
+        return True
+
+    if _check_points_num_value(points_num):
+        return points_num
+    raise ValueError(f"[check_points_num] Check `points_num` value failed: {points_num}")
 
 
 def check_max_value(default: int, diff_value: int) -> int:

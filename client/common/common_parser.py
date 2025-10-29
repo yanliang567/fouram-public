@@ -14,7 +14,7 @@ from utils.util_log import log
 
 from client.common.common_func import (
     update_dict_value, parser_time, parser_data_size, loop_gen_scalar_files, gen_insert_scalars_params, loop_gen_files,
-    check_sparse_range, handle_special_file_data_type, gen_vectors, FieldTypes, get_fields_type
+    check_sparse_range, handle_special_file_data_type, gen_vectors, FieldTypes, get_fields_type, check_bounds
 )
 
 
@@ -322,6 +322,7 @@ class FieldsParamsBase:
     sparse_range: List[int] = None
     varchar_filled: Optional[bool] = None
     algorithm_params: Optional[dict] = field(default_factory=lambda: {})
+    bounds: Optional[list] = None
 
     @property
     def to_dict(self):
@@ -452,7 +453,8 @@ class ParserFieldsParams:
             for f in self._get_scalar_fields():
                 self._set_attr(f, {"dim": main_dim,
                                    "sparse_range": main_sparse_range,
-                                   "varchar_filled": main_varchar_filled})
+                                   "varchar_filled": main_varchar_filled,
+                                   "bounds": dv.default_bounds})
 
             # parser metric type
             for k1, v1 in self._dataset_params.get(pn.vectors_index, {}).items():
@@ -464,14 +466,18 @@ class ParserFieldsParams:
                 if isinstance(v, dict) and isinstance(v.get("other_params", {}), dict):
                     _other_params = v.get("other_params", {})
                     _p = {i: _other_params.get(i) for i in
-                          ["dataset", "column_name", "varchar_filled", "dim", "sparse_range", "algorithm_params"] if
-                          i in _other_params.keys()}
+                          ["dataset", "column_name", "varchar_filled", "dim", "sparse_range", "algorithm_params",
+                           "bounds"]
+                          if i in _other_params.keys()}
 
                     # set dim, `other_params.dim` > `params.dim` > `dataset_params.dim`
                     _p["dim"] = _p.get("dim", v.get("params", {}).get("dim", main_dim))
 
                     if "sparse_range" in _p.keys():
                         _p["sparse_range"] = check_sparse_range(_p["sparse_range"])
+
+                    if "bounds" in _p.keys():
+                        _p["bounds"] = check_bounds(_p["bounds"])
 
                     self._set_attr(k, _p)
         except Exception as e:

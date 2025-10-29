@@ -69,6 +69,8 @@ class DefaultValue:
     default_array_max_capacity = 10
     default_metric_type = "L2"
     default_sparse_range = [1, 10]
+    default_bounds = [[0, 100], [0, 100]]
+    default_geo_point_num_range = [2, 6]
 
     default_int64_field_name = "int64"
     default_float_field_name = "float"
@@ -78,6 +80,7 @@ class DefaultValue:
     default_float16_vector_name = "float16_vector"
     default_bfloat16_vector_name = "bfloat16_vector"
     default_sparse_float_vector_name = "sparse_float_vector"
+    default_int8_vector_name = "int8_vector"
     default_varchar_field_name = "varchar"
 
     code = "code"
@@ -107,6 +110,7 @@ class DefaultValue:
     default_scalar_types = [i for i in DataType.all_members.keys() if
                             i not in ["NONE", "UNKNOWN", "BINARY_VECTOR", "FLOAT_VECTOR", "FLOAT16_VECTOR",
                                       "BFLOAT16_VECTOR", "SPARSE_FLOAT_VECTOR"]]
+    default_all_vector_types = ["BINARY_VECTOR", "FLOAT_VECTOR", "FLOAT16_VECTOR", "BFLOAT16_VECTOR", "INT8_VECTOR"]
 
     default_alter_index_params = {'mmap.enabled': True}
 
@@ -149,6 +153,20 @@ class Precision:
     COMMON_PRECISION = 4
     CONCURRENT_PRECISION = 2
     ALGORITHM_PRECISION = 1
+
+
+class GeometryWKTType:
+    POINT = "POINT"
+    LINESTRING = "LINESTRING"
+    POLYGON = "POLYGON"
+    MULTIPOINT = "MULTIPOINT"
+    MULTILINESTRING = "MULTILINESTRING"
+    MULTIPOLYGON = "MULTIPOLYGON"
+    GEOMETRYCOLLECTION = "GEOMETRYCOLLECTION"
+
+    @staticmethod
+    def to_dict() -> dict:
+        return {k: v for k, v in vars(GeometryWKTType).items() if not str(k).startswith('_') and isinstance(v, str)}
 
 
 class CaseIterParams:

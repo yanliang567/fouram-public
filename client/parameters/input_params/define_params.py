@@ -1069,6 +1069,70 @@ class Expr:
     def ARRAY_LENGTH(name):
         return ExprBase(expr=f"ARRAY_LENGTH({name})")
 
+    @staticmethod
+    def st_equals(left, right):
+        return ExprBase(expr=f"st_equals({left}, \"{right}\")")
+
+    @staticmethod
+    def ST_EQUALS(left, right):
+        return ExprBase(expr=f"ST_EQUALS({left}, \"{right}\")")
+
+    @staticmethod
+    def st_touches(left, right):
+        return ExprBase(expr=f"st_touches({left}, \"{right}\")")
+
+    @staticmethod
+    def ST_TOUCHES(left, right):
+        return ExprBase(expr=f"ST_TOUCHES({left}, \"{right}\")")
+
+    @staticmethod
+    def st_overlaps(left, right):
+        return ExprBase(expr=f"st_overlaps({left}, \"{right}\")")
+
+    @staticmethod
+    def ST_OVERLAPS(left, right):
+        return ExprBase(expr=f"ST_OVERLAPS({left}, \"{right}\")")
+
+    @staticmethod
+    def st_crosses(left, right):
+        return ExprBase(expr=f"st_crosses({left}, \"{right}\")")
+
+    @staticmethod
+    def ST_CROSSES(left, right):
+        return ExprBase(expr=f"ST_CROSSES({left}, \"{right}\")")
+
+    @staticmethod
+    def st_contains(left, right):
+        return ExprBase(expr=f"st_contains({left}, \"{right}\")")
+
+    @staticmethod
+    def ST_CONTAINS(left, right):
+        return ExprBase(expr=f"ST_CONTAINS({left}, \"{right}\")")
+
+    @staticmethod
+    def st_intersects(left, right):
+        return ExprBase(expr=f"st_intersects({left}, \"{right}\")")
+
+    @staticmethod
+    def ST_INTERSECTS(left, right):
+        return ExprBase(expr=f"ST_INTERSECTS({left}, \"{right}\")")
+
+    @staticmethod
+    def st_within(left, right):
+        return ExprBase(expr=f"st_within({left}, \"{right}\")")
+
+    @staticmethod
+    def ST_WITHIN(left, right):
+        return ExprBase(expr=f"ST_WITHIN({left}, \"{right}\")")
+
+    @staticmethod
+    def st_dwithin(left, right):
+        return ExprBase(expr=f"st_dwithin({left}, \"{right}\")")
+
+    @staticmethod
+    def ST_DWITHIN(left, right):
+        return ExprBase(expr=f"ST_DWITHIN({left}, \"{right}\")")
+
 
 class CheckItems:
     IgnoreFlushRateLimitAndTimeout = [{pn.message: ServerExceptionsMessage.RateLimitError},

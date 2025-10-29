@@ -181,6 +181,7 @@ convert_data_type = "convert_data_type"
 
 # data type name lower
 ARRAY = "array"
+GEOMETRY = "geometry"
 
 # dataset config
 VECTOR = "vector"

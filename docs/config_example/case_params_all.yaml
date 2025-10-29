@@ -5,7 +5,7 @@ dataset_params:
   # metric type of index and search
   metric_type: L2 / IP / COSINE / JACCARD / <str>
   # specify the name of the vector column: when creating the collection, or for an existing collection
-  vector_field_name: float_vector / binary_vector / float16_vector / bfloat16_vector / sparse_float_vector / <str>
+  vector_field_name: float_vector / binary_vector / float16_vector / bfloat16_vector / sparse_float_vector / int8_vector / <str>
   # vector dimensions for vector field, make sure it is consistent with the dim of the specified dataset
   # `dataset_params.dim` is also a global parameter,
   # `dim` of other vector field will be overwritten by `dataset_params.dim` if `dataset_params.scalars_params.<vector field name>.params.dim` is not set
@@ -89,6 +89,8 @@ dataset_params:
       params:
         json_cast_type: VARCHAR
         json_path: json["key_1"]
+    geometry_linestring:
+      index_type: RTREE
 
   # parameters required to create scalars: {<field_name>: {<params>: {}, <other_params>: {} }}
   scalars_params:
@@ -261,6 +263,14 @@ dataset_params:
         max_capacity: 5
       other_params:
         varchar_filled: false
+    # `geometry` data type naming rules: geometry_<geometry wkt type> as prefix
+    # Geometry WKT types: point, linestring, polygon, multipoint, multilinestring, multipolygon, geometrycollection
+    geometry_point:
+      other_params:
+        # `bounds` default value is: [[0, 100], [0, 100]]
+        bounds:
+        - [50, 100]  # random range of x coordinates, 0 <= left < right
+        - [300, 310]  # random range of y coordinates, 0 <= left < right
 
   # list resource groups after preparing data
   show_resource_groups: False / <bool>
@@ -290,7 +300,7 @@ collection_params:
   auto_id: false / <bool>
   # create scalars: <List[<scalar field name>...]>
   # Notice: scalars are created here so that operations on scalar can take effect.
-  other_fields: [ "int64_1", "float_1", "json_1", "json_2", "varchar_1", "varchar_2", "array_varchar_1", "array_int64_1" ]
+  other_fields: [ "int64_1", "float_1", "json_1", "json_2", "varchar_1", "varchar_2", "array_varchar_1", "array_int64_1", "timestamptz" ]
   shards_num: 2 / <int>
   # the default pk is `int64`, you can set `true` to set the primary key column to `varchar` type
   # parameters of the `varchar` pk column can be set in `dataset_params.scalars_params.id`
