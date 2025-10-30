@@ -943,7 +943,8 @@ class Base:
         entities = gen_entities(self.collection_schema, params.get_vectors, params.get_ids, params.varchar_filled,
                                 anns_field=params.anns_field, insert_scalars_params=params.scalars_params,
                                 data_organization=params.data_organization, dynamic_fields=params.dynamic_fields,
-                                dynamic_fields_schema=params.dynamic_fields_schema)
+                                dynamic_fields_schema=params.dynamic_fields_schema,
+                                partial_update_fields=params.partial_update_fields)
         return self.collection_wrap.upsert(entities, **params.obj_params)
 
     def concurrent_delete(self, params: ConcurrentTaskDelete):

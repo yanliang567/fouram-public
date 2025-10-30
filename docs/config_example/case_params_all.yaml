@@ -709,11 +709,19 @@ concurrent_tasks:
     params:
       nb: Optional[int] = 1  # number of batch upsert
       timeout: Optional[int] = 60
+      partial_update: Optional[bool] = None  # if `partial_update` is enabled and `partial_update_fields` is not set, then all fields will be updated
 
       # same as `common_params.data_organization`
       data_organization: Optional[str] = None
       # dynamic fields for upserting, same as `collection_params.dynamic_fields`
       dynamic_fields: Optional[list] = []
+      # specify a subset of fields within collection fields, 'id' must be selected, auto id is not supported in this scene
+      # `partial_update_fields` does not affect `dynamic_fields`
+      # e.g.:
+      #    collection fields: 'id'(primary key), 'float_vector', 'int64', 'varchar', <dynamic_fields>
+      #    partial_update_fields: ["id", "int64"]
+      # Notice: if set ["id", "int64", "varchar_not_exist"], and "varchar_not_exist" is not a field of collection, upsert will not select this field
+      partial_update_fields: Optional[list] = None
 
       # random id or vectors
       # data that upsert will be retained and can be deleted later

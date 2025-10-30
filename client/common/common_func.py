@@ -522,8 +522,15 @@ def gen_values(data_type, vectors, ids, varchar_filled=False, field: dict = {}, 
     return values
 
 
+def check_data_field(field_name: str, partial_update_fields: List[str]):
+    if not partial_update_fields or field_name in partial_update_fields:
+        return True
+    return False
+
+
 def gen_entities(info, vectors=None, ids=None, varchar_filled=False, insert_scalars_params={}, anns_field: str = None,
-                 data_organization: str = None, dynamic_fields: list = [], dynamic_fields_schema: dict = {}):
+                 data_organization: str = None, dynamic_fields: list = [], dynamic_fields_schema: dict = {},
+                 partial_update_fields: List[str] = None):
     """
     insert_scalars_params = {<field name>: {"default_value": [], other_params: {}}...}
     """
@@ -536,7 +543,7 @@ def gen_entities(info, vectors=None, ids=None, varchar_filled=False, insert_scal
 
     entities = {}
     for field in info["fields"]:
-        if not (field["name"] == "id" and info["auto_id"]):
+        if not (field["name"] == "id" and info["auto_id"]) and check_data_field(field["name"], partial_update_fields):
             entities.update({
                 field["name"]: gen_values(
                     field["type"], vectors, ids, varchar_filled, field, **insert_scalars_params.get(field["name"], {}),

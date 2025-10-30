@@ -901,8 +901,26 @@ class ConcurrentTaskInsert(DataClassBase):
 
 
 @dataclass
-class ConcurrentInputParamsUpsert(ConcurrentInputParamsInsert):
-    pass
+class ConcurrentInputParamsUpsert(DataClassBase):
+    nb: Optional[int] = 1  # number of batch upsert
+    timeout: Optional[int] = DefaultValue.default_timeout
+    partial_update: Optional[bool] = None
+
+    data_organization: Optional[str] = None
+    # dynamic fields for inserting
+    dynamic_fields: Optional[list] = field(default_factory=lambda: [])
+    partial_update_fields: Optional[list] = None
+
+    # random id or vectors
+    random_id: Optional[bool] = False
+    random_vector: Optional[bool] = False
+    varchar_filled: Optional[bool] = False
+    start_id: Optional[int] = 0
+    shuffle_id: Optional[bool] = False
+
+    # check request result
+    check_task: Optional[str] = CheckTasks.checkResponse
+    check_items: Union[dict, list] = field(default_factory=lambda: {})
 
 
 @dataclass
@@ -913,11 +931,13 @@ class ConcurrentTaskUpsert(DataClassBase):
     nb: Optional[int] = 1
     timeout: Optional[int] = DefaultValue.default_timeout
     anns_field: Optional[str] = None
+    partial_update: Optional[bool] = None
 
     data_organization: Optional[str] = None
     # dynamic fields for upserting
     dynamic_fields: Optional[list] = field(default_factory=lambda: [])
     dynamic_fields_schema: Optional[dict] = field(default_factory=lambda: {})
+    partial_update_fields: Optional[list] = None
 
     # random id or vectors
     random_id: Optional[bool] = False
@@ -929,6 +949,7 @@ class ConcurrentTaskUpsert(DataClassBase):
     _loop_ids = None
     fixed_ids = None
     fixed_vectors = None
+    _extra_params = {}
 
     # check request result
     check_task: Optional[str] = CheckTasks.checkResponse
@@ -940,6 +961,17 @@ class ConcurrentTaskUpsert(DataClassBase):
             raise ValueError(
                 "[{0}] Check task:`{1}` can't be used in `{2}` concurrent request, only supports:{3}".format(
                     "ConcurrentTaskUpsert", self.check_task, "upsert", support_tasks))
+
+        if self.partial_update is not True:
+            self.partial_update_fields = None
+        if not (self.partial_update_fields is None or (isinstance(self.partial_update_fields, list) and all(
+                [isinstance(p, str) for p in self.partial_update_fields]))):
+            raise ValueError("[{0}] `partial_update_fields` data type is not a `List[str]`: {1}".format(
+                "ConcurrentTaskUpsert", self.partial_update_fields))
+
+        if self.partial_update is True:
+            self._extra_params.update({"partial_update": self.partial_update})
+
         log.debug("[ConcurrentTaskUpsert] Init done.")
 
     def set_params(self):
@@ -970,7 +1002,8 @@ class ConcurrentTaskUpsert(DataClassBase):
 
     @property
     def obj_params(self):
-        return {"timeout": self.timeout, "check_task": self.check_task, "check_items": self.check_items}
+        return {"timeout": self.timeout, "check_task": self.check_task, "check_items": self.check_items,
+                **self._extra_params}
 
 
 @dataclass
