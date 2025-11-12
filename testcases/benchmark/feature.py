@@ -3336,7 +3336,7 @@ class TestFeatureCases(PerfTemplate):
             NodeResource(nodes=[dataNode], cpu=4),
             NodeResource(nodes=[streamingNode]).custom_resource(
                 limits_cpu=2, requests_cpu=1, limits_mem=16, requests_mem=16),
-            NodeResource(nodes=[queryNode], cpu=6, mem=8)
+            NodeResource(nodes=[queryNode], cpu=6, mem=16)  # update mem from 8G to 16G
         ]
 
         self.concurrency_template(
@@ -3506,7 +3506,7 @@ class TestFeatureCases(PerfTemplate):
         node_resources = [
             NodeResource(nodes=[dataNode], cpu=8),
             NodeResource(nodes=[streamingNode], cpu=2, mem=10),
-            NodeResource(nodes=[queryNode], cpu=12, mem=12)
+            NodeResource(nodes=[queryNode], cpu=12, mem=16)  # update mem from 12G to 16G
         ]
 
         self.concurrency_template(
