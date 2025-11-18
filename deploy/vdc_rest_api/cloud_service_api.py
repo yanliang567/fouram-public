@@ -101,9 +101,9 @@ class CloudServiceApi:
         return self.req.post(url=url, body=body, headers=self.headers, log_level=log_level)
 
     @request_catch()
-    def describe(self, instance_id: str, log_level=Log_Level) -> RequestResponseParser:
+    def describe(self, instance_id: str, log_level=Log_Level, ignore_http_code=False) -> RequestResponseParser:
         url = self.host + "/cloud/v1/instance/describe?InstanceId={0}".format(instance_id)
-        return self.req.get(url=url, headers=self.headers, log_level=log_level)
+        return self.req.get(url=url, headers=self.headers, log_level=log_level, ignore_http_code=ignore_http_code)
 
     @request_catch()
     def list(self, current_page: int = 1, page_size: int = 50, search_key=None, project_id=None,

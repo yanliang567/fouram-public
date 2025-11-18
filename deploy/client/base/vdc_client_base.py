@@ -646,7 +646,8 @@ class VDCClientBase:
                 self.instance_name, get_class_key_name(InstanceStatus, status)))
             time.sleep(interval_time)
 
-            res = self.cloud_service_api.describe(instance_id=self.instance_id, check_result=False)
+            res = self.cloud_service_api.describe(instance_id=self.instance_id, check_result=False,
+                                                  ignore_http_code=True)
             if isinstance(res.data, dict) and "Status" in res.data and res.data["Status"] == status:
                 log.info(f'[VDCClientBase] Instance: {self.instance_name} is {res.data["StatusName"]}')
                 return True
