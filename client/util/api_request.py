@@ -3,7 +3,7 @@ import time
 from typing import Tuple
 import uuid
 
-from client.common.common_param import InterfaceResponse
+from client.common.common_param import InterfaceResponse, ApiRequestReturn
 
 from commons.common_type import PRECISION
 from commons.common_func import truncated_output, accept_kwargs
@@ -32,7 +32,7 @@ info_logout = InfoLogout()
 def time_catch():
     def wrapper(func):
         # @functools.wraps(func)
-        def inner_wrapper(*args, **kwargs) -> Tuple[tuple, bool]:
+        def inner_wrapper(*args, **kwargs) -> ApiRequestReturn:
             # use hex of uuid to remove "-"
             request_id = uuid.uuid4().hex
             func_name = args[0][0].__qualname__
@@ -51,13 +51,13 @@ def time_catch():
                 else:
                     log.debug(msg)
 
-                return (res, rt), True
+                return ApiRequestReturn(res, rt, True, request_id)
             except Exception as e:
                 rt = time.perf_counter() - start
                 log.debug(traceback.format_exc())
                 log.error("(api_response) : [%s] %s, [requestId: %s]" % (
                     func_name, truncated_output(e, info_logout.log_row_length), request_id))
-                return (e, rt), False
+                return ApiRequestReturn(e, rt, False, request_id)
 
         return inner_wrapper
 
@@ -85,7 +85,7 @@ def api_request(_list, request_id: str = None, **kwargs):
                 request_id))
 
             return func(*arg, **kwargs)
-    return (False, 0), False
+    return ApiRequestReturn(False, 0, False, request_id)
 
 
 def time_wrapper(func):

@@ -31,10 +31,10 @@ class ApiPartitionWrapper:
     def init_partition(self, collection, name, description="", check_task=None, check_items=None, **kwargs):
         """ In order to distinguish the same name of partition """
         func_name = sys._getframe().f_code.co_name
-        res, res_result = api_request([Partition, collection, name, description], **kwargs)
-        self.partition = res[0] if res_result else None
-        check_result = ResponseChecker(res, func_name, check_task, check_items, res_result, **kwargs).run()
-        return InterfaceResponse(*res, res_result, check_result)
+        res = api_request([Partition, collection, name, description], **kwargs)
+        self.partition = res.response if res.res_result else None
+        check_result = ResponseChecker(res, func_name, check_task, check_items, **kwargs).run()
+        return InterfaceResponse(*res.get_res_list, check_result)
 
     @property
     def description(self):
@@ -64,73 +64,70 @@ class ApiPartitionWrapper:
             return self._flush()
 
         func_name = sys._getframe().f_code.co_name
-        res, res_result = api_request([self.partition.flush], **kwargs)
-        check_result = ResponseChecker(res, func_name, check_task, check_items, res_result, **kwargs).run()
-        return InterfaceResponse(*res, res_result, check_result)
+        res = api_request([self.partition.flush], **kwargs)
+        check_result = ResponseChecker(res, func_name, check_task, check_items, **kwargs).run()
+        return InterfaceResponse(*res.get_res_list, check_result)
 
     def drop(self, check_task=None, check_items=None, **kwargs):
         func_name = sys._getframe().f_code.co_name
-        res, res_result = api_request([self.partition.drop], **kwargs)
-        check_result = ResponseChecker(res, func_name, check_task, check_items, res_result, **kwargs).run()
-        return InterfaceResponse(*res, res_result, check_result)
+        res = api_request([self.partition.drop], **kwargs)
+        check_result = ResponseChecker(res, func_name, check_task, check_items, **kwargs).run()
+        return InterfaceResponse(*res.get_res_list, check_result)
 
     def load(self, replica_number=NaN, timeout=None, check_task=None, check_items=None, **kwargs):
         replica_number = param_info.param_replica_num if replica_number is NaN else replica_number
 
         func_name = sys._getframe().f_code.co_name
-        res, res_result = api_request([self.partition.load, replica_number, timeout], **kwargs)
-        check_result = ResponseChecker(res, func_name, check_task, check_items, is_succ=res_result, **kwargs).run()
-        return InterfaceResponse(*res, res_result, check_result)
+        res = api_request([self.partition.load, replica_number, timeout], **kwargs)
+        check_result = ResponseChecker(res, func_name, check_task, check_items, **kwargs).run()
+        return InterfaceResponse(*res.get_res_list, check_result)
 
     def release(self, check_task=None, check_items=None, **kwargs):
         func_name = sys._getframe().f_code.co_name
-        res, res_result = api_request([self.partition.release], **kwargs)
-        check_result = ResponseChecker(res, func_name, check_task, check_items, is_succ=res_result, **kwargs).run()
-        return InterfaceResponse(*res, res_result, check_result)
+        res = api_request([self.partition.release], **kwargs)
+        check_result = ResponseChecker(res, func_name, check_task, check_items, **kwargs).run()
+        return InterfaceResponse(*res.get_res_list, check_result)
 
     def insert(self, data, check_task=None, check_items=None, **kwargs):
         func_name = sys._getframe().f_code.co_name
-        res, res_result = api_request([self.partition.insert, data], **kwargs)
-        check_result = ResponseChecker(res, func_name, check_task, check_items, is_succ=res_result, data=data,
-                                       **kwargs).run()
-        return InterfaceResponse(*res, res_result, check_result)
+        res = api_request([self.partition.insert, data], **kwargs)
+        check_result = ResponseChecker(res, func_name, check_task, check_items, data=data, **kwargs).run()
+        return InterfaceResponse(*res.get_res_list, check_result)
 
     def search(self, data, anns_field, params, limit, expr=None, output_fields=None, check_task=None, check_items=None,
                **kwargs):
         func_name = sys._getframe().f_code.co_name
-        res, res_result = api_request([self.partition.search, data, anns_field, params, limit, expr, output_fields],
-                                      **kwargs)
-        check_result = ResponseChecker(res, func_name, check_task, check_items, is_succ=res_result, data=data,
-                                       anns_field=anns_field, params=params, limit=limit, expr=expr,
-                                       output_fields=output_fields, **kwargs).run()
-        return InterfaceResponse(*res, res_result, check_result)
+        res = api_request([self.partition.search, data, anns_field, params, limit, expr, output_fields], **kwargs)
+        check_result = ResponseChecker(res, func_name, check_task, check_items, data=data, anns_field=anns_field,
+                                       params=params, limit=limit, expr=expr, output_fields=output_fields,
+                                       **kwargs).run()
+        return InterfaceResponse(*res.get_res_list, check_result)
 
     def hybrid_search(self, reqs, rerank, limit, output_fields=None, timeout=None, round_decimal=-1, check_task=None,
                       check_items=None, **kwargs):
         func_name = sys._getframe().f_code.co_name
-        res, res_result = api_request([self.partition.hybrid_search, reqs, rerank, limit, output_fields, timeout,
-                                       round_decimal], **kwargs)
-        check_result = ResponseChecker(res, func_name, check_task, check_items, is_succ=res_result, reqs=reqs,
-                                       rerank=rerank, limit=limit, output_fields=output_fields, timeout=timeout,
-                                       round_decimal=round_decimal, **kwargs).run()
-        return InterfaceResponse(*res, res_result, check_result)
+        res = api_request([self.partition.hybrid_search, reqs, rerank, limit, output_fields, timeout, round_decimal],
+                          **kwargs)
+        check_result = ResponseChecker(res, func_name, check_task, check_items, reqs=reqs, rerank=rerank, limit=limit,
+                                       output_fields=output_fields, timeout=timeout, round_decimal=round_decimal,
+                                       **kwargs).run()
+        return InterfaceResponse(*res.get_res_list, check_result)
 
     def query(self, expr, output_fields=None, timeout=None, check_task=None, check_items=None, **kwargs):
         func_name = sys._getframe().f_code.co_name
-        res, res_result = api_request([self.partition.query, expr, output_fields, timeout], **kwargs)
-        check_result = ResponseChecker(res, func_name, check_task, check_items, res_result, expression=expr,
+        res = api_request([self.partition.query, expr, output_fields, timeout], **kwargs)
+        check_result = ResponseChecker(res, func_name, check_task, check_items, expression=expr,
                                        output_fields=output_fields, timeout=timeout, **kwargs).run()
-        return InterfaceResponse(*res, res_result, check_result)
+        return InterfaceResponse(*res.get_res_list, check_result)
 
     def delete(self, expr, check_task=None, check_items=None, **kwargs):
         func_name = sys._getframe().f_code.co_name
-        res, res_result = api_request([self.partition.delete, expr], **kwargs)
-        check_result = ResponseChecker(res, func_name, check_task, check_items, is_succ=res_result, expr=expr,
-                                       **kwargs).run()
-        return InterfaceResponse(*res, res_result, check_result)
+        res = api_request([self.partition.delete, expr], **kwargs)
+        check_result = ResponseChecker(res, func_name, check_task, check_items, expr=expr, **kwargs).run()
+        return InterfaceResponse(*res.get_res_list, check_result)
 
     def get_replicas(self, timeout=None, check_task=None, check_items=None, **kwargs):
         func_name = sys._getframe().f_code.co_name
-        res, res_result = api_request([self.partition.get_replicas, timeout], **kwargs)
-        check_result = ResponseChecker(res, func_name, check_task, check_items, res_result, **kwargs).run()
-        return InterfaceResponse(*res, res_result, check_result)
+        res = api_request([self.partition.get_replicas, timeout], **kwargs)
+        check_result = ResponseChecker(res, func_name, check_task, check_items, **kwargs).run()
+        return InterfaceResponse(*res.get_res_list, check_result)

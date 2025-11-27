@@ -10,7 +10,6 @@ try:
 except ValueError as e:
     RNG = None
 
-
 MetricsToIndexType = {
     "L2": [pn.IndexTypeName.FLAT, pn.IndexTypeName.IVF_FLAT, pn.IndexTypeName.IVF_SQ8, pn.IndexTypeName.IVF_PQ,
            pn.IndexTypeName.HNSW, pn.IndexTypeName.IVF_HNSW, pn.IndexTypeName.RHNSW_FLAT, pn.IndexTypeName.RHNSW_SQ,
@@ -41,6 +40,18 @@ class InterfaceResponse:
     rt: Union[int, float]  # response time
     res_result: bool
     check_result: bool
+
+
+@dataclass
+class ApiRequestReturn:
+    response: any
+    rt: Union[int, float]  # response time
+    res_result: bool
+    request_id: str
+
+    @property
+    def get_res_list(self):
+        return [self.response, self.rt, self.res_result]
 
 
 @dataclass

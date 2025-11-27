@@ -5,6 +5,7 @@ from client.common.common_type import Error, CheckTasks, DefaultValue as dv
 import client.check.param_check as pc
 from client.check.exception_message import ServerExceptionsMessage
 
+from client.common.common_param import ApiRequestReturn
 from utils.util_log import log
 
 
@@ -42,12 +43,12 @@ def parser_check_items(check_items) -> List[Error]:
 
 
 class ResponseChecker:
-    def __init__(self, response: dict, func_name, check_task, check_items, is_succ=True, **kwargs):
-        self.response = response[0]  # response of api request
+    def __init__(self, res: ApiRequestReturn, func_name, check_task, check_items, **kwargs):
+        self.response = res.response  # response of api request
         self.func_name = func_name  # api function name
         self.check_task = check_task  # task to check response of the api request
         self.check_items = check_items  # check items and expectations that to be checked in check task
-        self.succ = is_succ  # api responses successful or not
+        self.succ = res.res_result  # api responses successful or not
         self.kwargs = kwargs
 
     def run(self):

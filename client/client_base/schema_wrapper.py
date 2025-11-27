@@ -24,11 +24,11 @@ class ApiCollectionSchemaWrapper:
     def init_collection_schema(self, fields, description="", check_task=None, check_items=None, **kwargs):
         """In order to distinguish the same name of CollectionSchema"""
         func_name = sys._getframe().f_code.co_name
-        res, res_result = api_request([CollectionSchema, fields, description], **kwargs)
-        self.collection_schema = res[0] if res_result else None
-        check_result = ResponseChecker(res, func_name, check_task, check_items, is_succ=res_result, fields=fields,
-                                       description=description, **kwargs).run()
-        return InterfaceResponse(*res, res_result, check_result)
+        res = api_request([CollectionSchema, fields, description], **kwargs)
+        self.collection_schema = res.response if res.res_result else None
+        check_result = ResponseChecker(res, func_name, check_task, check_items, fields=fields, description=description,
+                                       **kwargs).run()
+        return InterfaceResponse(*res.get_res_list, check_result)
 
     @property
     def primary_field(self):
@@ -64,11 +64,11 @@ class ApiFieldSchemaWrapper:
     def init_field_schema(self, name, dtype, description="", check_task=None, check_items=None, **kwargs):
         """In order to distinguish the same name of FieldSchema"""
         func_name = sys._getframe().f_code.co_name
-        res, res_result = api_request([FieldSchema, name, dtype, description], **kwargs)
-        self.field_schema = res[0] if res_result else None
-        check_result = ResponseChecker(res, func_name, check_task, check_items, res_result, name=name, dtype=dtype,
+        res = api_request([FieldSchema, name, dtype, description], **kwargs)
+        self.field_schema = res.response if res.res_result else None
+        check_result = ResponseChecker(res, func_name, check_task, check_items, name=name, dtype=dtype,
                                        description=description, **kwargs).run()
-        return InterfaceResponse(*res, res_result, check_result)
+        return InterfaceResponse(*res.get_res_list, check_result)
 
     @property
     def description(self):
