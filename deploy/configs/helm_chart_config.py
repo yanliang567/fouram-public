@@ -134,7 +134,8 @@ class HelmConfig(BaseConfig):
             return {}
 
         if not self.cluster:
-            return {"standalone": {"messageQueue": mq_type}, mq_type: {"enabled": True}}
+            _mq_type = "pulsarv3" if mq_type == pulsar else mq_type
+            return {"standalone": {"messageQueue": mq_type}, _mq_type: {"enabled": True}}
 
         if mq_type == pulsar:
             return {"pulsarv3": {"enabled": True}}
