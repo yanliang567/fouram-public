@@ -1,5 +1,6 @@
 import copy
 import dacite
+import traceback
 from typing import Dict, List
 
 from pymilvus.orm.types import CONSISTENCY_STRONG
@@ -45,6 +46,7 @@ class FunctionalCases(CommonCases):
             func_obj(*arg, **kwargs)
             return self.case_report.to_dict(), True
         except Exception as e:
+            log.error(traceback.format_exc())
             log.error("[FunctionalCases] Run {0} raise error: {1}".format(func_obj.__name__, e))
             return {}, False
 
@@ -149,27 +151,23 @@ class FunctionalCases(CommonCases):
 
     """ Base request """
 
-    def get_collection_fields(self, collection_obj: callable = None):
-        collection_obj = collection_obj or self.collection_wrap
-        return [f.name for f in collection_obj.schema.fields]
-
     def collection_delete(self, report_data: bool = True, **kwargs):
         log.info("[FunctionalCases] Delete params: {0}".format(kwargs))
-        res = self.collection_wrap.delete(**kwargs)
+        res = self.delete_api(**kwargs)
         if report_data:
             self.set_report_data({"delete_RT": round(res.rt, Precision.DELETE_PRECISION)})
         return res
 
     def collection_flush(self, report_data: bool = True, **kwargs):
         log.info("[FunctionalCases] Flush params: {0}".format(kwargs))
-        res = self.collection_wrap.flush(**kwargs)
+        res = self.flush_api(**kwargs)
         if report_data:
             self.set_report_data({"flush_RT": round(res.rt, Precision.FLUSH_PRECISION)})
         return res
 
     def collection_query(self, report_data: bool = True, **kwargs):
         log.info("[FunctionalCases] Query params: {0}".format(kwargs))
-        res = self.collection_wrap.query(**kwargs)
+        res = self.query_api(**kwargs)
         if report_data:
             self.set_report_data({"query_RT": round(res.rt, Precision.QUERY_PRECISION)})
         return res
@@ -270,7 +268,7 @@ class FunctionalCases(CommonCases):
         log.info(f"[scene_functional_query_all_deleted] functional params: {functional_params}")
 
         # get extra partitions and parser datasize
-        actual_partition_names = [p.name for p in self.collection_wrap.partitions]
+        actual_partition_names = self.collection_partition_names
         extra_partitions = self.params_obj.dataset_params.get(pn.extra_partitions, None)
         if extra_partitions:
             sub_partitions_params_list = (
@@ -317,7 +315,11 @@ class FunctionalCases(CommonCases):
                                 f"[scene_functional_query_all_deleted] Query partitions {other_partitions} "
                                 f"with expr: {_expr} shouldn't return empty.")
 
-            return res_delete.response.delete_count
+            if hasattr(res_delete.response, "delete_count"):
+                return res_delete.response.delete_count
+            elif isinstance(res_delete.response, dict):
+                return res_delete.response.get("delete_count")
+            raise ValueError(f"[scene_functional_query_all_deleted] Can not parse delete result: {res_delete.response}")
 
         # query before delete
         count_before = self.collection_query(expr="", consistency_level=CONSISTENCY_STRONG, output_fields=["count(*)"])
@@ -348,9 +350,9 @@ class FunctionalCases(CommonCases):
                 delete_pks = loop_ids(functional_params.delete_batch, start_id=functional_params.delete_range[0])
 
                 # get pk field name
-                if self.collection_wrap.schema.primary_field.dtype != DataType.INT64:
+                if self.primary_key_data_type != DataType.INT64:
                     raise Exception(f"[scene_functional_query_all_deleted] Delete range batch only supported int64 pk.")
-                pk = self.collection_wrap.schema.primary_field.name
+                pk = self.primary_key_name
 
                 for i in range(0, ni_count):
                     del_count = _inner_delete_query_empty(f"{pk} in {next(delete_pks)}",

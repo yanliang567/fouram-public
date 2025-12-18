@@ -3,7 +3,7 @@ import copy
 import time
 import dacite
 
-from client.cases.base import Base
+from client.cases.base_client.base import Base
 from client.cases.case_report import CasesReport
 from client.parameters import params_name as pn
 from client.parameters.params import ParamsFormat, ParamsBase
@@ -141,7 +141,7 @@ class CommonCases(Base):
 
             self.rebuild_index(vector_default_field_name, metric_type)
         else:
-            collection_names = self.utility_wrap.list_collections().response if not self.params_obj.collection_params.get(
+            collection_names = self.list_all_collections if not self.params_obj.collection_params.get(
                 pn.collection_name, None) else [self.params_obj.collection_params[pn.collection_name]]
             if len(collection_names) == 0 or len(collection_names) > 1:
                 msg = "[AccCases] There can only be one collection in the database: {}".format(collection_names)
@@ -163,8 +163,8 @@ class CommonCases(Base):
         # load collection
         self.load_collection(**self.params_obj.load_params)
 
-        counts = self.collection_wrap.num_entities
-        log.info("[AccCases] Number of vectors in the collection({0}): {1}".format(self.collection_wrap.name, counts))
+        counts = self.collection_num_entities()
+        log.info("[AccCases] Number of vectors in the collection({0}): {1}".format(self.get_collection_name, counts))
         self.show_all_resource(shards_num=self.params_obj.collection_params.get(pn.shards_num, 2),
                                show_resource_groups=self.params_obj.dataset_params.get(pn.show_resource_groups, True),
                                show_db_user=self.params_obj.dataset_params.get(pn.show_db_user, False))

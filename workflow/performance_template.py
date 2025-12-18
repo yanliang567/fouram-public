@@ -25,9 +25,10 @@ class PerfTemplate(Base):
 
     def serial_template(self, input_params: InputParamsBase, case_callable_obj: callable,
                         default_case_params: dict = {}, cpu=8, mem=16, deploy_mode=STANDALONE,
-                        node_resources=None, set_dependence=None, input_configs: dict = {}, **kwargs):
+                        node_resources=None, set_dependence=None, input_configs: dict = {}, client_type=None, **kwargs):
         log.info("[PerfTemplate] Input parameters: {0}".format(vars(input_params)))
         input_params = copy.deepcopy(input_params)
+        self.set_client_type(client_type=client_type)
         kwargs.update({DeployArchitecture:
                        get_deploy_architecture(param_info.deploy_architecture, kwargs.get(DeployArchitecture, None))})
 
@@ -89,9 +90,10 @@ class PerfTemplate(Base):
     def concurrency_template(self, input_params: InputParamsBase, case_callable_obj: callable,
                              default_case_params: dict = {}, cpu=8, mem=16, deploy_mode=STANDALONE, interval=30,
                              sync_report=False, old_version_format=True, input_configs: dict = {},
-                             node_resources=None, set_dependence=None, **kwargs):
+                             node_resources=None, set_dependence=None, client_type=None, **kwargs):
         log.info("[PerfTemplate] Input parameters: {0}".format(vars(input_params)))
         input_params = copy.deepcopy(input_params)
+        self.set_client_type(client_type=client_type)
         kwargs.update({DeployArchitecture:
                        get_deploy_architecture(param_info.deploy_architecture, kwargs.get(DeployArchitecture, None))})
 
@@ -167,9 +169,10 @@ class PerfTemplate(Base):
     def functional_template(self, input_params: InputParamsBase, case_callable_obj: callable,
                             sub_callable_obj: callable, default_case_params: dict = {}, cpu=8, mem=16,
                             deploy_mode=STANDALONE, node_resources=None, set_dependence=None, input_configs: dict = {},
-                            **kwargs):
+                            client_type=None, **kwargs):
         log.info("[PerfTemplate] Input parameters: {0}".format(vars(input_params)))
         input_params = copy.deepcopy(input_params)
+        self.set_client_type(client_type=client_type)
         kwargs.update({DeployArchitecture:
                        get_deploy_architecture(param_info.deploy_architecture, kwargs.get(DeployArchitecture, None))})
 

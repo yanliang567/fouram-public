@@ -3,8 +3,14 @@ from client.common.common_type import DefaultValue as dv
 
 try:
     from pymilvus import DEFAULT_RESOURCE_GROUP
+    RESOURCE_GROUPS_FLAG = True
 except ImportError as e:
-    DEFAULT_RESOURCE_GROUP = dv.default_resource_group
+    try:
+        from pymilvus.client.constants import DEFAULT_RESOURCE_GROUP
+        RESOURCE_GROUPS_FLAG = True
+    except ImportError as e:
+        DEFAULT_RESOURCE_GROUP = dv.default_resource_group
+        RESOURCE_GROUPS_FLAG = False
 
 
 class LogLevel:
@@ -59,6 +65,11 @@ class TeardownType:
 class ConcurrencyType:
     Locust = "Locust"
     GoBench = "goBench"
+
+
+class ClientType:
+    ORM = "ORM"
+    MilvusClient = "MilvusClient"
 
 
 @dataclass

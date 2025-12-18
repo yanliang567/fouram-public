@@ -11,8 +11,14 @@ from utils.util_log import log
 
 
 class InfoLogout:
-    _log_output = ["Collection.insert", "Collection.upsert", "Collection.delete", "Index", "Collection.load",
-                   "Collection.search", "Collection.query", "Collection.hybrid_search", "Collection.flush"]
+    orm_log_output = ["Collection.insert", "Collection.upsert", "Collection.delete", "Index", "Collection.load",
+                      "Collection.search", "Collection.query", "Collection.hybrid_search", "Collection.flush"]
+    mc_log_output = [
+        f"MilvusClient.{n}" for n in
+        ["insert", "upsert", "delete", "create_index", "load_collection", "search", "query", "hybrid_search", "flush"]
+    ]
+
+    _log_output = orm_log_output + mc_log_output
     log_output = _log_output
     log_row_length = 3000
 
@@ -39,7 +45,7 @@ def time_catch():
             start = time.perf_counter()
             try:
                 # start = time.perf_counter()
-                res = func(*args, request_id=request_id, **kwargs)
+                start, res = func(*args, request_id=request_id, **kwargs)
                 rt = time.perf_counter() - start
 
                 log.debug("(api_response) : [%s] %s, [requestId: %s]" % (
@@ -84,7 +90,8 @@ def api_request(_list, request_id: str = None, **kwargs):
                 func_name, truncated_output(arg, info_logout.log_row_length, func_name=func_name), str(kwargs),
                 request_id))
 
-            return func(*arg, **kwargs)
+            start = time.perf_counter()
+            return start, func(*arg, **kwargs)
     return ApiRequestReturn(False, 0, False, request_id)
 
 

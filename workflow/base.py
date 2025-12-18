@@ -11,7 +11,7 @@ from commons.common_func import (
     parser_input_config, execute_funcs, update_dict_value, check_deploy_config, write_shell_file, waiting_all_threads)
 from commons.auto_get import AutoGetTag
 from commons.common_params import EnvVariable
-from commons.common_type import TeardownType, ConcurrencyType, CommonCallable
+from commons.common_type import TeardownType, ConcurrencyType, CommonCallable, ClientType
 from data_report.metrics import Report_Metric_Object
 
 
@@ -153,6 +153,10 @@ class Base:
             param_info.param_host = _e[0]
         else:
             raise Exception(f"[Base] Can not parser endpoint: {endpoint}, type: {type(endpoint)}, please check.")
+
+    @staticmethod
+    def set_client_type(client_type=None):
+        param_info.client_type = param_info.client_type or client_type or ClientType.ORM
 
     def init_server_client(self, deploy_tool=Operator, deploy_mode=STANDALONE, deploy_architecture=None):
         self.deploy_client = DefaultClient(deploy_tool=deploy_tool, deploy_mode=deploy_mode,

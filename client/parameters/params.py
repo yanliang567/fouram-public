@@ -7,7 +7,7 @@ from client.client_base import RRFRanker, WeightedRanker, AnnSearchRequest, Data
 from client.common.common_parser import ParserFieldsParams
 from client.common.common_func import (
     gen_combinations, update_dict_value, loop_ids, gen_vectors, get_default_field_name, check_vector_length,
-    parser_check_tasks, gen_random_query_data
+    parser_check_tasks, gen_random_query_data, check_mc_data_organization
 )
 from client.common.common_type import concurrent_global_params, DefaultValue, CheckTasks
 from client.check.func_check import InterfaceCheckTasks
@@ -1145,6 +1145,8 @@ class ConcurrentTaskSceneTest(DataClassBase):
 
     all_fields_params: ParserFieldsParams = None
 
+    _mc_insert_obj_params = None
+
     def __post_init__(self):
         self.dynamic_fields_schema = self.all_fields_params.get_collection_dynamic_fields_schema
 
@@ -1157,6 +1159,13 @@ class ConcurrentTaskSceneTest(DataClassBase):
             "dynamic_fields": self.dynamic_fields,
             "dynamic_fields_schema": self.dynamic_fields_schema
         }
+
+    @property
+    def mc_insert_obj_params(self):
+        if self._mc_insert_obj_params is None:
+            self._mc_insert_obj_params = update_dict_value(
+                {"data_organization": check_mc_data_organization(self.data_organization)}, self.insert_obj_params)
+        return self._mc_insert_obj_params
 
 
 @dataclass
@@ -1310,6 +1319,8 @@ class ConcurrentTaskSceneInsertPartition(DataClassBase):
 
     flush_obj_params: Optional[dict] = None
 
+    _mc_insert_obj_params = None
+
     def __post_init__(self):
         self.flush_obj_params = {"timeout": self.timeout, "check_task": None, "check_items": None}
 
@@ -1332,6 +1343,13 @@ class ConcurrentTaskSceneInsertPartition(DataClassBase):
             "dynamic_fields": self.dynamic_fields,
             "dynamic_fields_schema": self.dynamic_fields_schema
         }
+
+    @property
+    def mc_insert_obj_params(self):
+        if self._mc_insert_obj_params is None:
+            self._mc_insert_obj_params = update_dict_value(
+                {"data_organization": check_mc_data_organization(self.data_organization)}, self.insert_obj_params)
+        return self._mc_insert_obj_params
 
 
 @dataclass
@@ -1393,6 +1411,8 @@ class ConcurrentTaskSceneTestPartition(DataClassBase):
 
     flush_obj_params: Optional[dict] = None
 
+    _mc_insert_obj_params = None
+
     def __post_init__(self):
         self.flush_obj_params = {"timeout": self.timeout, "check_task": None, "check_items": None}
         self.released_search_obj_params = {
@@ -1432,6 +1452,13 @@ class ConcurrentTaskSceneTestPartition(DataClassBase):
             "dynamic_fields": self.dynamic_fields,
             "dynamic_fields_schema": self.dynamic_fields_schema
         }
+
+    @property
+    def mc_insert_obj_params(self):
+        if self._mc_insert_obj_params is None:
+            self._mc_insert_obj_params = update_dict_value(
+                {"data_organization": check_mc_data_organization(self.data_organization)}, self.insert_obj_params)
+        return self._mc_insert_obj_params
 
 
 @dataclass
@@ -1498,6 +1525,8 @@ class ConcurrentTaskSceneTestPartitionHybridSearch(DataClassBase):
     check_tasks: Optional[dict] = field(default_factory=lambda: {})
 
     flush_obj_params: Optional[dict] = None
+
+    _mc_insert_obj_params = None
 
     def __post_init__(self):
         self.flush_obj_params = {"timeout": self.timeout, "check_task": None, "check_items": None}
@@ -1569,6 +1598,13 @@ class ConcurrentTaskSceneTestPartitionHybridSearch(DataClassBase):
             "dynamic_fields": self.dynamic_fields,
             "dynamic_fields_schema": self.dynamic_fields_schema
         }
+
+    @property
+    def mc_insert_obj_params(self):
+        if self._mc_insert_obj_params is None:
+            self._mc_insert_obj_params = update_dict_value(
+                {"data_organization": check_mc_data_organization(self.data_organization)}, self.insert_obj_params)
+        return self._mc_insert_obj_params
 
 
 @dataclass
@@ -1913,6 +1949,8 @@ class ConcurrentTaskSceneSearchTest(DataClassBase):
 
     all_fields_params: ParserFieldsParams = None
 
+    _mc_insert_obj_params = None
+
     def __post_init__(self):
         self.dynamic_fields_schema = self.all_fields_params.get_collection_dynamic_fields_schema
 
@@ -1925,6 +1963,13 @@ class ConcurrentTaskSceneSearchTest(DataClassBase):
             "dynamic_fields": self.dynamic_fields,
             "dynamic_fields_schema": self.dynamic_fields_schema
         }
+
+    @property
+    def mc_insert_obj_params(self):
+        if self._mc_insert_obj_params is None:
+            self._mc_insert_obj_params = update_dict_value(
+                {"data_organization": check_mc_data_organization(self.data_organization)}, self.insert_obj_params)
+        return self._mc_insert_obj_params
 
 
 @dataclass
@@ -2059,6 +2104,8 @@ class ConcurrentTaskSceneHybridSearchTest(DataClassBase):
     alter_index: Optional[list] = field(default_factory=lambda: [])
     custom_insert_api: Optional[str] = insert
 
+    _mc_insert_obj_params = None
+
     def __post_init__(self):
         self.dynamic_fields_schema = self.all_fields_params.get_collection_dynamic_fields_schema
 
@@ -2071,6 +2118,13 @@ class ConcurrentTaskSceneHybridSearchTest(DataClassBase):
             "dynamic_fields": self.dynamic_fields,
             "dynamic_fields_schema": self.dynamic_fields_schema
         }
+
+    @property
+    def mc_insert_obj_params(self):
+        if self._mc_insert_obj_params is None:
+            self._mc_insert_obj_params = update_dict_value(
+                {"data_organization": check_mc_data_organization(self.data_organization)}, self.insert_obj_params)
+        return self._mc_insert_obj_params
 
     def set_random_data(self):
         for r in self.reqs:

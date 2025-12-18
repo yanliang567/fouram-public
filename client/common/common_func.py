@@ -17,7 +17,9 @@ from itertools import product, zip_longest, cycle
 from scipy.sparse import csr_matrix, isspmatrix
 from datetime import datetime, timezone
 
-from client.client_base import ApiCollectionSchemaWrapper, ApiFieldSchemaWrapper, AnnSearchRequest, DataType
+from client.client_base import (
+    ApiCollectionSchemaWrapper, ApiFieldSchemaWrapper, AnnSearchRequest, DataType, MilvusClientWrapper
+)
 from client.parameters import params_name as pn
 from client.common.common_type import NAS, SimilarityMetrics, AccMetrics, Precision, DefaultValue as dv, GeometryWKTType
 from client.common.common_param import GoBenchIndex, SegmentsAnalysis, RNG
@@ -156,6 +158,72 @@ def gen_collection_schema(vector_field_name="", description=dv.default_desc, def
     return ApiCollectionSchemaWrapper().init_collection_schema(
         fields=fields, description=description, auto_id=auto_id, primary_field=primary_field,
         enable_dynamic_field=kwargs.get("enable_dynamic_field", False)).response
+
+
+def gen_mc_field_schema(schema_obj, name: str, dtype=None, description=dv.default_desc, is_primary=False,
+                        scalars_params={}, **kwargs):
+    field_types = FieldTypes.to_dict
+    if dtype is None:
+        for _field in field_types.keys():
+            if name.startswith(_field.lower()):
+                _kwargs = {}
+
+                _field_element, _data_type = _field, DataType.NONE
+                if hasattr(DataType, "ARRAY") and _field.lower() == pn.ARRAY:
+                    _field_element, _data_type = get_array_element_type(name)
+                    _kwargs.update({"max_capacity": kwargs.get("max_capacity", dv.default_array_max_capacity),
+                                    "element_type": _data_type})
+
+                if _field_element in ["STRING", "VARCHAR"]:
+                    _kwargs.update({"max_length": kwargs.get("max_length", dv.default_max_length)})
+                elif _field_element in dv.default_all_vector_types:
+                    _kwargs.update({"dim": kwargs.get("dim", dv.default_dim)})
+
+                _kwargs.update(scalars_params.get(name, {}).get("params", {}))
+                return schema_obj.add_field(field_name=name, datatype=field_types[_field], description=description,
+                                            is_primary=is_primary, **_kwargs)
+    else:
+        if dtype in field_types.values():
+            kwargs.update(scalars_params.get(name, {}).get("params", {}))
+            return schema_obj.add_field(field_name=name, datatype=dtype, description=description, is_primary=is_primary,
+                                        **kwargs)
+    log.error("[gen_mc_field_schema] The field schema for generating {0} is not supported, please check.".format(name))
+    return []
+
+
+def gen_mc_collection_schema(mc_obj: MilvusClientWrapper, vector_field_name="", description=dv.default_desc,
+                             default_fields=True, auto_id=False, other_fields=[], primary_field=None, varchar_id=False,
+                             scalars_params={}, **kwargs):
+    """
+    "scalars_params" =  {<field_name>: {
+                                        "params": {},  # for creating collection, e.g.: max_length
+                                        "other_params": {
+                                                "dataset": <dataset name>
+                                                ...  # extra params, e.g.: varchar_filled
+                                        }  # for inserting values
+                        }, ...}
+    """
+    id_type = DataType.INT64
+    _k = {}
+
+    schema_obj = mc_obj.create_schema(
+        description=description, auto_id=auto_id, primary_field=primary_field,
+        enable_dynamic_field=kwargs.get("enable_dynamic_field", False)).response
+
+    if varchar_id:
+        id_type = DataType.VARCHAR
+        _k.update({"max_length": kwargs.get("max_length", dv.default_max_length)})
+    fields = [
+        gen_mc_field_schema(schema_obj, "id", dtype=id_type, is_primary=True, scalars_params=scalars_params, **_k),
+        gen_mc_field_schema(schema_obj, vector_field_name, scalars_params=scalars_params,
+                            dim=kwargs.get("dim", dv.default_dim))
+    ] if default_fields else []
+
+    for _field in other_fields:
+        fields.append(gen_mc_field_schema(schema_obj, _field, scalars_params=scalars_params, **kwargs))
+
+    log.debug(f"[gen_mc_collection_schema] The generated field schema contains the following:{schema_obj.to_dict()}")
+    return schema_obj
 
 
 """ param handling """
@@ -569,6 +637,12 @@ def gen_entities(info, vectors=None, ids=None, varchar_filled=False, insert_scal
     else:
         all_org = [None, "", "column_insert", "row_insert", "data_frame"]
         raise ValueError(f"[gen_entities] Can't parser data organization: {data_organization}, only support: {all_org}")
+
+
+def check_mc_data_organization(value, print_warn_msg: bool = True):
+    if value not in ["row_insert", None, ""] and print_warn_msg:
+        log.warning(f"[check_mc_data_organization] MilvusClient only supports `row_insert`, not: `{value}`")
+    return "row_insert"
 
 
 def handle_bfloat16_type(data):
@@ -1195,6 +1269,10 @@ def check_vector_index_params(field_name: str, params):
     else:
         log.error(f"[check_vector_index_params] Vector field: {field_name} index params is not dict: {params}")
     return False
+
+
+def check_user_length(name: str):
+    return name if len(name) <= 32 else str(name)[-32:]
 
 
 def check_set_properties_params(params):

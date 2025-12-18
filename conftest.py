@@ -6,12 +6,14 @@ from deploy.commons.common_params import Helm, Operator, STANDALONE
 from db_client.client_db import Database_Client
 from utils.util_log import log
 from configs.log_config import log_config
-from commons.common_func import modify_file, check_deploy_tool, check_deploy_mode
+from commons.common_func import modify_file, check_deploy_tool, check_deploy_mode, check_client_type
 from parameters.input_params import param_info, InputParamsBase
 
 
 def pytest_addoption(parser):
     parser.addoption("--client_version", action="store", default="2.2", help="client version")
+    parser.addoption("--client_type", action="store", default=None,
+                     help="only support `ORM` and `MilvusClient`/`MC`, default is `ORM`")
     parser.addoption("--host", action="store", default="localhost", help="service's ip")
     parser.addoption("--port", action="store", default=19530, help="service's port")
     parser.addoption("--uri", action="store", default="", help="service's uri")
@@ -19,8 +21,8 @@ def pytest_addoption(parser):
     parser.addoption("--tag", action="store", default="all", help="only run tests matching the tag.")
     parser.addoption('--clean_log', action='store_true', default=False, help="clean log before testing")
     parser.addoption('--secure', action='store_true', default=False, help="using secure when connection server")
-    parser.addoption("--user", action="store", default="", help="enable secure and set user name")
-    parser.addoption("--password", action="store", default="", help="enable secure and set user password")
+    parser.addoption("--user", action="store", default="", help="disable secure and set user name")
+    parser.addoption("--password", action="store", default="", help="disable secure and set user password")
     parser.addoption("--db_name", action="store", default="", help="database name use for connect")
     parser.addoption("--run_id", action="store", default=None, help="run id for client test")
     parser.addoption('--err_msg', action='store', default="err_msg", help="error message of test")
@@ -171,6 +173,7 @@ def initialize_env(request):
     log.info("[initialize_milvus] Log cleaned up, start testing...")
     param_info.prepare_param_info(
         client_version, host, port,
+        client_type=check_client_type(request.config.getoption("--client_type")),
         uri=request.config.getoption("--uri"),
         token=request.config.getoption("--token"),
         # secure

@@ -15,6 +15,7 @@ class ParamInfo:
         self.client_version = ""
         self.param_host = DefaultConfig.DEFAULT_HOST
         self.param_port = DefaultConfig.DEFAULT_PORT
+        self.client_type = None
         self.param_uri = "tcp://127.0.0.1:19530"  # DefaultConfig.GRPC_URI
         self.param_token = ""
         self.param_handler = ""
@@ -51,7 +52,7 @@ class ParamInfo:
         self.chaos_watch_time = None
 
     def prepare_param_info(
-            self, client_version, host, port,
+            self, client_version, host, port, client_type: str = None,
             token="", uri="", handler="", secure="", param_user="", param_password="", param_db_name="",
             vdc_user="", vdc_env="", vdc_region_id="", vdc_serverless_host="",
             milvus_tag=None, milvus_tag_prefix="", tag_repository=None, release_name_prefix="", release_name="",
@@ -65,6 +66,7 @@ class ParamInfo:
         self.client_version = client_version
         self.param_host = host
         self.param_port = port
+        self.client_type = client_type or self.client_type
 
         self.param_uri = uri
         self.param_token = token

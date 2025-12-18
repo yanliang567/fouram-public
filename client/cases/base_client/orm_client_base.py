@@ -19,22 +19,18 @@ from client.client_base import (
     ApiDBWrapper,
     DataType
 )
-
-from client.common.common_parser import (
-    PrepareInsertParams, GoSearchParams
-)
+from client.common.common_parser import PrepareInsertParams
 from client.common.common_func import (
-    gen_collection_schema, gen_unique_str, parser_data_size, gen_vectors, gen_entities, gen_random_query_data,
-    go_bench, go_bench_refine,
+    gen_collection_schema, gen_unique_str, parser_data_size, gen_vectors, gen_entities,
     remove_list_values, parser_segment_info, update_dict_value, hide_dict_value,
     get_default_search_params, parser_search_params_expr, get_ann_search_request_params, check_vector_index_params,
-    parser_set_properties_params, parser_alter_index_params, check_vector_length, convert_scalar_index_params_to_list
+    parser_set_properties_params, parser_alter_index_params, check_vector_length, convert_scalar_index_params_to_list,
+    check_user_length
 )
 from client.common.common_param import TransferNodesParams, TransferReplicasParams
 from client.common.common_type import Precision, CheckTasks, DefaultValue as dv
 from client.parameters import params_name as pn
 from client.parameters.params import (
-    DataClassBase,
     ConcurrentTaskSearch,
     ConcurrentTaskHybridSearch,
     ConcurrentTaskQuery,
@@ -61,21 +57,14 @@ from client.util.api_request import func_time_catch
 
 # packages outside the client folder
 from parameters.input_params import param_info
-from commons.common_params import EnvVariable
-from commons.common_type import LogLevel
+from commons.common_type import LogLevel, DEFAULT_RESOURCE_GROUP, RESOURCE_GROUPS_FLAG
 from utils.util_log import log
 
-try:
-    from pymilvus import DEFAULT_RESOURCE_GROUP
 
-    RESOURCE_GROUPS_FLAG = True
-except ImportError as e:
-    DEFAULT_RESOURCE_GROUP = dv.default_resource_group
-    RESOURCE_GROUPS_FLAG = False
-
-
-class Base:
+class ORMClientBase:
     shards_num = 2
+
+    name = "ORMClientBase"
 
     # new objects
     _role_wrap = None
@@ -93,10 +82,24 @@ class Base:
 
         self.collection_name = ''
         self.collection_schema = None
+        self._main_db_name = None
 
     # def __del__(self):
-    #     log.info("[Base] Start disconnect connection.")
+    #     log.info("[ORMClientBase] Start disconnect connection.")
     #     self.remove_connect()
+
+    """ init api """
+
+    def delete_api(self, **kwargs):
+        return self.collection_wrap.delete(**kwargs)
+
+    def flush_api(self, **kwargs):
+        return self.collection_wrap.flush(**kwargs)
+
+    def query_api(self, **kwargs):
+        return self.collection_wrap.query(**kwargs)
+
+    """ base functions"""
 
     @property
     def role_wrap(self) -> ApiRoleWrapper:
@@ -141,13 +144,13 @@ class Base:
         # create user
         if user not in self.get_all_users(using=using):
             self.utility_wrap.create_user(user=user, password=password, using=using)
-            log.customize(log_level)(f"[Base] Create user:{user}, password:{password} done.")
+            log.customize(log_level)(f"[{self.name}] Create user:{user}, password:{password} done.")
 
         # create role and set to user
         _role_obj = self.init_role(role_name=role_name, using=using)
         if user not in _role_obj.get_users().response:
             _role_obj.add_user(username=user)
-            log.customize(log_level)(f"[Base] Add user:{user} to role:{role_name}")
+            log.customize(log_level)(f"[{self.name}] Add user:{user} to role:{role_name}")
 
     def delete_user_from_role(self, user, role_name=dv.default_rbac_role_name, using=DefaultConfig.DEFAULT_USING,
                               log_level=LogLevel.INFO):
@@ -155,25 +158,25 @@ class Base:
         _role_obj = self.init_role(role_name=role_name, using=using)
         if user in _role_obj.get_users().response:
             _role_obj.remove_user(username=user)
-            log.customize(log_level)(f"[Base] Remove user:{user} from role:{role_name}")
+            log.customize(log_level)(f"[{self.name}] Remove user:{user} from role:{role_name}")
 
     def delete_users(self, user, using=DefaultConfig.DEFAULT_USING, log_level=LogLevel.INFO):
         # delete user
         if user in self.get_all_users(using=using):
             self.utility_wrap.delete_user(user=user, using=using)
-            log.customize(log_level)(f"[Base] Delete user:{user}")
+            log.customize(log_level)(f"[{self.name}] Delete user:{user}")
 
     def create_db(self, db_name: str, using=DefaultConfig.DEFAULT_USING, log_level=LogLevel.INFO):
         """ Only for serial option """
         if db_name not in self.db_wrap.list_database(using=using).response:
             self.db_wrap.create_database(db_name=db_name, using=using)
-            log.customize(log_level)(f"[Base] Create database:{db_name} done.")
+            log.customize(log_level)(f"[{self.name}] Create database:{db_name} done.")
 
     def drop_db(self, db_name: str, using=DefaultConfig.DEFAULT_USING, log_level=LogLevel.INFO):
         """ Only for serial option """
         if db_name in self.db_wrap.list_database(using=using).response:
             self.db_wrap.drop_database(db_name=db_name, using=using)
-            log.customize(log_level)(f"[Base] Drop database:{db_name} done.")
+            log.customize(log_level)(f"[{self.name}] Drop database:{db_name} done.")
 
     def clean_all_rbac(self, reset_rbac=False, using=dv.default_backup_alias, log_level=LogLevel.INFO):
         if reset_rbac:
@@ -187,13 +190,13 @@ class Base:
                 for _role in all_users[_user]:
                     self.delete_user_from_role(user=_user, role_name=_role, using=using, log_level=LogLevel.DEBUG)
                 self.delete_users(user=_user, using=using, log_level=LogLevel.DEBUG)
-            log.customize(log_level)(f"[Base] Cleaned all RBAC:{all_users}")
+            log.customize(log_level)(f"[{self.name}] Cleaned all RBAC:{all_users}")
 
     def clean_all_db_and_collection(self, reset_db=False, clean=True, log_level=LogLevel.INFO):
         """ Only for serial option """
         if reset_db and clean:
             log.customize(log_level)(
-                f"[Base] Show all databases and collections:{self.get_all_db_and_collections()}")
+                f"[{self.name}] Show all databases and collections:{self.get_all_db_and_collections()}")
 
             # clean all collections
             for db in self.db_wrap.list_database().response:
@@ -203,10 +206,15 @@ class Base:
             self.db_wrap.using_database(db_name=dv.default_database)
             # clean all databases, except default db `default`
             for db in remove_list_values(self.db_wrap.list_database().response, dv.default_database):
-                self.db_wrap.drop_database(db_name=db)
+                if db != self._main_db_name:
+                    self.db_wrap.drop_database(db_name=db)
 
             log.customize(log_level)(
-                f"[Base] Cleaned all databases and collections:{self.get_all_db_and_collections()}")
+                f"[{self.name}] Cleaned all databases and collections:{self.get_all_db_and_collections()}")
+
+            if self._main_db_name:
+                # reset to main db name
+                self.db_wrap.using_database(db_name=self._main_db_name)
 
     def connect(self, host=None, port=None, secure=False, user="", password="", db_name="",
                 alias=DefaultConfig.DEFAULT_USING, log_level=LogLevel.INFO, **kwargs):
@@ -236,49 +244,78 @@ class Base:
         if db_name:
             self.check_backup_connect(**params)
             self.create_db(db_name=db_name, using=dv.default_backup_alias)
+            self._main_db_name = db_name
 
-        log.customize(log_level)("[Base] Connection params: {}".format(hide_dict_value(params, ["token"])))
+        log.customize(log_level)("[{0}] Connection params: {1}".format(self.name, hide_dict_value(params, ["token"])))
         return self.connection_wrap.connect(**params)
 
     def check_backup_connect(self, **kwargs):
         _kwargs = copy.deepcopy(kwargs)
 
-        update_params = {"alias": dv.default_backup_alias, "db_name": dv.default_database}
-        if _kwargs["user"] != dv.default_rbac_user:
-            update_params.update({"user": dv.default_rbac_user, "password": dv.default_rbac_password})
+        _update_params = {"alias": dv.default_backup_alias, "db_name": dv.default_database}
+        if _kwargs.get("user", None) != dv.default_rbac_user:
+            _update_params.update({"user": dv.default_rbac_user, "password": dv.default_rbac_password})
 
-        _kwargs.update(update_params)
+        _kwargs.update(_update_params)
         if not self.connection_wrap.has_connection(alias=dv.default_backup_alias).response:
             self.connection_wrap.connect(**_kwargs)
 
     def remove_connect(self, alias=DefaultConfig.DEFAULT_USING, log_level=LogLevel.INFO):
         """ Disconnect and remove default connect """
         if self.connection_wrap.has_connection(alias=alias).response:
-            log.customize(log_level)("[Base] Disconnect alias: {0}".format(alias))
+            log.customize(log_level)("[{0}] Disconnect alias: {1}".format(self.name, alias))
             self.connection_wrap.remove_connection(alias=alias)
 
     def create_collection(self, collection_name="", vector_field_name="", schema=None, other_fields=[], shards_num=2,
                           collection_obj: callable = None, log_level=LogLevel.INFO, varchar_id=False, scalars_params={},
                           auto_id=False, dynamic_fields: list = [], **kwargs):
         """ Create a collection with default schema """
-        schema = gen_collection_schema(
+        schema = schema or gen_collection_schema(
             vector_field_name=vector_field_name, other_fields=other_fields, varchar_id=varchar_id, auto_id=auto_id,
             max_length=kwargs.pop(pn.max_length, dv.default_max_length), dim=kwargs.pop(pn.dim, dv.default_dim),
-            scalars_params=scalars_params, enable_dynamic_field=kwargs.pop(pn.enable_dynamic_field, False)) \
-            if schema is None else schema
+            scalars_params=scalars_params, enable_dynamic_field=kwargs.pop(pn.enable_dynamic_field, False))
 
         collection_name = collection_name or gen_unique_str()
-        self.collection_name = self.collection_name or collection_name
+        if collection_obj is None:
+            self.collection_name = collection_name
+            log.debug("[{0}] Reset main collection name: {1}".format(self.name, self.collection_name))
 
-        log.customize(log_level)("[Base] Create collection {}".format(collection_name))
+        log.customize(log_level)("[{0}] Create collection {1}".format(self.name, collection_name))
         collection_obj = collection_obj or self.collection_wrap
         return collection_obj.init_collection(collection_name, schema=schema, shards_num=shards_num, **kwargs)
 
     def connect_collection(self, collection_name):
         """ Connect to an exist collection """
         self.collection_name = collection_name
-        log.info("[Base] Connect collection {}".format(self.collection_name))
+        log.info("[{0}] Connect collection {1}".format(self.name, self.collection_name))
         return self.collection_wrap.init_collection(self.collection_name)
+
+    @property
+    def list_all_collections(self):
+        return self.utility_wrap.list_collections().response
+
+    @property
+    def get_collection_name(self):
+        return self.collection_wrap.name
+
+    def collection_num_entities(self, **kwargs):
+        return self.collection_wrap.num_entities
+
+    @property
+    def collection_partition_names(self):
+        return [p.name for p in self.collection_wrap.partitions]
+
+    @property
+    def primary_key_data_type(self):
+        return self.collection_wrap.schema.primary_field.dtype
+
+    @property
+    def primary_key_name(self):
+        return self.collection_wrap.schema.primary_field.name
+
+    def get_collection_fields(self, collection_obj: callable = None, **kwargs):
+        collection_obj = collection_obj or self.collection_wrap
+        return [f.name for f in collection_obj.schema.fields]
 
     def clean_all_collection(self, clean=True, log_level=LogLevel.INFO):
         """ Drop all collections in the database """
@@ -286,13 +323,13 @@ class Base:
             # self.remove_connect()
             return
         collections = self.utility_wrap.list_collections().response
-        log.customize(log_level)("[Base] Start clean all collections {}".format(collections))
+        log.customize(log_level)("[{0}] Start clean all collections {1}".format(self.name, collections))
         for i in collections:
             self.utility_wrap.drop_collection(i)
 
     def release_all_collections(self):
         collections = self.utility_wrap.list_collections().response
-        log.info("[Base] Start release all collections {}".format(collections))
+        log.info("[{0}] Start release all collections {1}".format(self.name, collections))
         for i in collections:
             c = ApiCollectionWrapper()
             c.init_collection(i)
@@ -300,34 +337,35 @@ class Base:
 
     def clear_collections(self, clean_collection=True):
         if clean_collection:
-            log.info("[Base] Start clear collections")
+            log.info(f"[{self.name}] Start clear collections")
             self.collection_wrap.release()
-            log.info("[Base] Release collections done")
+            log.info(f"[{self.name}] Release collections done")
             self.clean_all_collection()
-            log.info("[Base] Clear collections Done!")
-        log.info("[Base] Start disconnect connection.")
+            log.info(f"[{self.name}] Clear collections Done!")
+        log.info(f"[{self.name}] Start disconnect connection.")
         self.remove_connect()
 
     def flush_collection(self, collection_obj: callable = None, log_level=LogLevel.INFO, **kwargs):
         collection_obj = collection_obj or self.collection_wrap
-        log.customize(log_level)("[Base] Start flush collection {}".format(collection_obj.name))
+        log.customize(log_level)("[{0}] Start flush collection {1}".format(self.name, collection_obj.name))
         return collection_obj.flush(**kwargs)
 
     def load_collection(self, replica_number=1, collection_obj: callable = None, log_level=LogLevel.INFO, **kwargs):
         collection_obj = collection_obj or self.collection_wrap
         kwargs = self.get_resource_groups(**kwargs)
-        log.customize(log_level)(
-            f"[Base] Start load collection {collection_obj.name},replica_number:{replica_number},kwargs:{kwargs}")
+        log.customize(log_level)("[{0}] Start load collection {1}, replica_number:{2}, kwargs:{3}".format(
+            self.name, collection_obj.name, replica_number, kwargs
+        ))
         return collection_obj.load(replica_number=replica_number, **kwargs)
 
     def release_collection(self, **kwargs):
-        log.info("[Base] Start release collection {}".format(self.collection_wrap.name))
+        log.info("[{0}] Start release collection {1}".format(self.name, self.collection_wrap.name))
         return self.collection_wrap.release(**kwargs)
 
     def get_collection_schema(self):
         self.collection_schema = self.collection_wrap.schema.to_dict()
-        log.info("[Base] Collection schema: \n{0}".format(
-            pformat(self.collection_schema, compact=True, width=240, sort_dicts=False)
+        log.info("[{0}] Collection schema: \n{1}".format(
+            self.name, pformat(self.collection_schema, compact=True, width=240, sort_dicts=False)
         ))
 
     def get_collection_load_state(self, collection_obj: callable = None, log_level=LogLevel.DEBUG):
@@ -341,12 +379,13 @@ class Base:
         collection_obj = collection_obj or self.collection_wrap
         res = self.utility_wrap.load_state(collection_name=collection_obj.name)
         log.customize(log_level)(
-            f"[Base] Collection:{collection_obj.name} LoadState:{LoadState(int(res.response)).name}")
+            f"[{self.name}] Collection:{collection_obj.name} LoadState:{LoadState(int(res.response)).name}")
         return res.response
 
     def collection_create_partition(self, partition_name: str, **kwargs):
         if not self.collection_wrap.has_partition(partition_name).response:
-            log.info(f"[Base] Start create partition:{partition_name} for collection:{self.collection_wrap.name}")
+            log.info(
+                f"[{self.name}] Start create partition:{partition_name} for collection:{self.collection_wrap.name}")
             return self.collection_wrap.create_partition(partition_name=partition_name, **kwargs)
 
     def insert_batch(self, vectors, ids, data_size, varchar_filled=False, collection_obj: callable = None,
@@ -364,7 +403,7 @@ class Base:
                                 dynamic_fields_schema=dynamic_fields_schema)
 
         log.customize(log_level)(
-            f"[Base] Start {custom_api_insert}ing, ids: {ids[0]} - {ids[-1]}, data size: {data_size}")
+            f"[{self.name}] Start {custom_api_insert}ing, ids: {ids[0]} - {ids[-1]}, data size: {data_size}")
         collection_obj = collection_obj or self.collection_wrap
         res = getattr(collection_obj, custom_api_insert, collection_obj.insert)(entities, **kwargs)
         self.count_entities(collection_obj=collection_obj, log_level=log_level)
@@ -384,7 +423,7 @@ class Base:
 
         collection_name = collection_name or self.collection_name
         log.customize(log_level)(
-            "[Base] Start inserting {0} vectors to collection {1}".format(data_size, collection_name))
+            "[{0}] Start inserting {1} vectors to collection {2}".format(self.name, data_size, collection_name))
 
         p_i = input_obj or PrepareInsertParams(ni=ni, scalars_params=scalars_params, dim=dim, data_type=data_type,
                                                column_name=column_name, dataset_size=data_size, varchar_id=varchar_id)
@@ -417,9 +456,9 @@ class Base:
         total_time = round((batch_rt + last_rt), Precision.COMMON_PRECISION)
         ips = round(int(data_size) / total_time, Precision.INSERT_PRECISION) if total_time != 0 else 0
         ni_time = round(batch_rt / ni_cunt, Precision.INSERT_PRECISION) if ni_cunt != 0 else 0
-        msg = "[Base] Total time of insert: {0}s, average number of vector bars inserted per second: {1}," + \
+        msg = "[{4}] Total time of insert: {0}s, average number of vector bars inserted per second: {1}," + \
               " average time to insert {2} vectors per time: {3}s"
-        log.customize(log_level)(msg.format(total_time, ips, ni, ni_time))
+        log.customize(log_level)(msg.format(total_time, ips, ni, ni_time, self.name))
         return {
             "insert": {
                 "total_time": total_time,
@@ -439,7 +478,7 @@ class Base:
         batch_rt = 0
         last_rt = 0
 
-        log.info("[Base] Start inserting {} vectors".format(size))
+        log.info("[{0}] Start inserting {1} vectors".format(self.name, size))
         p_i = input_obj or PrepareInsertParams(ni=ni, scalars_params=scalars_params, acc_dataset_train=source_vectors,
                                                dataset_size=size, varchar_id=varchar_id)
 
@@ -454,7 +493,7 @@ class Base:
                 insert_scalars_params=p_i.insert_scalars_params(last_insert), anns_field=anns_field, **kwargs)
 
         total_time = round(batch_rt + last_rt, Precision.INSERT_PRECISION)
-        log.info("[Base] Total time of ann insert: {}s".format(total_time))
+        log.info("[{0}] Total time of ann insert: {1}s".format(self.name, total_time))
         return {
             "ann_insert": {
                 "total_time": total_time
@@ -470,8 +509,8 @@ class Base:
         collection_obj = collection_obj or self.collection_wrap
 
         log.customize(log_level)(
-            "[Base] Start build index of {0} for field:{1} collection:{2}, params:{3}, kwargs:{4}".format(
-                index_type, field_name, collection_obj.name, index_params, kwargs))
+            "[{5}] Start build index of {0} for field:{1} collection:{2}, params:{3}, kwargs:{4}".format(
+                index_type, field_name, collection_obj.name, index_params, kwargs, self.name))
         return self.index_wrap.init_index(collection_obj.collection, field_name, index_params, **kwargs)
 
     def build_scalar_index(self, field_name, index_params: dict = {}, collection_obj: callable = None,
@@ -479,8 +518,8 @@ class Base:
         collection_obj = collection_obj or self.collection_wrap
 
         log.customize(log_level)(
-            "[Base] Start build scalar index of {0} for field:{1}, index_params:{2}, kwargs: {3}".format(
-                collection_obj.name, field_name, index_params, kwargs))
+            "[{4}] Start build scalar index of {0} for field:{1}, index_params:{2}, kwargs: {3}".format(
+                collection_obj.name, field_name, index_params, kwargs, self.name))
         return self.index_wrap.init_index(collection_obj.collection, field_name, index_params=index_params, **kwargs)
 
     def show_index(self, collection_name=""):
@@ -488,21 +527,23 @@ class Base:
         check_indexes = self.collection_wrap.indexes
         if check_indexes:
             _indexes_result = [{i.field_name: i.params} for i in check_indexes]
-            log.info("[Base] Index params of {0}:{1}".format(collection_name, _indexes_result))
+            log.info("[{0}] Index params of {1}: {2}".format(self.name, collection_name, _indexes_result))
             return _indexes_result
 
-        log.info("[Base] Collection:{0} is not building index".format(self.collection_wrap.name))
+        log.info("[{0}] Collection:{1} is not building index".format(self.name, self.collection_wrap.name))
         return {}
 
     def describe_collection_index(self, log_level=LogLevel.INFO):
         indexes = self.collection_wrap.indexes
-        log.customize(log_level)("[Base] Collection:{0} indexes: {1}".format(self.collection_wrap.name, indexes))
+        log.customize(log_level)("[{0}] Collection:{1} indexes: {2}".format(
+            self.name, self.collection_wrap.name, indexes))
         return indexes
 
     def describe_collection(self, collection_obj: callable = None, log_level=LogLevel.INFO):
         collection_obj = collection_obj or self.collection_wrap
         describe = collection_obj.describe()
-        log.customize(log_level)("[Base] Collection:{0} describe: {1}".format(collection_obj.name, describe))
+        log.customize(log_level)("[{0}] Collection:{1} describe: {2}".format(
+            self.name, collection_obj.name, describe.response))
         return describe
 
     def clean_index(self):
@@ -513,26 +554,28 @@ class Base:
         check_indexes = self.collection_wrap.indexes
         if check_indexes:
             _check_result = [i.field_name for i in check_indexes]
-            log.error(f"[Base] Indexes:{_check_result} of collection:{self.collection_wrap.name} can not be cleaned.")
+            log.error(
+                f"[{self.name}] Indexes:{_check_result} of collection:{self.collection_wrap.name} can not be cleaned.")
             return False
-        log.info("[Base] Clean all index done.")
+        log.info(f"[{self.name}] Clean all index done.")
         return True
 
     def drop_specified_field_index(self, field_name: str):
         for _index_obj in self.collection_wrap.indexes:
             if _index_obj.field_name == field_name:
                 self.collection_wrap.drop_index(index_name=_index_obj.index_name)
-                log.info(f"[Base] Drop index of field:`{field_name}`, index name:{_index_obj.index_name} done.")
+                log.info(f"[{self.name}] Drop index of field:`{field_name}`, index name:{_index_obj.index_name} done.")
 
         if field_name in [i.field_name for i in self.collection_wrap.indexes]:
-            log.error(f"[Base] Index of collection:{self.collection_wrap.name} field:`{field_name}` can't be dropped.")
+            log.error(
+                f"[{self.name}] Index of collection:{self.collection_wrap.name} field:`{field_name}` can't be dropped.")
             return False
         return True
 
     def count_entities(self, collection_obj: callable = None, log_level=LogLevel.INFO):
         collection_obj = collection_obj or self.collection_wrap
         counts = collection_obj.num_entities
-        log.customize(log_level)(f"[Base] Number of vectors in the collection({collection_obj.name}): {counts}")
+        log.customize(log_level)(f"[{self.name}] Number of vectors in the collection({collection_obj.name}): {counts}")
 
     def query(self, ids=None, expr=None, **kwargs):
         """
@@ -540,7 +583,7 @@ class Base:
         """
         _expr = ""
         if ids is None and expr is None:
-            raise Exception("[Base] Params of query are needed.")
+            raise Exception(f"[{self.name}] Params of query are needed.")
 
         elif ids is not None:
             _expr = "id in %s" % str(ids)
@@ -548,72 +591,37 @@ class Base:
         elif expr is not None:
             _expr = parser_search_params_expr(expr)
 
-        log.info("[Base] expr of query: \"{0}\", kwargs:{1}".format(_expr, kwargs))
+        log.info("[{0}] expr of query: \"{1}\", kwargs:{2}".format(self.name, _expr, kwargs))
         return self.collection_wrap.query(expr=_expr, **kwargs)
 
     def search(self, data, anns_field, param, limit, expr=None, timeout=300, **kwargs):
         """
         :return: InterfaceResponse
         """
-        msg = '[Base] Params of search nq:{0}, anns_field:{1}, param:{2}, limit:{3}, expr:"{4}", timeout:{5} kwargs:{6}'
-        log.info(msg.format(check_vector_length(data), anns_field, param, limit, expr, timeout, kwargs))
+        msg = '[{7}] Params of search nq:{0}, anns_field:{1}, param:{2}, limit:{3}, expr:"{4}", timeout:{5} kwargs:{6}'
+        log.info(msg.format(check_vector_length(data), anns_field, param, limit, expr, timeout, kwargs, self.name))
         return self.collection_wrap.search(data, anns_field, param, limit, expr=expr, timeout=timeout, **kwargs)
 
     def hybrid_search(self, reqs, rerank, limit, timeout=300, **kwargs):
         """
         :return: InterfaceResponse
         """
-        log.info("[Base] Params of hybrid_search: reqs:{0}, rerank:{1}, limit:{2}, timeout:{3}, kwargs:{4}".format(
-            get_ann_search_request_params(reqs, print_vectors=kwargs.pop("print_vectors", False)), rerank, limit,
-            timeout, kwargs))
+        msg = "[{5}] Params of hybrid_search: reqs:{0}, rerank:{1}, limit:{2}, timeout:{3}, kwargs:{4}"
+        log.info(msg.format(get_ann_search_request_params(reqs, print_vectors=kwargs.pop("print_vectors", False)),
+                            rerank, limit, timeout, kwargs, self.name))
         return self.collection_wrap.hybrid_search(reqs, rerank, limit, timeout=timeout, **kwargs)
-
-    def go_search(self, index_type: str, go_search_params: GoSearchParams, concurrent_number: int,
-                  during_time: int, interval: int, uri="", go_benchmark="", timeout=300, output_format="json",
-                  partition_names=[], secure=False) -> dict:
-        """
-        :return: dict
-        """
-        go_benchmark = go_benchmark or EnvVariable.MILVUS_GOBENCH_PATH
-        uri = uri or "{0}:{1}".format(param_info.param_host, param_info.param_port)
-        secure = secure or param_info.param_secure
-        user = param_info.param_user
-        password = param_info.param_password
-
-        return go_bench(go_benchmark=go_benchmark, uri=uri, collection_name=self.collection_name,
-                        index_type=index_type, search_params=go_search_params.search_parameters,
-                        search_timeout=timeout, search_vector=go_search_params.data,
-                        concurrent_number=concurrent_number, during_time=during_time, interval=interval,
-                        log_path=log.log_info, output_format=output_format, partition_names=partition_names,
-                        secure=secure, user=user, password=password, json_file_path=go_search_params.json_file_path)
-
-    @staticmethod
-    def go_bench(case_params: dict, concurrency_type: str = "parallel", uri="", go_benchmark="", output_format="json",
-                 secure=False) -> dict:
-        """
-        :return: dict
-        """
-        go_benchmark = go_benchmark or EnvVariable.MILVUS_GOBENCH_PATH
-        uri = uri or "{0}:{1}".format(param_info.param_host, param_info.param_port)
-        secure = secure or param_info.param_secure
-        user = param_info.param_user
-        password = param_info.param_password
-
-        return go_bench_refine(go_benchmark=go_benchmark, uri=uri, case_params=case_params, log_path=log.log_info,
-                               concurrency_type=concurrency_type, output_format=output_format,
-                               secure=secure, user=user, password=password)
 
     def _transfer_nodes(self, source: str, target: str, num_node: int):
         if num_node > 0:
             self.utility_wrap.transfer_node(source=source, target=target, num_node=num_node)
         else:
-            log.warning(f"[Base] Can not transfer node {num_node} from {source} to {target}")
+            log.warning(f"[{self.name}] Can not transfer node {num_node} from {source} to {target}")
 
     def transfer_nodes(self, node: TransferNodesParams, all_rg: list):
         if node.source not in all_rg:
-            raise Exception(f"[Base] The source resource group does not exist:{node.source}")
+            raise Exception(f"[{self.name}] The source resource group does not exist:{node.source}")
         if node.target not in all_rg:
-            log.debug(f"[Base] Create resource group {node.target} before transfer")
+            log.debug(f"[{self.name}] Create resource group {node.target} before transfer")
             self.utility_wrap.create_resource_group(name=node.target)
         self._transfer_nodes(source=node.source, target=node.target, num_node=node.num_node)
 
@@ -622,25 +630,25 @@ class Base:
             self.utility_wrap.transfer_replica(
                 source=source, target=target, collection_name=collection_name, num_replica=num_replica)
         else:
-            log.warning("[Base] Can't transfer replica %s from %s to %s, collection_name: %s" % (
-                num_replica, source, target, collection_name))
+            log.warning("[{0}] Can't transfer replica {1} from {2} to {3}, collection_name: {4}".format(
+                self.name, num_replica, source, target, collection_name))
 
     def transfer_replicas(self, replica: TransferReplicasParams, all_rg: list):
         if replica.source not in all_rg:
-            raise Exception(f"[Base] The source resource group does not exist:{replica.source}")
+            raise Exception(f"[{self.name}] The source resource group does not exist:{replica.source}")
         if replica.target not in all_rg:
-            raise Exception(f"[Base] The target resource group does not exist:{replica.source}")
+            raise Exception(f"[{self.name}] The target resource group does not exist:{replica.source}")
         self._transfer_replicas(source=replica.source, target=replica.target,
                                 collection_name=replica.collection_name, num_replica=replica.num_replica)
 
     def drop_all_resource_groups(self):
         lrg = self.utility_wrap.list_resource_groups().response
-        log.debug("[Base] All resource groups {0}".format(lrg))
+        log.debug("[{0}] All resource groups {1}".format(self.name, lrg))
         for n in remove_list_values(lrg, DEFAULT_RESOURCE_GROUP):
             res = self.utility_wrap.describe_resource_group(name=n).response
             self._transfer_nodes(source=n, target=DEFAULT_RESOURCE_GROUP, num_node=res.num_available_node)
             self.utility_wrap.drop_resource_group(name=n)
-            log.debug("[Base] Dropped resource group {0}".format(n))
+            log.debug("[{0}] Dropped resource group {1}".format(self.name, n))
 
     def reset_resource_groups(self, reset_rg=True):
         if not reset_rg:
@@ -651,8 +659,8 @@ class Base:
         # check result
         _lrg = self.utility_wrap.list_resource_groups().response
         if len(remove_list_values(_lrg, DEFAULT_RESOURCE_GROUP)) > 0:
-            raise Exception("[Base] Failed to clean resource groups:{0}, please check manually".format(_lrg))
-        log.info("[Base] Dropped all resource groups except the default resource group.")
+            raise Exception("[{0}] Failed to clean resource groups:{1}, please check manually".format(self.name, _lrg))
+        log.info(f"[{self.name}] Dropped all resource groups except the default resource group.")
 
     def set_resource_groups(self, **kwargs):
         """
@@ -675,8 +683,8 @@ class Base:
             # check available nodes
             res = self.utility_wrap.describe_resource_group(name=DEFAULT_RESOURCE_GROUP).response
             if sum(_groups) > res.num_available_node:
-                raise Exception("[Base] Default num_available_node:%s is less than required:%s, list:%s" % (
-                    res.num_available_node, sum(_groups), _groups))
+                raise Exception("[{0}] Default num_available_node:{1} is less than required:{2}, list:{3}".format(
+                    self.name, res.num_available_node, sum(_groups), _groups))
 
             # transfer nodes
             lrg = self.utility_wrap.list_resource_groups().response
@@ -684,7 +692,7 @@ class Base:
                 self.transfer_nodes(
                     TransferNodesParams(source=DEFAULT_RESOURCE_GROUP, target=f"RG_{i}", num_node=_groups[i]), lrg)
                 # todo need to check transfer result
-            log.info(f"[Base] Transfer all nodes done: {_groups}")
+            log.info(f"[{self.name}] Transfer all nodes done: {_groups}")
 
         elif isinstance(_groups, dict):
             _transfer_nodes = _groups.get(pn.transfer_nodes, [])
@@ -695,13 +703,13 @@ class Base:
             for _node in _transfer_nodes:
                 self.transfer_nodes(TransferNodesParams(**_node), lrg)
                 # todo need to check transfer result
-            log.info(f"[Base] Transfer all nodes done: {_transfer_nodes}")
+            log.info(f"[{self.name}] Transfer all nodes done: {_transfer_nodes}")
 
             # transfer replicas
             for _replica in _transfer_replicas:
                 self.transfer_replicas(TransferReplicasParams(**_replica), lrg)
                 # todo need to check transfer result
-            log.info(f"[Base] Transfer all replicas done: {_transfer_replicas}")
+            log.info(f"[{self.name}] Transfer all replicas done: {_transfer_replicas}")
 
     def get_resource_groups(self, **kwargs):
         _rg = kwargs.pop(pn.resource_groups, None)
@@ -714,7 +722,7 @@ class Base:
                 rg = random.sample(remove_list_values(lrg, DEFAULT_RESOURCE_GROUP), _rg)
                 kwargs.update({pn.resource_groups: rg})
             else:
-                raise Exception(f"[Base] The current resource groups{lrg}:{len(lrg)} < required:{_rg}")
+                raise Exception(f"[{self.name}] The current resource groups{lrg}:{len(lrg)} < required:{_rg}")
 
         elif isinstance(_rg, list):
             kwargs.update({pn.resource_groups: _rg})
@@ -726,13 +734,13 @@ class Base:
 
     def show_all_db_user(self, _flag=False):
         if _flag:
-            log.info(f"[Base] Select all users and roles: {self.get_all_users_roles()}")
-            log.info(f"[Base] Select all databases and collections: {self.get_all_db_and_collections()}")
+            log.info(f"[{self.name}] Select all users and roles: {self.get_all_users_roles()}")
+            log.info(f"[{self.name}] Select all databases and collections: {self.get_all_db_and_collections()}")
 
     def show_collection_properties(self, collection_obj: callable = None):
         properties = self.get_collection_properties(collection_obj=collection_obj, log_level=LogLevel.DEBUG)
         if properties:
-            log.info(f"[Base] Collection {self.collection_wrap.name} properties: {properties}")
+            log.info(f"[{self.name}] Collection {self.collection_wrap.name} properties: {properties}")
 
     def show_resource_groups(self, _flag=True):
         if RESOURCE_GROUPS_FLAG and _flag:
@@ -740,18 +748,18 @@ class Base:
             for rg in lrg:
                 res = self.utility_wrap.describe_resource_group(name=rg).response
                 del_res = str(res).replace("\n", "").replace("\r", "").replace(" ", "")
-                log.info(f"[Base] Describe resource group:{rg}, {del_res}")
+                log.info(f"[{self.name}] Describe resource group:{rg}, {del_res}")
 
     def show_collection_replicas(self, timeout=3600):
         res = self.collection_wrap.get_replicas(timeout=timeout).response
-        log.info(f"[Base] Collection {self.collection_name} replicas info - {res}")
+        log.info(f"[{self.name}] Collection {self.collection_name} replicas info - {res}")
 
     def show_segment_info(self, collection_name="", shards_num=2, timeout=3600):
         collection_name = collection_name or self.collection_name
         res = self.utility_wrap.get_query_segment_info(collection_name=collection_name, timeout=timeout).response
-        log.debug(f"[Base] Collection {self.collection_name} segment info: \n {res}")
+        log.debug(f"[{self.name}] Collection {self.collection_name} segment info: \n {res}")
         res_seg = parser_segment_info(segment_info=res, shards_num=shards_num)
-        log.info(f"[Base] Parser segment info: \n{pformat(res_seg, sort_dicts=False)}")
+        log.info(f"[{self.name}] Parser segment info: \n{pformat(res_seg, sort_dicts=False)}")
 
     def show_all_resource(self, collection_name="", shards_num=2, show_resource_groups=True, show_db_user=False):
         self.show_collection_properties()
@@ -765,7 +773,7 @@ class Base:
                                   log_level=LogLevel.INFO, **kwargs):
         collection_obj = collection_obj or self.collection_wrap
         log.customize(log_level)(
-            f"[Base] Collection {collection_obj.name} set properties:{properties}, kwargs:{kwargs}")
+            f"[{self.name}] Collection {collection_obj.name} set properties:{properties}, kwargs:{kwargs}")
         collection_obj.set_properties(properties=properties, timeout=timeout, **kwargs)
 
     def set_all_properties(self, params: Union[dict, list, None], collection_obj: callable = None,
@@ -776,9 +784,8 @@ class Base:
     def collection_alter_index(self, index_name, extra_params, timeout=None, collection_obj: callable = None,
                                log_level=LogLevel.INFO, **kwargs):
         collection_obj = collection_obj or self.collection_wrap
-        log.customize(log_level)(
-            "[Base] Collection {0} alter index: index_name:{1}, extra_params:{2}".format(
-                collection_obj.name, index_name, extra_params))
+        log.customize(log_level)("[{0}] Collection {1} alter index: index_name:{2}, extra_params:{3}".format(
+            self.name, collection_obj.name, index_name, extra_params))
         collection_obj.alter_index(index_name=index_name, extra_params=extra_params, timeout=timeout)
 
     def set_alter_index(self, params: Union[list, dict, None], collection_obj: callable = None,
@@ -787,8 +794,7 @@ class Base:
             for p in parser_alter_index_params(params):
                 self.collection_alter_index(**p, collection_obj=collection_obj, log_level=log_level)
 
-    @staticmethod
-    def get_collection_params(collection_obj: ApiCollectionWrapper):
+    def get_collection_params(self, collection_obj: ApiCollectionWrapper):
         field_name = None
         dim = None
         metric_type = None
@@ -806,8 +812,9 @@ class Base:
             index_type = collection_obj.index().response.params.get("index_type")
             index_param = collection_obj.index().response.params.get("params")
 
-        log.debug("[Base] Collection %s field_name:%s, dim:%s, metric_type:%s, index_type:%s, index_param:%s" % (
-            collection_obj.name, field_name, dim, metric_type, index_type, index_param))
+        log.debug(
+            "[{0}] Collection {1} field_name:{2}, dim:{3}, metric_type:{4}, index_type:{5}, index_param:{6}".format(
+                self.name, collection_obj.name, field_name, dim, metric_type, index_type, index_param))
         return field_name, dim, metric_type, index_type, index_param
 
     def check_collection_load(self, collection_name: str):
@@ -818,43 +825,42 @@ class Base:
     def create_partition(self, collection, partition_name, partition_obj: callable = None, log_level=LogLevel.DEBUG):
         partition_obj = partition_obj or self.partition_wrap
         partition_obj.init_partition(collection, partition_name)
-        log.customize(log_level)(
-            "[Base] Create partition {0} of collection({1})".format(partition_name, collection.name))
+        log.customize(log_level)("[{0}] Create partition {1} of collection({2})".format(
+            self.name, partition_name, collection.name))
 
     def drop_partition(self, partition_obj: callable = None, log_level=LogLevel.DEBUG, **kwargs):
         partition_obj = partition_obj or self.partition_wrap
         partition_obj.drop(**kwargs)
-        log.customize(log_level)("[Base] Drop partition {0} done.".format(partition_obj.name))
+        log.customize(log_level)("[{0}] Drop partition {1} done.".format(self.name, partition_obj.name))
 
     def count_partition_entities(self, partition_obj: callable = None, log_level=LogLevel.DEBUG):
         partition_obj = partition_obj or self.partition_wrap
         counts = partition_obj.num_entities
-        log.customize(log_level)("[Base] Partition {0} num entities: ({1})".format(partition_obj.name, counts))
+        log.customize(log_level)("[{0}] Partition {1} num entities: {2}".format(self.name, partition_obj.name, counts))
 
     def flush_partition(self, partition_obj: callable = None, log_level=LogLevel.DEBUG, **kwargs):
         partition_obj = partition_obj or self.partition_wrap
-        log.customize(log_level)("[Base] Start flush partition {0}, kwargs: {1}".format(partition_obj.name, kwargs))
+        log.customize(log_level)("[{0}] Start flushing partition {1}, kwargs: {2}".format(
+            self.name, partition_obj.name, kwargs))
         return partition_obj.flush(**kwargs)
 
     def load_partition(self, partition_obj: callable = None, replica_number=1, log_level=LogLevel.DEBUG, **kwargs):
         partition_obj = partition_obj or self.partition_wrap
         kwargs = self.get_resource_groups(**kwargs)
-        log.customize(log_level)(
-            f"[Base] Start load partition {partition_obj.name}, replica_number:{replica_number}, kwargs:{kwargs}")
+        log.customize(log_level)("[{0}] Start loading partition {1}, replica_number: {2}, kwargs: {3}".format(
+            self.name, partition_obj.name, replica_number, kwargs
+        ))
         return partition_obj.load(replica_number=replica_number, **kwargs)
 
     def release_partition(self, partition_obj: callable = None, log_level=LogLevel.DEBUG, **kwargs):
         partition_obj = partition_obj or self.partition_wrap
-        log.customize(log_level)("[Base] Start release partition {0}".format(partition_obj.name))
+        log.customize(log_level)("[{0}] Start release partition {1}".format(self.name, partition_obj.name))
         return partition_obj.release(**kwargs)
 
     def search_partition(self, data, anns_field, param, limit, expr=None, partition_obj: callable = None, timeout=300,
                          log_level=LogLevel.DEBUG, **kwargs):
-        """
-        :return: InterfaceResponse
-        """
         partition_obj = partition_obj or self.partition_wrap
-        msg = f"[Base] Params of partition:{partition_obj.name} " + \
+        msg = f"[{self.name}] Params of partition: {partition_obj.name} " + \
               "search: nq:{0}, anns_field:{1}, param:{2}, limit:{3}, expr:\"{4}\", kwargs:{5}".format(
                   check_vector_length(data), anns_field, param, limit, expr, kwargs)
         log.customize(log_level)(msg)
@@ -862,15 +868,12 @@ class Base:
 
     def hybrid_search_partition(self, reqs, rerank, limit, output_fields=None, partition_obj: callable = None,
                                 timeout=300, log_level=LogLevel.DEBUG, **kwargs):
-        """
-        :return: InterfaceResponse
-        """
         partition_obj = partition_obj or self.partition_wrap
 
-        msg = "[Base] Params of partition:{0} hybrid_search: reqs:{1}, rerank:{2}, limit:{3}, timeout:{4}, kwargs:{5}"
+        msg = "[{6}] Params of partition:{0} hybrid_search: reqs:{1}, rerank:{2}, limit:{3}, timeout:{4}, kwargs:{5}"
         log.customize(log_level)(msg.format(
             partition_obj.name, get_ann_search_request_params(reqs, print_vectors=kwargs.pop("print_vectors", False)),
-            rerank, limit, timeout, kwargs))
+            rerank, limit, timeout, kwargs, self.name))
         return partition_obj.hybrid_search(reqs, rerank, limit, output_fields=output_fields, timeout=timeout, **kwargs)
 
     def concurrent_search(self, params: ConcurrentTaskSearch):
@@ -882,8 +885,8 @@ class Base:
         log_level = LogLevel.DEBUG
 
         _reqs, _reqs_params = params.get_random_data()
-        log.customize(log_level)(
-            f"[Base] Params of concurrent_hybrid_search reqs: {_reqs_params}, {params.get_all_params}")
+        log.customize(log_level)("[{0}] Params of concurrent_hybrid_search reqs: {1}, {2}".format(
+            self.name, _reqs_params, params.get_all_params))
         return self.collection_wrap.hybrid_search(reqs=_reqs, **params.obj_params)
 
     def concurrent_query(self, params: ConcurrentTaskQuery):
@@ -907,8 +910,8 @@ class Base:
         for i in params.partitions:
             _obj = all_partition.get(i, None)
             if _obj is None:
-                raise ValueError("[Base] {0} partition:`{1}` not in collection:{2}, partitions:{3}".format(
-                    func_name, i, self.collection_wrap.name, all_partition.keys()))
+                raise ValueError("[{0}] {1} partition:`{2}` not in collection:{3}, partitions:{4}".format(
+                    self.name, func_name, i, self.collection_wrap.name, all_partition.keys()))
             release_obj.append(_obj)
 
         # release partitions
@@ -917,8 +920,8 @@ class Base:
             _partitions.append(o.name)
             o.release(**params.obj_params)
 
-        log.debug(f"[Base] {func_name} release partitions done: {_partitions}")
-        return f"[Base] {func_name} finished."
+        log.debug(f"[{self.name}] {func_name} release partitions done: {_partitions}")
+        return f"[{self.name}] {func_name} finished."
 
     @func_time_catch()
     def concurrent_load_release(self, params: ConcurrentTaskLoadRelease):
@@ -928,9 +931,9 @@ class Base:
         release_res = self.collection_wrap.release(**params.release_obj_params)
 
         if not (load_res.check_result and release_res.check_result):
-            raise ValueError("[Base] Check {0} result failed, load: {1}, release: {2}".format(
-                func_name, load_res.check_result, release_res.check_result))
-        return f"[Base] {func_name} finished."
+            raise ValueError("[{0}] Check {1} result failed, load: {2}, release: {3}".format(
+                self.name, func_name, load_res.check_result, release_res.check_result))
+        return f"[{self.name}] {func_name} finished."
 
     def concurrent_insert(self, params: ConcurrentTaskInsert):
         entities = gen_entities(self.collection_schema, params.get_vectors, params.get_ids, params.varchar_filled,
@@ -995,15 +998,15 @@ class Base:
 
         time.sleep(59)
         # drop collection
-        log.customize(log_level)("[Base] Drop collection {}.".format(collection_name))
+        log.customize(log_level)("[{0}] Drop collection {1}.".format(self.name, collection_name))
         self.utility_wrap.drop_collection(collection_name)
 
-        return "[Base] concurrent_scene_test finished."
+        return f"[{self.name}] concurrent_scene_test finished."
 
     @func_time_catch()
     def concurrent_scene_insert_delete_flush(self, params: ConcurrentTaskSceneInsertDeleteFlush):
         log_level, func_name = LogLevel.DEBUG, "concurrent_scene_insert_delete_flush"
-        log.customize(log_level)("[Base] Start {0}: {1}".format(func_name, self.collection_name))
+        log.customize(log_level)("[{0}] Start {1}: {2}".format(self.name, func_name, self.collection_name))
 
         # insert vectors
         entities = gen_entities(
@@ -1020,9 +1023,9 @@ class Base:
         flush_res = self.collection_wrap.flush(**params.flush_obj_params)
 
         if not (insert_res.check_result and delete_res.check_result and flush_res.check_result):
-            raise ValueError("[Base] Check {0} result failed, insert: {1}, delete: {2}, flush: {3}".format(
-                func_name, insert_res.check_result, delete_res.check_result, flush_res.check_result))
-        return f"[Base] {func_name} finished."
+            raise ValueError("[{0}] Check {1} result failed, insert: {2}, delete: {3}, flush: {4}".format(
+                self.name, func_name, insert_res.check_result, delete_res.check_result, flush_res.check_result))
+        return f"[{self.name}] {func_name} finished."
 
     @func_time_catch()
     def concurrent_scene_insert_partition(self, params: ConcurrentTaskSceneInsertPartition):
@@ -1049,11 +1052,11 @@ class Base:
                                check_task=CheckTasks.checkResponse)
         # drop partition
         self.drop_partition(partition_obj, log_level)
-        return "[Base] concurrent_scene_insert_partition finished."
+        return f"[{self.name}] concurrent_scene_insert_partition finished."
 
     @func_time_catch()
     def concurrent_scene_test_partition(self, params: ConcurrentTaskSceneTestPartition):
-        log_level = LogLevel.DEBUG
+        log_level, func_name = LogLevel.DEBUG, "concurrent_scene_test_partition"
         partition_obj = ApiPartitionWrapper()
         partition_name = gen_unique_str("scene_test_partition")
 
@@ -1076,8 +1079,8 @@ class Base:
 
         # create indexes again
         for _index in self.describe_collection_index(log_level=log_level):
-            log.customize(log_level)(
-                f"[Base] Start building index, field_name:{_index.field_name}, index_params:{_index.params}")
+            log.customize(log_level)("[{0}] {1} start building index, field_name:{2}, index_params:{3}".format(
+                self.name, func_name, _index.field_name, _index.params))
             self.index_wrap.init_index(self.collection_wrap.collection, _index.field_name, index_params=_index.params)
 
         # load and search
@@ -1102,13 +1105,13 @@ class Base:
 
         if params.search_counts > sum(search_results):
             msg = f"{[partition_name]}: {params.search_counts} > {sum(search_results)}"
-            raise Exception(f"[Base] Search of concurrent_scene_test_partition failed: {msg}, please check.")
+            raise Exception(f"[{self.name}] Search of {func_name} failed: {msg}, please check.")
 
-        return "[Base] concurrent_scene_test_partition finished."
+        return f"[{self.name}] {func_name} finished."
 
     @func_time_catch()
     def concurrent_scene_test_partition_hybrid_search(self, params: ConcurrentTaskSceneTestPartitionHybridSearch):
-        log_level = LogLevel.DEBUG
+        log_level, func_name = LogLevel.DEBUG, "concurrent_scene_test_partition_hybrid_search"
         partition_obj = ApiPartitionWrapper()
         partition_name = gen_unique_str("scene_test_partition_hybrid_search")
 
@@ -1132,8 +1135,8 @@ class Base:
         # create indexes again
         for _index in self.describe_collection_index(log_level=log_level):
             log.customize(log_level)(
-                "[Base] Partition:{0} start building index, field_name:{1}, index_params:{2}".format(
-                    partition_name, _index.field_name, _index.params))
+                "[{0}] Partition:{1} start building index, field_name:{2}, index_params:{3}".format(
+                    self.name, partition_name, _index.field_name, _index.params))
             self.index_wrap.init_index(self.collection_wrap.collection, _index.field_name, index_params=_index.params)
 
         # load and search
@@ -1156,18 +1159,9 @@ class Base:
 
         if params.hybrid_search_counts > sum(hybrid_search_results):
             msg = f"{partition_name}: {params.hybrid_search_counts} > {sum(hybrid_search_results)}"
-            raise Exception(
-                f"[Base] Hybrid_search of concurrent_scene_test_partition_hybrid_search failed: {msg}, please check.")
+            raise Exception("[{0}] Hybrid_search of {1} failed: {2}, please check.".format(self.name, func_name, msg))
 
-        return "[Base] concurrent_scene_test_partition_hybrid_search finished."
-
-    @func_time_catch()
-    def concurrent_debug(self, params: DataClassBase):
-        # time.sleep(random.randint(1, 6))
-        # time.sleep(round(random.random(), 4))
-        time.sleep(float(random.randint(1, 20) / 1000.0))
-        log.debug("[Base] DataClassBase.obj_params: {}".format(params.obj_params))
-        return "[Base] concurrent_debug finished."
+        return f"[{self.name}] {func_name} finished."
 
     @func_time_catch()
     def concurrent_iterate_search(self, params: ConcurrentTaskIterateSearch):
@@ -1175,7 +1169,7 @@ class Base:
         log_level = LogLevel.DEBUG
 
         collections = params.collection_names or self.utility_wrap.list_collections().response
-        log.customize(log_level)("[Base] Start iterate search over all collections {}".format(collections))
+        log.customize(log_level)("[{0}] Start iterate search over all collections {1}".format(self.name, collections))
         for i in collections:
             if self.check_collection_load(i):
                 c = ApiCollectionWrapper()
@@ -1193,8 +1187,8 @@ class Base:
 
                     c.search(check_task=CheckTasks.checkResponse, **params.obj_params)
                 else:
-                    log.warning(f"[Base] Can't get collection: {i} params, please check.")
-        return "[Base] concurrent_iterate_search finished."
+                    log.warning(f"[{self.name}] Can't get collection: {i} params, please check.")
+        return f"[{self.name}] concurrent_iterate_search finished."
 
     @func_time_catch()
     def concurrent_load_search_release(self, params: ConcurrentTaskLoadSearchRelease):
@@ -1217,11 +1211,11 @@ class Base:
         release_res = self.collection_wrap.release(**params.release_obj_params).check_result
 
         if not (load_res and sum(search_res) == params.search_counts and release_res):
-            msg = "[Base] Check {0} result failed, load:{1}, search failed:{2}, release:{3}"
+            msg = "[{0}] Check {1} result failed, load:{2}, search failed:{3}, release:{4}"
             raise ValueError(
-                msg.format(func_name, load_res, params.search_counts - sum(search_res), release_res))
+                msg.format(self.name, func_name, load_res, params.search_counts - sum(search_res), release_res))
 
-        return f"[Base] {func_name} finished."
+        return f"[{self.name}] {func_name} finished."
 
     @func_time_catch()
     def concurrent_load_hybrid_search_release(self, params: ConcurrentTaskLoadHybridSearchRelease):
@@ -1237,7 +1231,7 @@ class Base:
             _count += 1
             if params.random_data:
                 params.set_random_data()
-            log.debug(f"[Base] Params of {func_name} hybrid_search: {params.get_all_hybrid_search_params}")
+            log.debug(f"[{self.name}] Params of {func_name} hybrid_search: {params.get_all_hybrid_search_params}")
             hybrid_search_res.append(self.collection_wrap.hybrid_search(
                 reqs=params.reqs, **params.hybrid_search_obj_params).check_result)
 
@@ -1245,15 +1239,15 @@ class Base:
         release_res = self.collection_wrap.release(**params.release_obj_params).check_result
 
         if not (load_res and sum(hybrid_search_res) == params.hybrid_search_counts and release_res):
-            msg = "[Base] Check {0} result failed, load:{1}, hybrid_search failed:{2}, release:{3}"
-            raise ValueError(
-                msg.format(func_name, load_res, params.hybrid_search_counts - sum(hybrid_search_res), release_res))
+            msg = "[{0}] Check {1} result failed, load:{2}, hybrid_search failed:{3}, release:{4}"
+            raise ValueError(msg.format(
+                self.name, func_name, load_res, params.hybrid_search_counts - sum(hybrid_search_res), release_res))
 
-        return f"[Base] {func_name} finished."
+        return f"[{self.name}] {func_name} finished."
 
     @func_time_catch()
     def concurrent_scene_search_test(self, params: ConcurrentTaskSceneSearchTest):
-        log_level = LogLevel.DEBUG
+        log_level, func_name = LogLevel.DEBUG, "concurrent_scene_search_test"
         collection_obj = ApiCollectionWrapper()
         collection_name, user, password, role_name = gen_unique_str("scene_search_test"), "", "", ""
 
@@ -1263,7 +1257,8 @@ class Base:
             connect_using = collection_name
             # create new user, role
             if params.new_user:
-                user, password, role_name = collection_name, dv.default_rbac_password, dv.default_rbac_role_name
+                user = check_user_length(collection_name)
+                password, role_name = dv.default_rbac_password, dv.default_rbac_role_name
                 self.create_user_role(user=user, password=password, role_name=role_name, log_level=log_level)
             self.connect(user=user, password=password, alias=connect_using, log_level=log_level)
 
@@ -1337,7 +1332,7 @@ class Base:
 
         # search collection
         search_results = []
-        log.customize(log_level)("[Base] Search collection {}.".format(collection_obj.name))
+        log.customize(log_level)("[{0}] Search collection {1}".format(self.name, collection_obj.name))
         for i in range(params.search_counts):
             res = collection_obj.search(
                 gen_vectors(nb=params.nq, dim=params.dim, field_name=params.vector_field_name,
@@ -1348,7 +1343,7 @@ class Base:
             search_results.append(res.check_result)
 
         # drop collection
-        log.customize(log_level)("[Base] Drop collection {}.".format(collection_name))
+        log.customize(log_level)("[{0}] Drop collection {1}.".format(self.name, collection_name))
         self.utility_wrap.drop_collection(collection_name, using=connect_using)
 
         # remove connect
@@ -1361,13 +1356,13 @@ class Base:
 
         if params.search_counts > sum(search_results):
             msg = f"{collection_name}: {params.search_counts} > {sum(search_results)}"
-            raise Exception(f"[Base] Search of concurrent_scene_search_test failed: {msg}, please check.")
+            raise Exception(f"[{self.name}] Search of {func_name} failed: {msg}, please check.")
 
-        return "[Base] concurrent_scene_search_test finished."
+        return f"[{self.name}] {func_name} finished."
 
     @func_time_catch()
     def concurrent_scene_hybrid_search_test(self, params: ConcurrentTaskSceneHybridSearchTest):
-        log_level = LogLevel.DEBUG
+        log_level, func_name = LogLevel.DEBUG, "concurrent_scene_hybrid_search_test"
         collection_obj = ApiCollectionWrapper()
         collection_name, user, password, role_name = gen_unique_str("scene_hybrid_search_test"), "", "", ""
 
@@ -1377,7 +1372,8 @@ class Base:
             connect_using = collection_name
             # create new user, role
             if params.new_user:
-                user, password, role_name = collection_name, dv.default_rbac_password, dv.default_rbac_role_name
+                user = check_user_length(collection_name)
+                password, role_name = dv.default_rbac_password, dv.default_rbac_role_name
                 self.create_user_role(user=user, password=password, role_name=role_name, log_level=log_level)
             self.connect(user=user, password=password, alias=connect_using, log_level=log_level)
 
@@ -1451,8 +1447,8 @@ class Base:
 
         # search collection
         hybrid_search_results = []
-        log.customize(log_level)(
-            f"[Base] Collection:{collection_obj.name} hybrid_search params: {params.get_all_hybrid_search_params}")
+        log.customize(log_level)("[{0}] Collection: {1} hybrid_search params: {2}".format(
+            self.name, collection_obj.name, params.get_all_hybrid_search_params))
         for i in range(params.hybrid_search_counts):
             if params.random_data:
                 params.set_random_data()
@@ -1460,7 +1456,7 @@ class Base:
             hybrid_search_results.append(res.check_result)
 
         # drop collection
-        log.customize(log_level)("[Base] Drop collection {}.".format(collection_name))
+        log.customize(log_level)("[{0}] Drop collection {1}.".format(self.name, collection_name))
         self.utility_wrap.drop_collection(collection_name, using=connect_using)
 
         # remove connect
@@ -1473,7 +1469,6 @@ class Base:
 
         if params.hybrid_search_counts > sum(hybrid_search_results):
             msg = f"{collection_name}: {params.hybrid_search_counts} > {sum(hybrid_search_results)}"
-            raise Exception(
-                f"[Base] Hybrid_search of concurrent_scene_hybrid_search_test failed: {msg}, please check.")
+            raise Exception(f"[{self.name}] Hybrid_search of {func_name} failed: {msg}, please check.")
 
-        return "[Base] concurrent_scene_hybrid_search_test finished."
+        return f"[{self.name}] {func_name} finished."

@@ -4,7 +4,7 @@ import dacite
 
 import pymilvus
 
-from client.cases.base import Base
+from client.cases.base_client.base import Base
 from client.cases.case_report import CasesReport
 from client.parameters.params import ParamsFormat, ParamsBase
 from client.parameters import params_name as pn
@@ -62,7 +62,7 @@ class CommonCases(Base):
             self.create_collection(**_collection_params)
 
         else:
-            collection_names = self.utility_wrap.list_collections().response if not self.params_obj.collection_params.get(
+            collection_names = self.list_all_collections() if not self.params_obj.collection_params.get(
                 pn.collection_name, None) else [self.params_obj.collection_params[pn.collection_name]]
             if len(collection_names) == 0 or len(collection_names) > 1:
                 msg = "[CommonCases] There can only be one collection in the database: {}".format(collection_names)
@@ -75,7 +75,7 @@ class CommonCases(Base):
         self.set_all_properties(params=self.params_obj.common_params.get(pn.set_properties, None))
 
         self.get_collection_schema()
-        log.info("[CommonCases] Prepare collection {0} done.".format(self.collection_wrap.name))
+        log.info("[CommonCases] Prepare collection {0} done.".format(self.get_collection_name))
 
     def prepare_insert(self, data_type, dim, size, ni, vector_field_name: str = None,
                        sparse_range: list = dv.default_sparse_range, scalars_params: dict = {},
@@ -142,7 +142,7 @@ class CommonCases(Base):
             res_flush = self.flush_collection()
             self.case_report.add_attr(**{"flush": {"RT": round(res_flush.rt, Precision.FLUSH_PRECISION)}})
         else:
-            log.info("[CommonCases] Collection {0} was not flushed while preparing.".format(self.collection_wrap.name))
+            log.info("[CommonCases] Collection {0} was not flushed while preparing.".format(self.get_collection_name))
 
     def prepare_index(self, vector_field_name, metric_type, clean_index_before=False, build_scalars_index=True,
                       extra_setting=True):

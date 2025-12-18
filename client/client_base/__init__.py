@@ -1,5 +1,6 @@
 from client.client_base.base_wrapper import (
-    RRFRanker, WeightedRanker, AnnSearchRequest, DataType, MilvusException, ExtraList, HybridExtraList
+    RRFRanker, WeightedRanker, AnnSearchRequest, DataType, MilvusException, ExtraList, HybridExtraList,
+    ResourceGroupConfig
 )
 from client.client_base.connections_wrapper import ApiConnectionsWrapper
 from client.client_base.collection_wrapper import ApiCollectionWrapper
@@ -10,8 +11,11 @@ from client.client_base.utility_wrapper import ApiUtilityWrapper
 from client.client_base.role_wrapper import ApiRoleWrapper
 from client.client_base.db_wrapper import ApiDBWrapper
 
+from client.client_base.milvus_client_wrapper import MilvusClientWrapper
+
 __all__ = [
     RRFRanker, WeightedRanker, AnnSearchRequest, DataType, MilvusException, ExtraList, HybridExtraList,
+    ResourceGroupConfig,
     ApiConnectionsWrapper,
     ApiCollectionWrapper,
     ApiIndexWrapper,
@@ -20,5 +24,6 @@ __all__ = [
     ApiFieldSchemaWrapper,
     ApiUtilityWrapper,
     ApiRoleWrapper,
-    ApiDBWrapper
+    ApiDBWrapper,
+    MilvusClientWrapper,
 ]

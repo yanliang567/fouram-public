@@ -5,7 +5,7 @@ The `deploy_architecture` is a command-line parameter for `pytest`, primarily us
 ### Background
 ```text
 - For versions <= v2.5, the default architecture includes: proxy, Coord, dataNode, indexNode, queryNode, and third-party components.
-- For versions >= v2.6, the new architecture includes: proxy, Coord, dataNode, queryNode, and third-party components.
+- For versions >= v2.6, the new architecture includes: proxy, Coord, dataNode, queryNode, streamingNode and third-party components.
 
 Supported values:
     - For <= v2.5 default architecture: 'default'

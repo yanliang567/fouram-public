@@ -11,34 +11,11 @@ class BaseInitWrapper:
 
 
 class BaseWrapper:
-    def __init__(self, **kwargs):
-        raise ImportError(f"[BaseWrapper] Import failed: {kwargs}")
+    def __init__(self, *args, **kwargs):
+        raise ImportError(f"[BaseWrapper] Import failed: {args} {kwargs}")
 
     def __getattr__(self, name):
-        raise ImportError(f"[BaseWrapper] Can't import: {self.object_name}.{name}, error: {self.message}")
-
-
-try:
-    from pymilvus import RRFRanker, WeightedRanker, AnnSearchRequest
-except ImportError as e:
-    RRFRanker = BaseWrapper
-    WeightedRanker = BaseWrapper
-    AnnSearchRequest = BaseWrapper
-
-try:
-    from pymilvus.client.types import ExtraList
-except ImportError as e:
-    ExtraList = BaseWrapper
-
-try:
-    from pymilvus.client.types import HybridExtraList
-except ImportError as e:
-    HybridExtraList = BaseWrapper
-
-try:
-    from pymilvus.exceptions import MilvusException
-except ImportError as e:
-    MilvusException = BaseWrapper
+        raise ImportError(f"[BaseWrapper] Can't get attr: {name}")
 
 
 class DataTypeWrapper(object):
@@ -63,3 +40,32 @@ class DataTypeWrapper(object):
 
 
 DataType = DataTypeWrapper()
+
+""" compatibility handling for pymilvus """
+
+try:
+    from pymilvus import RRFRanker, WeightedRanker, AnnSearchRequest
+except ImportError as e:
+    RRFRanker = BaseWrapper
+    WeightedRanker = BaseWrapper
+    AnnSearchRequest = BaseWrapper
+
+try:
+    from pymilvus.client.types import ExtraList
+except ImportError as e:
+    ExtraList = BaseWrapper
+
+try:
+    from pymilvus.client.types import HybridExtraList
+except ImportError as e:
+    HybridExtraList = BaseWrapper
+
+try:
+    from pymilvus.exceptions import MilvusException
+except ImportError as e:
+    MilvusException = BaseWrapper
+
+try:
+    from pymilvus.client.types import ResourceGroupConfig
+except ImportError as e:
+    ResourceGroupConfig = BaseInitWrapper

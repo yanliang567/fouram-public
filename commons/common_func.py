@@ -11,6 +11,7 @@ from deploy.commons.common_params import (
     Helm, Operator, OP, VDC, CLUSTER, STANDALONE, ClassID, HelmSetParams, STREAMING, ClassIDBase
 )
 
+from commons.common_type import ClientType
 from utils.util_log import log
 from utils.util_catch import func_request
 
@@ -229,32 +230,42 @@ def execute_funcs(funcs: List[tuple]):
             log.error("[execute_funcs] Parameter error: {0}".format(func))
 
 
+def parser_dml_log(data):
+    _fields, _length, content = None, None, ""
+    if isinstance(data[0], list):
+        _fields, _length, content = len(data), len(data[0]), ""
+
+        for i in data:
+            content += f"[ `type{type(i[0])}, dtype<{getattr(i[0], 'dtype', '')}>` {str(i[0]):.24s} ... ], "
+
+    elif isinstance(getattr(data[0], "shape", None), list) and getattr(data[0], "shape", None):
+        _fields, _length, content = len(data), getattr(data[0], "shape", None)[0], ""
+
+        for i in data:
+            content += f"[ `type{type(i[0])}, dtype<{getattr(i[0], 'dtype', '')}>` {str(i[0]):.24s} ... ], "
+
+    elif isinstance(data[0], dict):
+        _fields, _length, content = set([len(i) for i in data]), len(data), ""
+
+        for k, v in data[0].items():
+            content += f" `name<{k}>: type{type(v)}, dtype<{getattr(v, 'dtype', '')}>` {str(v):.24s}, "
+        content = "{ %s } ...  " % content
+    return _fields, _length, content
+
+
 def truncated_output(context, row_length=300, func_name: str = ""):
     # Special handling of output
     if func_name in ["Collection.insert", "Collection.upsert"]:
         _data = context[0]
         if isinstance(_data, list) and _data:
-            _fields, _length, content = None, None, ""
-            if isinstance(_data[0], list):
-                _fields, _length, content = len(_data), len(_data[0]), ""
-
-                for i in _data:
-                    content += f"[ `type{type(i[0])}, dtype<{getattr(i[0], 'dtype', '')}>` {str(i[0]):.24s} ... ], "
-
-            elif isinstance(getattr(_data[0], "shape", None), list) and getattr(_data[0], "shape", None):
-                _fields, _length, content = len(_data), getattr(_data[0], "shape", None)[0], ""
-
-                for i in _data:
-                    content += f"[ `type{type(i[0])}, dtype<{getattr(i[0], 'dtype', '')}>` {str(i[0]):.24s} ... ], "
-
-            elif isinstance(_data[0], dict):
-                _fields, _length, content = set([len(i) for i in _data]), len(_data), ""
-
-                for k, v in _data[0].items():
-                    content += f" `name<{k}>: type{type(v)}, dtype<{getattr(v, 'dtype', '')}>` {str(v):.24s}, "
-                content = "{ %s } ...  " % content
-
+            _fields, _length, content = parser_dml_log(_data)
             return f"<{func_name} fields: {_fields}, length: {_length}, content: [ {content[:-2]} ]>, {context[1:]}"
+    elif func_name in ["MilvusClient.insert", "MilvusClient.upsert"]:
+        _data = context[1]
+        if isinstance(_data, list) and _data:
+            _fields, _length, content = parser_dml_log(_data)
+            return f"<{func_name} fields: {_fields}, length: {_length}, content: [ {content[:-2]} ]>, " + \
+                   f"collection_name: {context[0]}, {context[2:]}"
 
     _str = str(context)
     return _str[:row_length] + '......' + _str[-row_length:] if len(_str) > row_length * 2 else _str
@@ -368,6 +379,18 @@ def get_deploy_architecture(input_param, default_value):
     if input_param is not None:
         return check_deploy_architecture(input_param)
     return check_deploy_architecture(default_value)
+
+
+def check_client_type(value):
+    if not value:
+        return None
+    elif str(value).upper() in [ClientType.ORM]:
+        return ClientType.ORM
+    elif str(value).upper() in [str(n).upper() for n in [ClientType.MilvusClient, "mc"]]:
+        return ClientType.MilvusClient
+    else:
+        log.error(f"[check_client_type] Client type `{value}` is not supported!!! ")
+    return None
 
 
 def hide_value(source, keys):
