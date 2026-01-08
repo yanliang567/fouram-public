@@ -1,6 +1,7 @@
 import numpy as np
 import copy
 import dacite
+import traceback
 
 import pymilvus
 
@@ -62,7 +63,7 @@ class CommonCases(Base):
             self.create_collection(**_collection_params)
 
         else:
-            collection_names = self.list_all_collections() if not self.params_obj.collection_params.get(
+            collection_names = self.list_all_collections if not self.params_obj.collection_params.get(
                 pn.collection_name, None) else [self.params_obj.collection_params[pn.collection_name]]
             if len(collection_names) == 0 or len(collection_names) > 1:
                 msg = "[CommonCases] There can only be one collection in the database: {}".format(collection_names)
@@ -506,6 +507,7 @@ class InsertBatch(CommonCases):
                 self.count_entities()
                 return self.case_report.to_dict(), True
             except Exception as e:
+                log.error(traceback.format_exc())
                 log.error("[InsertBatch] Insert batch raise error: {}".format(e))
                 return {}, False
 
@@ -580,6 +582,7 @@ class BuildIndex(CommonCases):
                                    clean_index_before=True)
                 return self.case_report.to_dict(), True
             except Exception as e:
+                log.error(traceback.format_exc())
                 log.error("[BuildIndex] Build index raise error: {}".format(e))
                 return {}, False
 
@@ -657,6 +660,7 @@ class Load(CommonCases):
                 self.prepare_load(**self.params_obj.load_params)
                 return self.case_report.to_dict(), True
             except Exception as e:
+                log.error(traceback.format_exc())
                 log.error("[Load] Load raise error: {}".format(e))
                 return {}, False
 
@@ -747,6 +751,7 @@ class Query(CommonCases):
                 self.prepare_query(self.params_obj.dataset_params[pn.req_run_counts], **run_query_params)
                 return self.case_report.to_dict(), True
             except Exception as e:
+                log.error(traceback.format_exc())
                 log.error("[Query] Query raise error: {}".format(e))
                 return {}, False
 
@@ -859,6 +864,7 @@ class Search(CommonCases):
                 self.prepare_search(self.params_obj.dataset_params[pn.req_run_counts], **run_s_p)
                 return self.case_report.to_dict(), True
             except Exception as e:
+                log.error(traceback.format_exc())
                 log.error("[Search] Search raise error: {}".format(e))
                 return {}, False
 
@@ -968,6 +974,7 @@ class SearchRecall(CommonCases):
                                            **run_s_p)
                 return self.case_report.to_dict(), True
             except Exception as e:
+                log.error(traceback.format_exc())
                 log.error("[SearchRecall] Search raise error: {}".format(e))
                 return {}, False
 
@@ -1085,6 +1092,7 @@ class HybridSearch(CommonCases):
                 self.prepare_hybrid_search(self.params_obj.dataset_params[pn.req_run_counts], **run_s_p)
                 return self.case_report.to_dict(), True
             except Exception as e:
+                log.error(traceback.format_exc())
                 log.error("[HybridSearch] HybridSearch raise error: {}".format(e))
                 return {}, False
 
