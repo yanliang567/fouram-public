@@ -133,10 +133,21 @@ class ParamsRebuildPartialIndex(ParamsBase):
     multi_scalars_index: Optional[Dict[str, List[FuncParamsScalarsIndex]]] = field(default_factory=lambda: {})
 
 
+@dataclass
+class ParamsCollectionAddFields(ParamsBase):
+    add_fields: List[str]
+    scalars_params: Optional[dict] = field(default_factory=lambda: {})
+    vectors_index: Optional[Dict[str, FuncParamsVectorsIndex]] = field(default_factory=lambda: {})
+    scalars_index: Optional[Dict[str, FuncParamsScalarsIndex]] = field(default_factory=lambda: {})
+    multi_scalars_index: Optional[Dict[str, List[FuncParamsScalarsIndex]]] = field(default_factory=lambda: {})
+    reload: Optional[bool] = False
+
+
 class GetParamObj:
     scene_functional_query_deleted = ParamsQueryDeleted
     scene_functional_query_all_deleted = ParamsQueryAllDeleted
     scene_functional_rebuild_partial_index = ParamsRebuildPartialIndex
+    scene_functional_collection_add_fields = ParamsCollectionAddFields
 
     def get_obj(self, name):
         return getattr(self, name, ParamsBase)

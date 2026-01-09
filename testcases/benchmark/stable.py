@@ -13,7 +13,7 @@ from deploy.configs.default_configs import NodeResource, SetDependence
 
 from workflow.performance_template import PerfTemplate
 from parameters.input_params import InputParamsBase
-from commons.common_type import DefaultParams as dp
+from commons.common_type import DefaultParams as dp, ClientType
 from commons.common_func import dict_merge
 
 
@@ -43,7 +43,8 @@ class TestConcurrentCases(PerfTemplate):
                 3. check test result and report
                 4. clean env"""
 
-    def test_concurrent_locust_custom_parameters(self, input_params: InputParamsBase):
+    @pytest.mark.parametrize("client_type", [ClientType.MilvusClient])
+    def test_concurrent_locust_custom_parameters(self, input_params: InputParamsBase, client_type):
         """
         :test steps:
             1. concurrent test and calculation of RT and QPS
@@ -52,7 +53,7 @@ class TestConcurrentCases(PerfTemplate):
         #                     ConcurrentParams.params_scene_insert_delete_flush(random_id=True, random_vector=True)]
         self.concurrency_template(
             input_params=input_params, cpu=dp.default_cpu, mem=dp.default_mem, old_version_format=False,
-            case_callable_obj=ConcurrentClientBase().scene_concurrent_locust)
+            case_callable_obj=ConcurrentClientBase().scene_concurrent_locust, client_type=client_type)
 
     # @pytest.mark.skip(reason="search can't pass parameter `output_fields` when it is IVF_SQ8 index")
     @pytest.mark.locust

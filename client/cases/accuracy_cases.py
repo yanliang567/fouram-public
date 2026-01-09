@@ -69,6 +69,7 @@ class CommonCases(Base):
 
         varchar_id = self.params_obj.collection_params.get(pn.varchar_id, False)
         data_organization = self.params_obj.common_params.get(pn.data_organization, None)
+        partial_update_fields = self.params_obj.common_params.get(pn.partial_update_fields, None)
         dynamic_fields = self.params_obj.collection_params.get(pn.dynamic_fields, [])
 
         self.clean_all_rbac(reset_rbac=self.params_obj.database_user_params.get(pn.reset_rbac, False))
@@ -122,6 +123,7 @@ class CommonCases(Base):
                         ni=self.params_obj.dataset_params[pn.ni_per], scalars_params=scalars_params,
                         input_obj=insert_obj, partition_name=p.partition_name, anns_field=vector_default_field_name,
                         custom_api_insert=custom_api_insert, varchar_id=varchar_id, data_organization=data_organization,
+                        partial_update_fields=partial_update_fields,
                         dynamic_fields=dynamic_fields, dynamic_fields_schema=dynamic_fields_schema
                     ))
                 self.case_report.add_attr(**deal_insert_result(inert_time, acc=True))
@@ -131,6 +133,7 @@ class CommonCases(Base):
                     source_vectors=self.dataset_train, ni=self.params_obj.dataset_params[pn.ni_per],
                     scalars_params=scalars_params, anns_field=vector_default_field_name,
                     custom_api_insert=custom_api_insert, varchar_id=varchar_id, data_organization=data_organization,
+                    partial_update_fields=partial_update_fields,
                     dynamic_fields=dynamic_fields, dynamic_fields_schema=dynamic_fields_schema
                 )
                 self.case_report.add_attr(**res_insert)

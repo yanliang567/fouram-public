@@ -99,7 +99,7 @@ def get_geometry_wkt_type(data_type: str) -> str:
     return GeometryWKTType.POINT
 
 
-def gen_field_schema(name: str, dtype=None, description=dv.default_desc, is_primary=False, scalars_params={}, **kwargs):
+def gen_field_params(name: str, dtype=None, scalars_params={}, **kwargs) -> (any, dict):
     field_types = FieldTypes.to_dict
     if dtype is None:
         for _field in field_types.keys():
@@ -118,14 +118,22 @@ def gen_field_schema(name: str, dtype=None, description=dv.default_desc, is_prim
                     _kwargs.update({"dim": kwargs.get("dim", dv.default_dim)})
 
                 _kwargs.update(scalars_params.get(name, {}).get("params", {}))
-                return ApiFieldSchemaWrapper().init_field_schema(
-                    name=name, dtype=field_types[_field], description=description, is_primary=is_primary,
-                    **_kwargs).response
+                return field_types[_field], _kwargs
     else:
         if dtype in field_types.values():
             kwargs.update(scalars_params.get(name, {}).get("params", {}))
-            return ApiFieldSchemaWrapper().init_field_schema(
-                name=name, dtype=dtype, description=description, is_primary=is_primary, **kwargs).response
+            return dtype, kwargs
+
+    log.error(f"[gen_field_params] The field schema params for generating {name} is not supported, please check.")
+    return None, {}
+
+
+def gen_field_schema(name: str, dtype=None, description=dv.default_desc, is_primary=False, scalars_params={}, **kwargs):
+    dtype, _k = gen_field_params(name=name, dtype=dtype, scalars_params=scalars_params, **kwargs)
+    if dtype:
+        return ApiFieldSchemaWrapper().init_field_schema(
+            name=name, dtype=dtype, description=description, is_primary=is_primary, **_k).response
+
     log.error("[gen_field_schema] The field schema for generating {0} is not supported, please check.".format(name))
     return []
 
@@ -162,31 +170,11 @@ def gen_collection_schema(vector_field_name="", description=dv.default_desc, def
 
 def gen_mc_field_schema(schema_obj, name: str, dtype=None, description=dv.default_desc, is_primary=False,
                         scalars_params={}, **kwargs):
-    field_types = FieldTypes.to_dict
-    if dtype is None:
-        for _field in field_types.keys():
-            if name.startswith(_field.lower()):
-                _kwargs = {}
+    dtype, _k = gen_field_params(name=name, dtype=dtype, scalars_params=scalars_params, **kwargs)
+    if dtype:
+        return schema_obj.add_field(
+            field_name=name, datatype=dtype, description=description, is_primary=is_primary, **_k)
 
-                _field_element, _data_type = _field, DataType.NONE
-                if hasattr(DataType, "ARRAY") and _field.lower() == pn.ARRAY:
-                    _field_element, _data_type = get_array_element_type(name)
-                    _kwargs.update({"max_capacity": kwargs.get("max_capacity", dv.default_array_max_capacity),
-                                    "element_type": _data_type})
-
-                if _field_element in ["STRING", "VARCHAR"]:
-                    _kwargs.update({"max_length": kwargs.get("max_length", dv.default_max_length)})
-                elif _field_element in dv.default_all_vector_types:
-                    _kwargs.update({"dim": kwargs.get("dim", dv.default_dim)})
-
-                _kwargs.update(scalars_params.get(name, {}).get("params", {}))
-                return schema_obj.add_field(field_name=name, datatype=field_types[_field], description=description,
-                                            is_primary=is_primary, **_kwargs)
-    else:
-        if dtype in field_types.values():
-            kwargs.update(scalars_params.get(name, {}).get("params", {}))
-            return schema_obj.add_field(field_name=name, datatype=dtype, description=description, is_primary=is_primary,
-                                        **kwargs)
     log.error("[gen_mc_field_schema] The field schema for generating {0} is not supported, please check.".format(name))
     return []
 
@@ -224,6 +212,19 @@ def gen_mc_collection_schema(mc_obj: MilvusClientWrapper, vector_field_name="", 
 
     log.debug(f"[gen_mc_collection_schema] The generated field schema contains the following:{schema_obj.to_dict()}")
     return schema_obj
+
+
+def gen_mc_add_fields(mc_obj: MilvusClientWrapper, collection_name: str, add_fields=[], scalars_params={},
+                      description=dv.default_desc, **kwargs):
+    for _field in add_fields:
+        dtype, _k = gen_field_params(name=_field, scalars_params=scalars_params, **kwargs)
+        if dtype:
+            _k.update({"nullable": True})
+            mc_obj.add_collection_field(collection_name=collection_name, field_name=_field, data_type=dtype,
+                                        desc=description, **_k)
+        else:
+            log.error(f"[gen_mc_add_fields] Not support adding field name `{_field}`, please use valid naming rules.")
+    return mc_obj
 
 
 """ param handling """
@@ -591,7 +592,7 @@ def gen_values(data_type, vectors, ids, varchar_filled=False, field: dict = {}, 
 
 
 def check_data_field(field_name: str, partial_update_fields: List[str]):
-    if not partial_update_fields or field_name in partial_update_fields:
+    if partial_update_fields is None or field_name in partial_update_fields:
         return True
     return False
 
@@ -631,7 +632,7 @@ def gen_entities(info, vectors=None, ids=None, varchar_filled=False, insert_scal
     if data_organization in [None, "", "column_insert"]:
         return list(entities.values())
     elif data_organization in ["row_insert"]:
-        return gen_combinations_data(entities)
+        return gen_combinations_data(entities, nq=len(ids))
     elif data_organization in ["data_frame"]:
         return pd.DataFrame(entities)
     else:
@@ -729,7 +730,7 @@ def convert_to_iterable(data) -> Iterable:
     return data
 
 
-def gen_combinations_data(kwargs: dict):
+def gen_combinations_data(kwargs: dict, nq: int = None):
     """
     {
         'id': [1, 2, 3],
@@ -741,12 +742,15 @@ def gen_combinations_data(kwargs: dict):
         {'id': 2, 'vector': [2.0, 4.0, 6.0]},
         {'id': 3, 'vector': [10.0, 11.0, 12.0]}
     ]
+
+    {} -> [{}, .... <len(nq)>]
     """
     try:
         flat = []
         for k, v in kwargs.items():
             flat.append([(k, el) for el in convert_to_iterable(v)])
-        return [dict(x) for x in zip(*flat)]
+        result = [dict(x) for x in zip(*flat)]
+        return result if result else [{} for _ in range(nq)]
     except Exception as e:
         raise ValueError(f"[gen_combinations_data] Combinations data failed, data: {kwargs}, error: {e}")
 

@@ -86,6 +86,7 @@ class CommonCases(Base):
         data_size = self.params_obj.dataset_params.get(pn.dataset_size, 0)
         varchar_id = self.params_obj.collection_params.get(pn.varchar_id, False)
         data_organization = self.params_obj.common_params.get(pn.data_organization, None)
+        partial_update_fields = self.params_obj.common_params.get(pn.partial_update_fields, None)
         dynamic_fields = self.params_obj.collection_params.get(pn.dynamic_fields, [])
 
         # insert to partitions
@@ -115,8 +116,8 @@ class CommonCases(Base):
                     scalars_params=scalars_params, column_name=self.params_obj.dataset_params.get(pn.column_name, ""),
                     input_obj=insert_obj, partition_name=p.partition_name, anns_field=vector_field_name,
                     sparse_range=sparse_range, custom_api_insert=custom_api_insert, varchar_id=varchar_id,
-                    data_organization=data_organization, dynamic_fields=dynamic_fields,
-                    dynamic_fields_schema=dynamic_fields_schema
+                    data_organization=data_organization, partial_update_fields=partial_update_fields,
+                    dynamic_fields=dynamic_fields, dynamic_fields_schema=dynamic_fields_schema
                 ))
             self.case_report.add_attr(**deal_insert_result(inert_time))
 
@@ -125,8 +126,8 @@ class CommonCases(Base):
                 data_type=data_type, dim=dim, size=size, ni=ni,
                 scalars_params=scalars_params, column_name=self.params_obj.dataset_params.get(pn.column_name, ""),
                 anns_field=vector_field_name, sparse_range=sparse_range, custom_api_insert=custom_api_insert,
-                varchar_id=varchar_id, data_organization=data_organization, dynamic_fields=dynamic_fields,
-                dynamic_fields_schema=dynamic_fields_schema
+                varchar_id=varchar_id, data_organization=data_organization, partial_update_fields=partial_update_fields,
+                dynamic_fields=dynamic_fields, dynamic_fields_schema=dynamic_fields_schema
             )
             self.case_report.add_attr(**res_insert)
 

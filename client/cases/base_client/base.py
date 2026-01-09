@@ -292,3 +292,8 @@ class Base:
 
     def concurrent_scene_hybrid_search_test(self, params: ConcurrentTaskSceneHybridSearchTest):
         return self.client.concurrent_scene_hybrid_search_test(params=params)
+
+    """ Only for MilvusClient """
+
+    def collection_add_fields(self, add_fields, scalars_params={}, **kwargs):
+        return self.client.collection_add_fields(add_fields=add_fields, scalars_params=scalars_params, **kwargs)

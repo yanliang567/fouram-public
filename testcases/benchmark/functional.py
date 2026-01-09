@@ -4,7 +4,7 @@ from client.cases import FunctionalCases
 from client.common.common_func import parser_data_size  # do not remove
 from client.parameters.input_params import FunctionalParams
 from client.parameters import params_name as pn
-from client.common.common_type import DefaultValue as dv
+from client.common.common_type import DefaultValue as dv, SimilarityMetrics
 import client.parameters.input_params.define_params as cdp
 from client.parameters.functional_params import (
     FuncParamsDelete,
@@ -18,7 +18,8 @@ from deploy.commons.common_params import CLUSTER, STANDALONE, queryNode, dataNod
 
 from workflow.performance_template import PerfTemplate
 from parameters.input_params import param_info, InputParamsBase
-from commons.common_type import DefaultParams as dp
+from commons.common_type import DefaultParams as dp, ClientType
+from commons.common_func import dict_merge
 
 
 class TestFunctionalCases(PerfTemplate):
@@ -172,3 +173,56 @@ class TestFunctionalCases(PerfTemplate):
             input_params=input_params, cpu=dp.default_cpu, mem=dp.default_mem, deploy_mode=deploy_mode,
             case_callable_obj=obj.scene_functional_base, sub_callable_obj=obj.scene_functional_query_all_deleted,
             default_case_params=default_case_params)
+
+    @pytest.mark.parametrize("deploy_mode, client_type", [(STANDALONE, ClientType.MilvusClient)])
+    def test_functional_scene_collection_add_fields(
+            self, input_params: InputParamsBase, deploy_mode, client_type):
+        """
+        Notice: only support `MilvusClient` interface
+
+        :test steps:
+            1. Prepare data
+            2. add fields -> build index -> reload
+        """
+        obj = FunctionalCases()
+
+        default_case_params = FunctionalParams().params_scene_functional(
+            FunctionalParams.params_scene_functional_collection_add_fields(
+                add_fields=["float16_vector_add", "bfloat16_vector_add", "sparse_float_vector_add",
+                            "int64_add", "bool_add", "varchar_add", "array_varchar_add", "timestamptz"],
+                scalars_params=dict_merge([
+                    cdp.DefaultScalarParams.local("float16_vector_add", 32),
+                    cdp.DefaultScalarParams.local("bfloat16_vector_add", 16),
+                    cdp.DefaultScalarParams.default_value("int64_add", 99),
+                    cdp.DefaultScalarParams.default_value("varchar_add", "this is a default value"),
+                    cdp.DefaultScalarParams.default_value("bool_add", False),
+                ]),
+                vectors_index={
+                    "float16_vector_add": FuncParamsVectorsIndex(
+                        metric_type=dv.default_metric_type, **cdp.DefaultIndexParams.IVF_SQ8),
+                    "bfloat16_vector_add": FuncParamsVectorsIndex(
+                        metric_type=SimilarityMetrics.IP, **cdp.DefaultIndexParams.DISKANN),
+                    "sparse_float_vector_add": FuncParamsVectorsIndex(
+                        metric_type=SimilarityMetrics.IP, **cdp.DefaultIndexParams.SPARSE_WAND),
+                },
+                scalars_index={
+                    "int64_add": FuncParamsScalarsIndex(index_type="INVERTED"),
+                    "bool_add": FuncParamsScalarsIndex(index_type="BITMAP"),
+                    "int64_3": FuncParamsScalarsIndex(),
+                    "varchar_1": FuncParamsScalarsIndex(index_type="INVERTED", index_param={})},
+                multi_scalars_index={
+                    "json_1": [
+                        FuncParamsScalarsIndex(index_type="INVERTED",
+                                               index_param={"json_cast_type": "DOUBLE", "json_path": 'json_1["int8"]'}),
+                        FuncParamsScalarsIndex(index_type="INVERTED",
+                                               index_param={"json_cast_type": "BOOL", "json_path": 'json_1["bool"]'})
+                    ]
+                },
+                reload=True
+            ),
+            other_fields=cdp.other_fields + ["int64_3", "json_1", "timestamptz_1"], **cdp.DefaultIndexParams.HNSW)
+
+        self.functional_template(
+            input_params=input_params, cpu=dp.default_cpu, mem=dp.default_mem, deploy_mode=deploy_mode,
+            case_callable_obj=obj.scene_functional_base, sub_callable_obj=obj.scene_functional_collection_add_fields,
+            default_case_params=default_case_params, client_type=client_type)

@@ -62,6 +62,31 @@ class FunctionalParams(CommonParams):
             "multi_scalars_index": {k: [o.to_dict for o in v] for k, v in multi_scalars_index.items()}
         }
 
+    @staticmethod
+    def params_scene_functional_collection_add_fields(
+            add_fields: List[str],
+            scalars_params: dict = {},
+            vectors_index: Dict[str, FuncParamsVectorsIndex] = {},
+            scalars_index: Dict[str, FuncParamsScalarsIndex] = {},
+            multi_scalars_index: Dict[str, List[FuncParamsScalarsIndex]] = {},
+            reload: bool = False
+    ):
+        """
+        add_fields: List[str]
+        scalars_params: Optional[dict] = field(default_factory=lambda: {})
+        vectors_index: Optional[Dict[str, FuncParamsVectorsIndex]] = field(default_factory=lambda: {})
+        scalars_index: Optional[Dict[str, FuncParamsScalarsIndex]] = field(default_factory=lambda: {})
+        multi_scalars_index: Optional[Dict[str, List[FuncParamsScalarsIndex]]] = field(default_factory=lambda: {})
+        reload: Optional[bool] = False
+        """
+        return {
+            "add_fields": add_fields, "scalars_params": scalars_params,
+            "vectors_index": {k: v.to_dict for k, v in vectors_index.items()},
+            "scalars_index": {k: v.to_dict for k, v in scalars_index.items()},
+            "multi_scalars_index": {k: [o.to_dict for o in v] for k, v in multi_scalars_index.items()},
+            "reload": reload
+        }
+
     def params_scene_functional(self, functional_params: dict, dataset_name=pn.DatasetsName.SIFT, dim=128,
                                 dataset_size="1m", ni_per=50000,
                                 vectors_index=None, scalars_index=None, scalars_params=None,

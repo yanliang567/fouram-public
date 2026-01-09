@@ -11,7 +11,7 @@ from pymilvus.client.types import LoadState
 
 from client.common.common_parser import PrepareInsertParams
 from client.common.common_func import (
-    gen_mc_collection_schema, gen_unique_str, parser_data_size, gen_vectors, gen_entities,
+    gen_mc_collection_schema, gen_mc_add_fields, gen_unique_str, parser_data_size, gen_vectors, gen_entities,
     remove_list_values, parser_segment_info, update_dict_value, hide_dict_value, check_mc_data_organization,
     get_default_search_params, parser_search_params_expr, get_ann_search_request_params, check_vector_index_params,
     parser_set_properties_params, parser_alter_index_params, check_vector_length, convert_scalar_index_params_to_list,
@@ -345,6 +345,15 @@ class MilvusClientBase:
             log.customize(log_level)("[{0}] Disconnect using: {1}".format(self.name, getattr(mc_obj, "_using", mc_obj)))
             mc_obj.close()
 
+    def collection_add_fields(self, add_fields: list, scalars_params={}, collection_name="", mc_obj: callable = None,
+                              log_level=LogLevel.INFO, **kwargs):
+        collection_name, mc_obj = collection_name or self.collection_name, mc_obj or self.mc
+
+        log.customize(log_level)(f"[{self.name}] Collection: {collection_name} start adding fields: {add_fields}")
+        gen_mc_add_fields(mc_obj=mc_obj, collection_name=collection_name, add_fields=add_fields,
+                          scalars_params=scalars_params, max_length=kwargs.pop(pn.max_length, dv.default_max_length),
+                          dim=kwargs.pop(pn.dim, dv.default_dim))
+
     def create_collection(self, collection_name="", vector_field_name="", schema=None, other_fields=[], shards_num=2,
                           mc_obj: callable = None, log_level=LogLevel.INFO, varchar_id=False, scalars_params={},
                           auto_id=False, dynamic_fields: list = [], set_main_collection=True, **kwargs):
@@ -481,7 +490,8 @@ class MilvusClientBase:
 
     def insert_batch(self, vectors, ids, data_size, varchar_filled=False, mc_obj: MilvusClientWrapper = None,
                      collection_schema=None, log_level=LogLevel.INFO, insert_scalars_params={}, anns_field: str = None,
-                     custom_api_insert: Union[pn.insert, pn.upsert] = pn.insert, data_organization=None,
+                     custom_api_insert: Union[pn.insert, pn.upsert] = pn.insert,
+                     data_organization=None, partial_update_fields=None,
                      dynamic_fields: list = [], dynamic_fields_schema: dict = {}, collection_name: str = None,
                      **kwargs):
         """
@@ -495,6 +505,7 @@ class MilvusClientBase:
 
         entities = gen_entities(collection_schema, vectors, ids, varchar_filled, insert_scalars_params, anns_field,
                                 data_organization=check_mc_data_organization(data_organization),
+                                partial_update_fields=partial_update_fields,
                                 dynamic_fields=dynamic_fields, dynamic_fields_schema=dynamic_fields_schema)
 
         log.customize(log_level)(
@@ -1104,7 +1115,8 @@ class MilvusClientBase:
             self.collection_schema, params.get_vectors, params.get_ids, params.varchar_filled,
             anns_field=params.anns_field, insert_scalars_params=params.scalars_params,
             data_organization=check_mc_data_organization(params.data_organization, False),
-            dynamic_fields=params.dynamic_fields, dynamic_fields_schema=params.dynamic_fields_schema)
+            dynamic_fields=params.dynamic_fields, dynamic_fields_schema=params.dynamic_fields_schema,
+            partial_update_fields=params.partial_update_fields)
         return self.insert_api(entities, **params.obj_params)
 
     def concurrent_upsert(self, params: ConcurrentTaskUpsert):

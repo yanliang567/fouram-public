@@ -6,7 +6,7 @@ from typing import Dict, List
 from pymilvus.orm.types import CONSISTENCY_STRONG
 
 from client.client_base import DataType
-from client.common.common_type import Precision, CaseIterParams, DefaultValue
+from client.common.common_type import Precision, CaseIterParams, DefaultValue as dv
 from client.common.common_parser import (
     ParserInputParams, ParserFieldsParams, ExtraPartitionsParams
 )
@@ -72,7 +72,7 @@ class FunctionalCases(CommonCases):
         vector_default_field_name = get_default_field_name(
             vector_type, self.params_obj.dataset_params.get(pn.vector_field_name, ""))
         sparse_range = check_sparse_range(
-            self.params_obj.dataset_params.get(pn.sparse_range, DefaultValue.default_sparse_range))
+            self.params_obj.dataset_params.get(pn.sparse_range, dv.default_sparse_range))
         all_fields_params = ParserFieldsParams(self.params_obj.dataset_params, self.params_obj.collection_params,
                                                main_field_name=vector_default_field_name)
 
@@ -433,3 +433,74 @@ class FunctionalCases(CommonCases):
         self.show_index()
 
         log.info(f"[FunctionalCases] Rebuild scalars: {scalars_field} vectors: {vectors_field} indexes done.")
+
+    @docstring_decorator
+    def scene_functional_collection_add_fields(self, **kwargs):
+        """
+        steps:
+            1. add collection fields based to `scalars_params`
+            2. build indexes if index params passed in
+            3. reload collection
+
+        input params:
+            add_fields: List[str]
+            scalars_params: Optional[dict] = {}
+
+            vectors_index:
+                <vector field name>:
+                    metric_type: str
+                    index_type: str
+                    index_param: dict
+            scalars_index:
+                <scalar field name>:
+                    index_type: Optional[str] = ""
+                    index_param: Optional[dict] = {}
+            multi_scalars_index:
+                <scalar field name>:
+                -   index_type: Optional[str] = ""
+                    index_param: Optional[dict] = {}
+                -   index_type: Optional[str] = ""
+                    index_param: Optional[dict] = {}
+
+            reload: Optional[bool] = False
+
+        notice:
+            1. only support `MilvusClient` interface
+            2. vector fields need to be indexed before reloading
+            3. scalar fields can be read without reloading
+        """
+        # parser input params for test case
+        params = self.parsing_functional_params(data_class=GetParamObj().scene_functional_collection_add_fields,
+                                                all_params=kwargs)
+
+        # add collection fields
+        self.collection_add_fields(add_fields=params.add_fields, scalars_params=params.scalars_params,
+                                   dim=self.params_obj.dataset_params[pn.dim],
+                                   max_length=self.params_obj.dataset_params.get(pn.max_length, dv.default_max_length))
+        self.get_collection_schema()
+
+        # build indexes
+        scalars_field = list(params.scalars_index.keys()) + list(params.multi_scalars_index.keys())
+        vectors_field = list(params.vectors_index.keys())
+
+        # check rebuild fields
+        if len(scalars_field) + len(vectors_field) == 0:
+            log.info("[FunctionalCases] No scalar and vector fields need to rebuild index.")
+        else:
+            other_fields = self.get_collection_fields()
+            for _field in scalars_field + vectors_field:
+                if _field not in other_fields:
+                    log.debug(f"[FunctionalCases] The field `{_field}` isn't in collection {other_fields}.")
+            self.show_index()
+
+            # build index
+            log.info(f"[FunctionalCases] Start building indexes, scalars: {scalars_field}, vectors: {vectors_field}")
+            self.build_indexes(vectors_index=params.vectors_index, scalars_index=params.scalars_index,
+                               multi_scalars_index=params.multi_scalars_index)
+            self.show_index()
+
+        if params.reload:
+            self.release_collection()
+            self.prepare_load(**self.params_obj.load_params)
+
+        log.info(f"[FunctionalCases] Add fields: {params.add_fields} done.")

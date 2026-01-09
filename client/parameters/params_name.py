@@ -56,6 +56,7 @@ dataset_name = "dataset_name"
 column_name = "column_name"
 dim = "dim"
 data_organization = "data_organization"
+partial_update_fields = "partial_update_fields"
 sparse_range = "sparse_range"
 dataset_size = "dataset_size"
 max_length = "max_length"
@@ -266,6 +267,7 @@ class IndexTypeName:
     AUTOINDEX = "AUTOINDEX"  # level=[1, 2, 3]
     SPARSE_WAND = "SPARSE_WAND"
     SPARSE_INVERTED_INDEX = "SPARSE_INVERTED_INDEX"
+    IVF_RABITQ = "IVF_RABITQ"
 
     # scalar
     STL_SORT = "STL_SORT"

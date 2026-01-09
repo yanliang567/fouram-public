@@ -34,7 +34,7 @@ from deploy.commons.common_func import get_class_key_name, get_default_deploy_mo
 from workflow.performance_template import PerfTemplate, ServerTemplate
 from parameters.input_params import param_info, InputParamsBase
 from commons.common_func import dict_merge
-from commons.common_type import DefaultParams as dp
+from commons.common_type import DefaultParams as dp, ClientType
 
 
 class TestServerDeploy(ServerTemplate):
@@ -141,13 +141,14 @@ class TestRecallCases(PerfTemplate):
             3. check test result and report
             4. clean env"""
 
-    def test_recall_scene_custom_parameters(self, input_params: InputParamsBase):
+    @pytest.mark.parametrize("client_type", [ClientType.MilvusClient])
+    def test_recall_scene_custom_parameters(self, input_params: InputParamsBase, client_type):
         """
         :test steps:
             1. serial search and calculation of RT and recall
         """
         self.serial_template(input_params=input_params, cpu=dp.default_cpu, mem=dp.default_mem, deploy_mode=CLUSTER,
-                             case_callable_obj=AccCases().scene_recall)
+                             case_callable_obj=AccCases().scene_recall, client_type=client_type)
 
     @pytest.mark.recall
     @pytest.mark.parametrize("deploy_mode", [STANDALONE])
@@ -548,13 +549,14 @@ class TestPerformanceCases(PerfTemplate):
             3. check test result and report
             4. clean env"""
 
-    def test_batch_insert_custom_parameters(self, input_params: InputParamsBase):
+    @pytest.mark.parametrize("client_type", [ClientType.MilvusClient])
+    def test_batch_insert_custom_parameters(self, input_params: InputParamsBase, client_type):
         """
         :test steps:
             1. batch insert and calculation of insert time
         """
         self.serial_template(input_params=input_params, cpu=dp.default_cpu, mem=dp.default_mem, deploy_mode=CLUSTER,
-                             case_callable_obj=InsertBatch().scene_insert_batch)
+                             case_callable_obj=InsertBatch().scene_insert_batch, client_type=client_type)
 
     @pytest.mark.insert
     @pytest.mark.parametrize("deploy_mode", [STANDALONE])
@@ -582,13 +584,14 @@ class TestPerformanceCases(PerfTemplate):
                              default_case_params=InsertBatchParams().params_insert_batch(),
                              node_resources=node_resources)
 
-    def test_build_index_custom_parameters(self, input_params: InputParamsBase):
+    @pytest.mark.parametrize("client_type", [ClientType.MilvusClient])
+    def test_build_index_custom_parameters(self, input_params: InputParamsBase, client_type):
         """
         :test steps:
             1. insert and calculation of build index time
         """
         self.serial_template(input_params=input_params, cpu=dp.default_cpu, mem=dp.default_mem, deploy_mode=CLUSTER,
-                             case_callable_obj=BuildIndex().scene_build_index)
+                             case_callable_obj=BuildIndex().scene_build_index, client_type=client_type)
 
     @pytest.mark.index
     @pytest.mark.parametrize("deploy_mode", [STANDALONE])
@@ -634,13 +637,14 @@ class TestPerformanceCases(PerfTemplate):
                              case_callable_obj=BuildIndex().scene_build_index,
                              default_case_params=BuildIndexParams().params_build_index_ivf_flat())
 
-    def test_load_custom_parameters(self, input_params: InputParamsBase):
+    @pytest.mark.parametrize("client_type", [ClientType.MilvusClient])
+    def test_load_custom_parameters(self, input_params: InputParamsBase, client_type):
         """
         :test steps:
             1. insert and calculation of load time
         """
         self.serial_template(input_params=input_params, cpu=dp.default_cpu, mem=dp.default_mem, deploy_mode=CLUSTER,
-                             case_callable_obj=Load().scene_load)
+                             case_callable_obj=Load().scene_load, client_type=client_type)
 
     @pytest.mark.load
     @pytest.mark.parametrize("deploy_mode", [STANDALONE])
@@ -662,21 +666,23 @@ class TestPerformanceCases(PerfTemplate):
         self.serial_template(input_params=input_params, cpu=dp.default_cpu, mem=dp.default_mem, deploy_mode=deploy_mode,
                              case_callable_obj=Load().scene_load, default_case_params=LoadParams().params_load())
 
-    def test_query_custom_parameters(self, input_params: InputParamsBase):
+    @pytest.mark.parametrize("client_type", [ClientType.MilvusClient])
+    def test_query_custom_parameters(self, input_params: InputParamsBase, client_type):
         """
         :test steps:
             1. insert and calculation of query time
         """
         self.serial_template(input_params=input_params, cpu=dp.default_cpu, mem=dp.default_mem, deploy_mode=CLUSTER,
-                             case_callable_obj=Query().scene_query_ids)
+                             case_callable_obj=Query().scene_query_ids, client_type=client_type)
 
-    def test_query_expr_custom_parameters(self, input_params: InputParamsBase):
+    @pytest.mark.parametrize("client_type", [ClientType.MilvusClient])
+    def test_query_expr_custom_parameters(self, input_params: InputParamsBase, client_type):
         """
         :test steps:
             1. insert and calculation of query time
         """
         self.serial_template(input_params=input_params, cpu=dp.default_cpu, mem=dp.default_mem, deploy_mode=CLUSTER,
-                             case_callable_obj=Query().scene_query_expr)
+                             case_callable_obj=Query().scene_query_expr, client_type=client_type)
 
     @pytest.mark.query
     @pytest.mark.parametrize("deploy_mode", [STANDALONE])
@@ -742,13 +748,14 @@ class TestPerformanceCases(PerfTemplate):
                              case_callable_obj=Query().scene_query_ids,
                              default_case_params=QueryParams().params_scene_query_ids_local())
 
-    def test_search_custom_parameters(self, input_params: InputParamsBase):
+    @pytest.mark.parametrize("client_type", [ClientType.MilvusClient])
+    def test_search_custom_parameters(self, input_params: InputParamsBase, client_type):
         """
         :test steps:
             1. insert and calculation of search time
         """
         self.serial_template(input_params=input_params, cpu=dp.default_cpu, mem=dp.default_mem, deploy_mode=CLUSTER,
-                             case_callable_obj=Search().scene_search)
+                             case_callable_obj=Search().scene_search, client_type=client_type)
 
     @pytest.mark.search
     @pytest.mark.parametrize("deploy_mode", [STANDALONE])
@@ -830,13 +837,14 @@ class TestPerformanceCases(PerfTemplate):
                              default_case_params=SearchParams().params_scene_search_auto_index(
                                  other_fields=[], search_expr=None, req_run_counts=30))
 
-    def test_search_recall_custom_parameters(self, input_params: InputParamsBase):
+    @pytest.mark.parametrize("client_type", [ClientType.MilvusClient])
+    def test_search_recall_custom_parameters(self, input_params: InputParamsBase, client_type):
         """
         :test steps:
             1. insert and calculation of search time and recall
         """
         self.serial_template(input_params=input_params, cpu=dp.default_cpu, mem=dp.default_mem, deploy_mode=CLUSTER,
-                             case_callable_obj=SearchRecall().scene_search_recall)
+                             case_callable_obj=SearchRecall().scene_search_recall, client_type=client_type)
 
     @pytest.mark.parametrize("deploy_mode", [STANDALONE])
     def test_ivf_flat_search_recall_standalone(self, input_params: InputParamsBase, deploy_mode):
@@ -862,13 +870,14 @@ class TestPerformanceCases(PerfTemplate):
         self.serial_template(input_params=input_params, cpu=dp.default_cpu, mem=dp.default_mem, deploy_mode=deploy_mode,
                              case_callable_obj=SearchRecall().scene_search_recall, default_case_params=case_params)
 
-    def test_hybrid_search_custom_parameters(self, input_params: InputParamsBase):
+    @pytest.mark.parametrize("client_type", [ClientType.MilvusClient])
+    def test_hybrid_search_custom_parameters(self, input_params: InputParamsBase, client_type):
         """
         :test steps:
             1. insert and calculation of hybrid_search time
         """
         self.serial_template(input_params=input_params, cpu=dp.default_cpu, mem=dp.default_mem, deploy_mode=CLUSTER,
-                             case_callable_obj=HybridSearch().scene_hybrid_search)
+                             case_callable_obj=HybridSearch().scene_hybrid_search, client_type=client_type)
 
     @pytest.mark.hybrid_search
     @pytest.mark.parametrize("deploy_mode", [STANDALONE])
@@ -925,14 +934,15 @@ class TestGoBenchCases(PerfTemplate):
             4. clean env"""
 
     #  `scene_go_search` is deprecated, use `scene_go_bench` instead
-    def test_go_bench_custom_parameters(self, input_params: InputParamsBase):
+    @pytest.mark.parametrize("client_type", [ClientType.MilvusClient])
+    def test_go_bench_custom_parameters(self, input_params: InputParamsBase, client_type):
         """
         :test steps:
             1. concurrent search and calculation of RT and QPS
         """
         self.concurrency_template(input_params=input_params, cpu=dp.default_cpu, mem=dp.default_mem,
                                   deploy_mode=STANDALONE, case_callable_obj=GoBenchCases().scene_go_search,
-                                  sync_report=True)
+                                  sync_report=True, client_type=client_type)
 
     @pytest.mark.parametrize("deploy_mode", [STANDALONE])
     def test_scene_go_bench_hnsw_standalone(self, input_params: InputParamsBase, deploy_mode):
@@ -967,14 +977,15 @@ class TestGoBenchCases(PerfTemplate):
 
     """ go bench after refine """
 
-    def test_concurrent_go_bench_custom_parameters(self, input_params: InputParamsBase):
+    @pytest.mark.parametrize("client_type", [ClientType.MilvusClient])
+    def test_concurrent_go_bench_custom_parameters(self, input_params: InputParamsBase, client_type):
         """
         :test steps:
             1. concurrent search and calculation of RT and QPS
         """
         self.concurrency_template(input_params=input_params, cpu=dp.default_cpu, mem=dp.default_mem,
                                   deploy_mode=STANDALONE, case_callable_obj=GoBenchCases().scene_go_bench,
-                                  sync_report=True)
+                                  sync_report=True, client_type=client_type)
 
     @pytest.mark.go
     @pytest.mark.parametrize("deploy_mode", [STANDALONE])

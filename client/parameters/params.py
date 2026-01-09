@@ -117,7 +117,8 @@ class ParamsFormat:
             custom_api: {
                 prepare_insert_api: ([type(str()), type(None)], OPTION)
             },
-            data_organization: ([type(str()), type(None)], OPTION)
+            data_organization: ([type(str()), type(None)], OPTION),
+            partial_update_fields: ([type(list()), type(None)], OPTION),
         }
     }
 
@@ -819,6 +820,7 @@ class ConcurrentInputParamsInsert(DataClassBase):
     data_organization: Optional[str] = None
     # dynamic fields for inserting
     dynamic_fields: Optional[list] = field(default_factory=lambda: [])
+    partial_update_fields: Optional[list] = None
 
     # random id or vectors
     random_id: Optional[bool] = False
@@ -845,6 +847,7 @@ class ConcurrentTaskInsert(DataClassBase):
     # dynamic fields for inserting
     dynamic_fields: Optional[list] = field(default_factory=lambda: [])
     dynamic_fields_schema: Optional[dict] = field(default_factory=lambda: {})
+    partial_update_fields: Optional[list] = None  # only for `MilvusClient` interface
 
     # random id or vectors
     random_id: Optional[bool] = False
@@ -867,6 +870,12 @@ class ConcurrentTaskInsert(DataClassBase):
             raise ValueError(
                 "[{0}] Check task:`{1}` can't be used in `{2}` concurrent request, only supports:{3}".format(
                     "ConcurrentTaskInsert", self.check_task, "insert", support_tasks))
+
+        if not (self.partial_update_fields is None or (isinstance(self.partial_update_fields, list) and all(
+                [isinstance(p, str) for p in self.partial_update_fields]))):
+            raise ValueError("[{0}] `partial_update_fields` data type is not a `List[str]`: {1}".format(
+                "ConcurrentTaskInsert", self.partial_update_fields))
+
         log.debug("[ConcurrentTaskInsert] Init done.")
 
     def set_params(self):
@@ -962,8 +971,8 @@ class ConcurrentTaskUpsert(DataClassBase):
                 "[{0}] Check task:`{1}` can't be used in `{2}` concurrent request, only supports:{3}".format(
                     "ConcurrentTaskUpsert", self.check_task, "upsert", support_tasks))
 
-        if self.partial_update is not True:
-            self.partial_update_fields = None
+        # if self.partial_update is not True:
+        #     self.partial_update_fields = None
         if not (self.partial_update_fields is None or (isinstance(self.partial_update_fields, list) and all(
                 [isinstance(p, str) for p in self.partial_update_fields]))):
             raise ValueError("[{0}] `partial_update_fields` data type is not a `List[str]`: {1}".format(

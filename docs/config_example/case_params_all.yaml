@@ -715,7 +715,8 @@ concurrent_tasks:
       data_organization: Optional[str] = None
       # dynamic fields for upserting, same as `collection_params.dynamic_fields`
       dynamic_fields: Optional[list] = []
-      # specify a subset of fields within collection fields, 'id' must be selected, auto id is not supported in this scene
+      # enabled partial_update: specify a subset of fields within collection fields, 'id' must be selected, auto id is not supported in this scene
+      # when setting nullable fields, you can select only some fields to write data
       # `partial_update_fields` does not affect `dynamic_fields`
       # e.g.:
       #    collection fields: 'id'(primary key), 'float_vector', 'int64', 'varchar', <dynamic_fields>

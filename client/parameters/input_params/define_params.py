@@ -28,6 +28,9 @@ class DefaultIndexParams:
     DISKANN = {pn.index_type: pn.IndexTypeName.DISKANN, pn.index_param: {}}
     BIN_IVF_FLAT = {pn.index_type: pn.IndexTypeName.BIN_IVF_FLAT, pn.index_param: {"nlist": 2048}}
     AUTOINDEX = {pn.index_type: pn.IndexTypeName.AUTOINDEX, pn.index_param: {}}
+    SPARSE_WAND = {pn.index_type: pn.IndexTypeName.SPARSE_WAND, pn.index_param: {"drop_ratio_build": 0.2}}
+    IVF_RABITQ = {pn.index_type: pn.IndexTypeName.IVF_RABITQ,
+                  pn.index_param: {pn.nlist: 128, "refine": "true", "refine_type": "SQ8"}}
 
 
 class DefaultVectorIndexParams:
@@ -462,6 +465,18 @@ class DefaultScalarParams:
         :param fields: ['json_1', ...]
         """
         return [DefaultScalarParams.nullable(field) for field in fields]
+
+    @staticmethod
+    def default_value(field: str, value: any = None):
+        """
+        :param field: float_vector_1
+        :param value: any
+        """
+        return {
+            field: {
+                "params": {"default_value": value}
+            }
+        }
 
     @staticmethod
     def specify_scope(field: str, specify_range: SpecifyRange = SpecifyRange(), max_capacity: int = 1, **kwargs):
