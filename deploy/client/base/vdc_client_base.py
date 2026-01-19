@@ -883,7 +883,12 @@ class VDCClientBase:
     def get_all_values(self, instance_id=""):
         """ host instance """
         instance_id = instance_id or self.real_instance_id
-        return CmdExe(f"kubectl get mi {instance_id} -o yaml -n {self.get_ns(instance_id)}").run_cmd()
+        # return CmdExe(f"kubectl get mi {instance_id} -o yaml -n {self.get_ns(instance_id)}").run_cmd()
+        k = f"kubectl -n {self.get_ns(instance_id)} "
+        msg = f"{k} get deployment -o yaml && " + \
+              "%s get cm | grep %s | awk '{print $1}' | " % (k, instance_id) + \
+              "while read line; do echo $line\":\" && %s get cm -o yaml $line; done" % k
+        return CmdExe(msg).run_cmd()
 
     def get_pods(self, instance_id=""):
         """ host instance """
