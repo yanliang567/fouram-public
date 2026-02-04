@@ -40,6 +40,7 @@ class VDCClientBase:
     region_id = ""
     rm_host = ""
     cloud_service_host = ""
+    cloud_account_host = ""
     infra_host = ""
     infra_token = ""
     cluster_name = ""
@@ -82,7 +83,7 @@ class VDCClientBase:
         if not isinstance(self._cloud_service_api, CloudServiceApi):
             self._cloud_service_api = CloudServiceApi(
                 user_id=self.user_id, host=self.cloud_service_host, email=self.email, password=self.password,
-                project_id=self.project_id)
+                project_id=self.project_id, account_host=self.cloud_account_host)
         return self._cloud_service_api
 
     @property
@@ -126,6 +127,7 @@ class VDCClientBase:
         self.region_id = param_info.vdc_region_id or vdc_env.region_id
         self.rm_host = vdc_env.rm_host
         self.cloud_service_host = vdc_env.cloud_service_host
+        self.cloud_account_host = vdc_env.cloud_account_host
         self.infra_host = vdc_env.infra_host
         self.infra_token = vdc_env.infra_token
         self.cluster_name = vdc_env.cluster_name

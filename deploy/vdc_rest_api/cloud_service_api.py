@@ -15,10 +15,12 @@ class CloudServiceApi:
     Log_Level = LogLevel.DEBUG
 
     def __init__(self, host: str, user_id: str = config_info.vdc_user.user_id,
-                 email=config_info.vdc_user.email, password=config_info.vdc_user.password, project_id: str = "0"):
+                 email=config_info.vdc_user.email, password=config_info.vdc_user.password, project_id: str = "0",
+                 account_host: str = config_info.vdc_env.cloud_account_host):
         self.email = email
         self.password = password
         self.host = host
+        self.account_host = account_host
         self.UserId = user_id
         self.req = Request()
 
@@ -157,7 +159,7 @@ class CloudServiceApi:
 
     @request_catch()
     def oos_login(self, email: str, password: str, log_level=Log_Level) -> RequestResponseParser:
-        url = self.host + "/account/v1/account/login"
+        url = self.account_host + "/account/inner/v1/account/login"
         headers = {
             "RequestId": str(uuid.uuid1()),
         }

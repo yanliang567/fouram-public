@@ -59,6 +59,7 @@ class VDCENVParams(ParamsBase):
     region_id: Optional[str] = field(default_factory=lambda: "")
     rm_host: Optional[str] = field(default_factory=lambda: "")
     cloud_service_host: Optional[str] = field(default_factory=lambda: "")
+    cloud_account_host: Optional[str] = field(default_factory=lambda: "")
     infra_host: Optional[str] = field(default_factory=lambda: "")
     infra_token: Optional[str] = field(default_factory=lambda: "")
     cluster_name: Optional[str] = field(default_factory=lambda: "")
@@ -66,7 +67,7 @@ class VDCENVParams(ParamsBase):
     mysql: Optional[dict] = field(default_factory=lambda: {})
 
     def check_params(self):
-        assert self.region_id and self.rm_host and self.cloud_service_host and \
+        assert self.region_id and self.rm_host and self.cloud_service_host and self.cloud_account_host and \
                self.infra_host and self.infra_token and self.cluster_name and self.cloud_service_test_host
 
         for j in ["host", "user", "password"]:
