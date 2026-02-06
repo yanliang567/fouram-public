@@ -113,6 +113,7 @@ class ParamsFormat:
         },
         common_params: {
             set_properties: ([type(dict()), type(list()), type(None)], OPTION),
+            alter_collection_field: ([type(dict()), type(list()), type(None)], OPTION),
             alter_index: ([type(dict()), type(list()), type(None)], OPTION),
             custom_api: {
                 prepare_insert_api: ([type(str()), type(None)], OPTION)
@@ -1885,6 +1886,7 @@ class ConcurrentInputParamsSceneSearchTest(DataClassBase):
 
     # common setting
     set_properties: Union[dict, list, None] = None
+    alter_collection_field: Union[dict, list, None] = None
     alter_index: Union[dict, list, None] = None
     custom_insert_api: Optional[str] = insert
 
@@ -1953,6 +1955,7 @@ class ConcurrentTaskSceneSearchTest(DataClassBase):
 
     # common setting
     set_properties: Optional[list] = field(default_factory=lambda: [])
+    alter_collection_field: Optional[list] = field(default_factory=lambda: [])
     alter_index: Optional[list] = field(default_factory=lambda: [])
     custom_insert_api: Optional[str] = insert
 
@@ -2032,6 +2035,7 @@ class ConcurrentInputParamsSceneHybridSearchTest(DataClassBase):
 
     # common setting
     set_properties: Union[dict, list, None] = None
+    alter_collection_field: Union[dict, list, None] = None
     alter_index: Union[dict, list, None] = None
     custom_insert_api: Optional[str] = insert
 
@@ -2110,6 +2114,7 @@ class ConcurrentTaskSceneHybridSearchTest(DataClassBase):
 
     # common setting
     set_properties: Optional[list] = field(default_factory=lambda: [])
+    alter_collection_field: Optional[list] = field(default_factory=lambda: [])
     alter_index: Optional[list] = field(default_factory=lambda: [])
     custom_insert_api: Optional[str] = insert
 

@@ -1308,6 +1308,37 @@ def parser_set_properties_params(params: Union[dict, list, None]) -> List[dict]:
     return _params
 
 
+def check_alter_collection_field_params(params):
+    fun_name = "check_alter_collection_field_params"
+
+    if isinstance(params, dict):
+        _check = [i for i in ["field_name", "field_params"] if i not in params.keys()]
+        if not _check:
+            return True
+        log.error(f"[{fun_name}] Alter collection field params does not contain: {_check}")
+    else:
+        log.error(f"[{fun_name}] Alter collection field params is not dict: {params}, type: {type(params)}")
+    return False
+
+
+def parser_alter_collection_field_params(params: Union[dict, list, None]) -> List[dict]:
+    _params, func_name = [], "parser_alter_collection_field_params"
+
+    if isinstance(params, dict) and check_alter_collection_field_params(params):
+        _params.append(params)
+    elif isinstance(params, list):
+        for p in params:
+            if isinstance(p, dict) and check_alter_collection_field_params(p):
+                _params.append(p)
+            else:
+                log.error(f"[{func_name}] Can't parser alter collection field subparams: {p}, type: {type(p)}")
+    elif params is not None:
+        log.error(f"[{func_name}] Can't parser alter collection field params: {params}, type: {type(params)}")
+
+    log.debug(f"[{func_name}] Parser alter collection field params done: {_params}")
+    return _params
+
+
 def check_alter_index_params(params):
     if isinstance(params, dict):
         _check = [i for i in ["index_name", "extra_params"] if i not in params.keys()]

@@ -142,6 +142,7 @@ reset_db = "reset_db"
 
 # common params
 set_properties = "set_properties"
+alter_collection_field = "alter_collection_field"
 alter_index = "alter_index"
 custom_api = "custom_api"
 prepare_insert_api = "prepare_insert_api"

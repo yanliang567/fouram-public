@@ -91,6 +91,8 @@ class CommonCases(Base):
 
             # setting collection properties
             self.set_all_properties(params=self.params_obj.common_params.get(pn.set_properties, None))
+            # setting collection fields properties
+            self.set_alter_collection_field(params=self.params_obj.common_params.get(pn.alter_collection_field, None))
 
             self.get_collection_schema()
 
@@ -155,6 +157,8 @@ class CommonCases(Base):
 
             # setting collection properties
             self.set_all_properties(params=self.params_obj.common_params.get(pn.set_properties, None))
+            # setting collection fields properties
+            self.set_alter_collection_field(params=self.params_obj.common_params.get(pn.alter_collection_field, None))
 
             self.get_collection_schema()
 

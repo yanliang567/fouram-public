@@ -3,6 +3,11 @@
 
 
 common_params:
+  # collection `alter_collection_field`, `alter_collection_field` after connecting to collection
+  # <dict> e.g.: {"field_name": "float_vector", "field_params": {"warmup": "sync"}, "timeout": None / <float>}
+  # <List[dict]> e.g.: [{"field_name": "<field name>", "field_params": {<alter field params>}}, ...]
+  alter_collection_field: None / <List[Union[str, dict]]> / <dict>
+
   # during the preparation phase, select a subset of fields from the collection based on `partial_update_fields` to generate the write data
   # the default is to generate data for all fields normally, excluding data from dynamic fields
   # Reuse `partial_update_fields` parameter of `upsert` as the fields to be written during the preparation phase
@@ -11,12 +16,22 @@ common_params:
   # In other scenes, the primary key field "id" must be selected
   partial_update_fields: Optional[list] = None
 concurrent_tasks:
-  - type: insert
-    params:
-      # when setting nullable fields, you can select only some fields to write data
-      # e.g.:
-      #   'id': primary key, auto id
-      #   'float_vector': nullable
-      #   'varchar': nullable
-      #  partial_update_fields=[] -> insert data=[{}, ... <insert batch size>]: writing empty data, but the number of data rows inside Milvus increases
-      partial_update_fields: Optional[list] = None
+- type: insert
+  params:
+    # when setting nullable fields, you can select only some fields to write data
+    # e.g.:
+    #   'id': primary key, auto id
+    #   'float_vector': nullable
+    #   'varchar': nullable
+    #  partial_update_fields=[] -> insert data=[{}, ... <insert batch size>]: writing empty data, but the number of data rows inside Milvus increases
+    partial_update_fields: Optional[list] = None
+
+- type: scene_search_test
+  params:
+    # common setting
+    alter_collection_field: Union[dict, list, None] = None  # same as `common_params.alter_collection_field`
+
+- type: scene_hybrid_search_test
+  params:
+    # common setting
+    alter_collection_field: Union[dict, list, None] = None  # same as `common_params.alter_collection_field`

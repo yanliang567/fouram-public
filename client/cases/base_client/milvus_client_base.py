@@ -14,8 +14,8 @@ from client.common.common_func import (
     gen_mc_collection_schema, gen_mc_add_fields, gen_unique_str, parser_data_size, gen_vectors, gen_entities,
     remove_list_values, parser_segment_info, update_dict_value, hide_dict_value, check_mc_data_organization,
     get_default_search_params, parser_search_params_expr, get_ann_search_request_params, check_vector_index_params,
-    parser_set_properties_params, parser_alter_index_params, check_vector_length, convert_scalar_index_params_to_list,
-    check_user_length
+    parser_set_properties_params, parser_alter_collection_field_params, parser_alter_index_params,
+    check_vector_length, convert_scalar_index_params_to_list, check_user_length
 )
 from client.util.api_request import func_time_catch
 from client.client_base import MilvusClientWrapper, ResourceGroupConfig, DataType
@@ -931,6 +931,20 @@ class MilvusClientBase:
         for p in parser_set_properties_params(params):
             self.collection_set_properties(**p, mc_obj=mc_obj, collection_name=collection_name, log_level=log_level)
 
+    def alter_collection_field(self, field_name, field_params, timeout=None, collection_name: str = None,
+                               mc_obj: MilvusClientWrapper = None, log_level=LogLevel.INFO, **kwargs):
+        collection_name, mc_obj = collection_name or self.collection_name, mc_obj or self.mc
+
+        msg = "[{0}] Collection {1} alter field: field_name:{2}, field_params:{3}, kwargs:{4}"
+        log.customize(log_level)(msg.format(self.name, collection_name, field_name, field_params, kwargs))
+        mc_obj.alter_collection_field(collection_name=collection_name, field_name=field_name, field_params=field_params,
+                                      timeout=timeout, **kwargs)
+
+    def set_alter_collection_field(self, params: Union[list, dict, None], collection_name: str = None,
+                                   mc_obj: MilvusClientWrapper = None, log_level=LogLevel.INFO):
+        for p in parser_alter_collection_field_params(params):
+            self.alter_collection_field(**p, collection_name=collection_name, mc_obj=mc_obj, log_level=log_level)
+
     def collection_alter_index(self, index_name, extra_params, timeout=None, collection_name: str = None,
                                mc_obj: MilvusClientWrapper = None, log_level=LogLevel.INFO, **kwargs):
         collection_name, mc_obj = collection_name or self.collection_name, mc_obj or self.mc
@@ -1432,6 +1446,9 @@ class MilvusClientBase:
         time.sleep(1)
         self.set_all_properties(params=params.set_properties, mc_obj=mc_obj, collection_name=collection_name,
                                 log_level=log_level)
+        # setting collection fields properties
+        self.set_alter_collection_field(params=params.alter_collection_field, mc_obj=mc_obj,
+                                        collection_name=collection_name, log_level=log_level)
 
         # prepare before inserting
         if params.prepare_before_insert:
@@ -1555,6 +1572,9 @@ class MilvusClientBase:
         time.sleep(1)
         self.set_all_properties(params=params.set_properties, mc_obj=mc_obj, collection_name=collection_name,
                                 log_level=log_level)
+        # setting collection fields properties
+        self.set_alter_collection_field(params=params.alter_collection_field, mc_obj=mc_obj,
+                                        collection_name=collection_name, log_level=log_level)
 
         # prepare before inserting
         if params.prepare_before_insert:

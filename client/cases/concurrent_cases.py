@@ -1,5 +1,6 @@
 import copy
 import dacite
+from typing import Union
 
 from client.common.common_type import Precision, CaseIterParams, DefaultValue as dv
 from client.common.common_parser import (
@@ -7,7 +8,7 @@ from client.common.common_parser import (
 )
 from client.common.common_func import (
     parser_scalar_index, gen_combinations, get_vector_type, get_default_field_name, parser_time, update_dict_value,
-    parser_set_properties_params, parser_alter_index_params, check_sparse_range
+    parser_set_properties_params, parser_alter_collection_field_params, parser_alter_index_params, check_sparse_range
 )
 from client.common.common_param import CustomAPIInsert
 from client.util.params_check import check_params
@@ -328,6 +329,16 @@ class ConcurrentClientBase(CommonCases):
         }, _params)
         return result
 
+    @staticmethod
+    def _parser_params(params: Union[ConcurrentInputParamsSceneSearchTest, ConcurrentInputParamsSceneHybridSearchTest]):
+        params.scalars_index = parser_scalar_index(params.scalars_index)
+        params.set_properties = parser_set_properties_params(params.set_properties)
+        params.alter_collection_field = parser_alter_collection_field_params(params.alter_collection_field)
+        params.alter_index = parser_alter_index_params(params.alter_index)
+        params.sparse_range = check_sparse_range(params.sparse_range)
+        params.custom_insert_api = CustomAPIInsert(prepare_insert_api=params.custom_insert_api).api
+        return params
+
     def parser_tasks_params(self, req_type, req_params, vector_field_name: str, metric_type: str,
                             all_fields_params: ParserFieldsParams, sparse_range: list = dv.default_sparse_range):
         if req_type == pn.search:
@@ -455,11 +466,7 @@ class ConcurrentClientBase(CommonCases):
 
         elif req_type == pn.scene_search_test:
             _p = ConcurrentInputParamsSceneSearchTest(**req_params)
-            _p.scalars_index = parser_scalar_index(_p.scalars_index)
-            _p.set_properties = parser_set_properties_params(_p.set_properties)
-            _p.alter_index = parser_alter_index_params(_p.alter_index)
-            _p.sparse_range = check_sparse_range(_p.sparse_range)
-            _p.custom_insert_api = CustomAPIInsert(prepare_insert_api=_p.custom_insert_api).api
+            _p = self._parser_params(_p)
 
             result = _p.to_dict
             result.update({"all_fields_params": _p.set_all_fields_params_obj,
@@ -468,11 +475,7 @@ class ConcurrentClientBase(CommonCases):
 
         elif req_type == pn.scene_hybrid_search_test:
             params = ConcurrentInputParamsSceneHybridSearchTest(**req_params)
-            params.scalars_index = parser_scalar_index(params.scalars_index)
-            params.set_properties = parser_set_properties_params(params.set_properties)
-            params.alter_index = parser_alter_index_params(params.alter_index)
-            params.sparse_range = check_sparse_range(params.sparse_range)
-            params.custom_insert_api = CustomAPIInsert(prepare_insert_api=params.custom_insert_api).api
+            params = self._parser_params(params)
 
             result = self.hybrid_search_param_analysis(_search_params=params.to_dict,
                                                        all_fields_params=params.set_all_fields_params_obj)[0]

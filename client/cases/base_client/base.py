@@ -219,6 +219,9 @@ class Base:
     def set_all_properties(self, params: Union[dict, list, None], **kwargs):
         self.client.set_all_properties(params=params, **kwargs)
 
+    def set_alter_collection_field(self, params: Union[dict, list, None], **kwargs):
+        self.client.set_alter_collection_field(params=params, **kwargs)
+
     def set_alter_index(self, params: Union[list, dict, None], **kwargs):
         self.client.set_alter_index(params=params, **kwargs)
 

@@ -24,8 +24,8 @@ from client.common.common_func import (
     gen_collection_schema, gen_unique_str, parser_data_size, gen_vectors, gen_entities,
     remove_list_values, parser_segment_info, update_dict_value, hide_dict_value,
     get_default_search_params, parser_search_params_expr, get_ann_search_request_params, check_vector_index_params,
-    parser_set_properties_params, parser_alter_index_params, check_vector_length, convert_scalar_index_params_to_list,
-    check_user_length
+    parser_set_properties_params, parser_alter_collection_field_params, parser_alter_index_params,
+    check_vector_length, convert_scalar_index_params_to_list, check_user_length
 )
 from client.common.common_param import TransferNodesParams, TransferReplicasParams
 from client.common.common_type import Precision, CheckTasks, DefaultValue as dv
@@ -781,6 +781,15 @@ class ORMClientBase:
         for p in parser_set_properties_params(params):
             self.collection_set_properties(**p, collection_obj=collection_obj, log_level=log_level)
 
+    def alter_collection_field(self, *args, **kwargs):
+        raise Exception(
+            f"[{self.name}] ORM does not have the `alter_collection_field` interface, please switch to MilvusClient.")
+
+    def set_alter_collection_field(self, params: Union[list, dict, None], collection_obj: callable = None,
+                                   log_level=LogLevel.INFO):
+        for p in parser_alter_collection_field_params(params):
+            self.alter_collection_field(**p, collection_obj=collection_obj, log_level=log_level)
+
     def collection_alter_index(self, index_name, extra_params, timeout=None, collection_obj: callable = None,
                                log_level=LogLevel.INFO, **kwargs):
         collection_obj = collection_obj or self.collection_wrap
@@ -1270,6 +1279,9 @@ class ORMClientBase:
                                enable_dynamic_field=params.enable_dynamic_field)
         time.sleep(1)
         self.set_all_properties(params=params.set_properties, collection_obj=collection_obj, log_level=log_level)
+        # setting collection fields properties
+        self.set_alter_collection_field(params=params.alter_collection_field, collection_obj=collection_obj,
+                                        log_level=log_level)
 
         # prepare before inserting
         if params.prepare_before_insert:
@@ -1385,6 +1397,9 @@ class ORMClientBase:
                                enable_dynamic_field=params.enable_dynamic_field)
         time.sleep(1)
         self.set_all_properties(params=params.set_properties, collection_obj=collection_obj, log_level=log_level)
+        # setting collection fields properties
+        self.set_alter_collection_field(params=params.alter_collection_field, collection_obj=collection_obj,
+                                        log_level=log_level)
 
         # prepare before inserting
         if params.prepare_before_insert:
