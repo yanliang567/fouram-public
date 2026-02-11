@@ -661,7 +661,8 @@ class MilvusClientBase:
         for i in index_names:
             res = self.mc.describe_index(collection_name=self.collection_name, index_name=i).response
             if isinstance(res, dict):
-                for n in ["total_rows", "indexed_rows", "pending_index_rows", "state", "index_name"]:
+                for n in ["total_rows", "indexed_rows", "pending_index_rows", "state", "index_name",
+                          "mmap.enabled", "warmup"]:
                     res.pop(n, None)
             indexes.update({i: res})
 
