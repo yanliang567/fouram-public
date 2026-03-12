@@ -249,7 +249,7 @@ class ClassID(ClassIDMem, ClassIDDisk):
     pass
 
 
-class RMNodeCategory:
+class RMNodeCategory(enum.Enum):
     proxy = 1
     RootCoord = 2
     QueryCoord = 3
@@ -260,6 +260,9 @@ class RMNodeCategory:
     indexNode = 8
     standalone = 9
     mixCoord = 10
+    containers = 11
+    etcd = 12
+    streamingNode = 13
 
 
 class ComponentsLabel(enum.Enum):

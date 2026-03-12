@@ -652,7 +652,7 @@ def gen_db_resource(source: dict, instance_id: str, class_id: list, db_raw: list
                         # fouram_id = "fouram-{0}c{1}g-{2}-{3}".format(
                         #     l_cpu, is_number(l_memory / 1024.0), eval(f"RMNodeCategory.{k}"), instance_id[-8:])
                         name_mem = is_number(l_memory / 1024.0)
-                        name_node_category = eval(f"RMNodeCategory.{k}")
+                        name_node_category = RMNodeCategory[k].value
                         fouram_id = parser_class_id_name(m_value=f"{l_cpu}c{name_mem}g-{name_node_category}",
                                                          l_value=instance_id)
 
@@ -719,6 +719,37 @@ def check_file_exist(file_dir, out_put=True):
             log.info("[check_file_exist] File not exist:{}".format(file_dir))
         return False
     return True
+
+
+def check_biz_critical(labels: dict):
+    """
+    return: check <bool>, enabled biz <bool>, deal labels <dict>
+    """
+    k, v = "biz-critical", "true"
+
+    log.debug(f"[check_biz_critical] Start checking labels: {labels}")
+    if isinstance(labels, dict):
+        if k in labels:
+            _biz = labels[k]
+            remaining = {key: val for key, val in labels.items() if key != k}
+
+            if _biz == v:
+                log.debug("[check_biz_critical] Check labels {0} is true, after check: {1}".format(k, remaining))
+                return True, True, remaining
+            else:
+                log.debug("[check_biz_critical] Check labels {0} is not true: {1}, after check: {2}".format(
+                    k, _biz, remaining))
+                return True, False, remaining
+    return False, False, labels
+
+
+def milvus_get_labels(response, components: List[str] = ["standalone", "querynode"]):
+    metadata = []
+    labels = []
+    if isinstance(response, list):
+        metadata = [r.get("metadata", {}) for r in response]
+        labels = [l for l in [m.get("labels", {}) for m in metadata] if l.get("app.kubernetes.io/component") in components]
+    return labels, metadata
 
 
 def deal_child_instance_class(res):

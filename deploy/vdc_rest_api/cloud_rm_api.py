@@ -1,8 +1,9 @@
 import uuid
 import time
+from typing import List
 
 from deploy.commons.request_catch import request_catch, RequestResponseParser
-from deploy.commons.common_params import ClassID
+from deploy.commons.common_params import ClassID, RMNodeCategory
 
 from commons.request_handler import Request
 from commons.common_type import LogLevel
@@ -287,8 +288,21 @@ class CloudRMApi:
     """ instance-controller """
 
     @request_catch()
-    def update_labels(self, instance_id: str, labels: dict, user_id: str = "",
+    def update_labels(self, instance_id: str, labels: dict, node_categories: List[str] = None, user_id: str = "",
                       log_level=Log_Level) -> RequestResponseParser:
         url = self.host + "/resource/v1/instance/milvus/update_labels?InstanceId=" + instance_id
-        body = labels
+        body = {
+            "NodeCategories": node_categories or [RMNodeCategory.queryNode.name, RMNodeCategory.standalone.name],
+            "Labels": labels,
+        }
+        return self.req.post(url=url, body=body, headers=self.update_headers(user_id=user_id), log_level=log_level)
+
+    @request_catch()
+    def update_biz_critical(self, instance_id: str, enable: bool = True, node_categories: List[str] = None,
+                            user_id: str = "", log_level=Log_Level) -> RequestResponseParser:
+        url = self.host + "/resource/v1/instance/milvus/update_biz_critical?InstanceId=" + instance_id
+        body = {
+            "nodeCategories": node_categories or [RMNodeCategory.queryNode.name, RMNodeCategory.standalone.name],
+            "enable": enable
+        }
         return self.req.post(url=url, body=body, headers=self.update_headers(user_id=user_id), log_level=log_level)

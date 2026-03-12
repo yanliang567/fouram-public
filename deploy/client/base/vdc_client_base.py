@@ -1,3 +1,4 @@
+import copy
 import re
 import time
 import json
@@ -10,7 +11,8 @@ from deploy.commons.status_code import RMErrorCode, InstanceStatus, InstanceType
 from deploy.commons.common_params import ClassID, RMNodeCategory, Pod
 from deploy.commons.common_func import (
     update_dict_value, add_resource, get_child_class_id, parser_modify_params, check_multi_keys_exist, get_api_version,
-    get_class_key_name, deal_child_instance_class, compare_cpu_value, compare_mem_value, check_sub_dict
+    get_class_key_name, deal_child_instance_class, compare_cpu_value, compare_mem_value, check_sub_dict,
+    check_biz_critical, milvus_get_labels
 )
 from deploy.commons.sql_statement import (
     sql_query_instance_id, sql_query_instance_class, sql_insert_instance_class,
@@ -397,9 +399,18 @@ class VDCClientBase:
         # Record server init status
         self.display_server(log_level=LogLevel.DEBUG)
 
+        all_labels = copy.deepcopy(labels)
+
+        _check, _enable, labels = check_biz_critical(labels)
+        if _check:
+            log.info(f"[VDCClientBase] Setting biz critical: {_enable} for milvus instance: {self.instance_name}")
+            self.cloud_rm_api.update_biz_critical(instance_id=self.instance_id, enable=_enable,
+                                                  user_id=self.real_user_id)
+
         # update instance labels
-        log.debug(f"[VDCClientBase] Start updating labels:{labels} for instance: {self.instance_name}")
-        self.cloud_rm_api.update_labels(instance_id=self.instance_id, labels=labels, user_id=self.real_user_id)
+        if labels:
+            log.info(f"[VDCClientBase] Start updating labels:{labels} for instance: {self.instance_name}")
+            self.cloud_rm_api.update_labels(instance_id=self.instance_id, labels=labels, user_id=self.real_user_id)
 
         if instance_type == InstanceType.Milvus:
             self.rm_restart_server(timeout=timeout)
@@ -413,10 +424,20 @@ class VDCClientBase:
         self.display_server(log_level=LogLevel.DEBUG)
 
         # check values
-        res = self.infra_api.pod_labels(instance_id=self.instance_id, cluster_name=self.cluster_name)
+        res = self.infra_api.milvus_pods(instance_id=self.instance_id)
+        _milvus_labels, _milvus_metadata = milvus_get_labels(res.data)
+
+        _need_check_labels = all_labels if _check and _enable else labels
         # check res.data contains labels
-        if not check_sub_dict(labels, res.data):
-            self._raise(f"[VDCClientBase] Check labels failed!! labels:{labels}, server labels:{res.data}")
+        for m in _milvus_labels:
+            if not check_sub_dict(_need_check_labels, m):
+                self._raise("[VDCClientBase] Check labels failed! labels:{0}, server labels:{1}, all labels:{2}".format(
+                    _need_check_labels, m, _milvus_metadata))
+
+        # res = self.infra_api.pod_labels(instance_id=self.instance_id, cluster_name=self.cluster_name)
+        # # check res.data contains labels
+        # if not check_sub_dict(labels, res.data):
+        #     self._raise(f"[VDCClientBase] Check labels failed!! labels:{labels}, server labels:{res.data}")
 
     def modify_instance(self, class_mode, timeout: int = 1800):
         """ Upgrade server's class mode """
@@ -612,7 +633,7 @@ class VDCClientBase:
             for k in range(db_raw[1]):
                 sql_insert_cust_instance_node(
                     self.mysql, instance_id=self.real_instance_id, cpu_cores=db_raw[3], mem_size=db_raw[4],
-                    class_id=db_raw[2], category=eval(f"RMNodeCategory.{db_raw[0]}"), region_id=self.region_id,
+                    class_id=db_raw[2], category=RMNodeCategory[db_raw[0]].value, region_id=self.region_id,
                     create_time=create_time)
         sql_query_cust_instance_node(self.mysql, self.real_instance_id)
 
@@ -625,7 +646,7 @@ class VDCClientBase:
 
             sql_insert_instance_class_oversold(
                 self.mysql, instance_id=self.real_instance_id, user_id=self.user_id, class_id=o[1],
-                node_category=eval(f"RMNodeCategory.{o[0]}"), extend_fields=o[2])
+                node_category=RMNodeCategory[o[0]].value, extend_fields=o[2])
 
         # update resource.child_class_template when InstanceIndexType is BigData
         if _disk_type == InstanceIndexType.BigData:
@@ -633,7 +654,7 @@ class VDCClientBase:
                 log.debug("[VDCClientBase] Update child_class_template table: {0}".format(child_class))
 
                 sql_insert_child_class_template(
-                    self.mysql, child_class_id=child_class[1], node_category=eval(f"RMNodeCategory.{child_class[0]}"),
+                    self.mysql, child_class_id=child_class[1], node_category=RMNodeCategory[child_class[0]].value,
                     spec_content=child_class[2])
 
         log.info("[VDCClientBase] Rewrite message in database complete.")

@@ -40,3 +40,8 @@ class InfraApi:
     def pod_labels(self, instance_id: str = "", cluster_name: str = "", log_level=Log_Level) -> RequestResponseParser:
         url = self.host + "/api/v1/cloud/cluster/{0}/milvus/{1}/v2/pod-labels".format(cluster_name, instance_id)
         return self.req.get(url=url, headers=self.headers, log_level=log_level)
+
+    @request_catch()
+    def milvus_pods(self, instance_id: str = "", log_level=Log_Level) -> RequestResponseParser:
+        url = self.host + "/api/v1/cloud/milvus/{0}/pods".format(instance_id)
+        return self.req.get(url=url, headers=self.headers, log_level=log_level)

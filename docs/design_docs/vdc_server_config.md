@@ -31,7 +31,19 @@ Extended configuration, currently supported parameters are as follows:
     - used to update instance labels
     - you can configure multi-label simultaneously
     - the key and value of the label must both be `string` type
-   
+    - {"biz-critical": "true"} / {"biz-critical": "false"}
+      - when labels contain {"biz-critical": <"true" or "false">}, the update_biz_critical interface will be called;
+      - for other key-value pairs, the update_labels interface will continue to be called.
+      - Notice:
+        - deploy + false => normal
+        - deploy + true => deploy a biz-critical instance
+        - instance is true:
+          - upgrade + false => only remove instance's `tolerations`
+          - upgrade + true => normal
+        - instance is false:
+          - upgrade + false => normal
+          - upgrade + true => upgrade to a biz-critical instance
+
 config example is as follows:
 ```json
 {
