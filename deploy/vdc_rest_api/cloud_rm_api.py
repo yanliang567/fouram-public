@@ -288,12 +288,13 @@ class CloudRMApi:
     """ instance-controller """
 
     @request_catch()
-    def update_labels(self, instance_id: str, labels: dict, node_categories: List[str] = None, user_id: str = "",
-                      log_level=Log_Level) -> RequestResponseParser:
+    def update_labels(self, instance_id: str, labels: dict, node_categories: List[str] = None, replica_index: int = 1,
+                      user_id: str = "", log_level=Log_Level) -> RequestResponseParser:
         url = self.host + "/resource/v1/instance/milvus/update_labels?InstanceId=" + instance_id
         body = {
-            "NodeCategories": node_categories or [RMNodeCategory.queryNode.name, RMNodeCategory.standalone.name],
-            "Labels": labels,
+            "nodeCategories": node_categories or [RMNodeCategory.queryNode.name, RMNodeCategory.standalone.name],
+            "labels": labels,
+            "replicaIndex": replica_index,
         }
         return self.req.post(url=url, body=body, headers=self.update_headers(user_id=user_id), log_level=log_level)
 

@@ -392,9 +392,41 @@ class VDCClientBase:
         log.info("[VDCClientBase] Update instance's:%s, instance_id:%s  image from %s to %s done" % (
             self.instance_name, self.real_instance_id, _db_version, image_tag))
 
-    def rm_update_labels(self, labels: dict, instance_type: InstanceType = InstanceType.Milvus, timeout: int = 1800):
+    def _get_instance_nodes(self, node_categories: list = None) -> list:
+        """Get instance nodes filtered by node categories, with replicaIndex and existing labels"""
+        res = self.cloud_rm_api.describe(instance_id=self.instance_id, user_id=self.real_user_id)
+        nodes = res.data.get("Nodes", []) if res.data else []
+        if node_categories:
+            nodes = [n for n in nodes if n.get("Role", "") in node_categories]
+        return nodes
+
+    def _update_labels_all_replicas(self, labels: dict, node_categories: list = None, merge: bool = True):
+        """Update labels for all replicas of matched node categories"""
+        node_categories = node_categories or [RMNodeCategory.queryNode.name, RMNodeCategory.standalone.name]
+        nodes = self._get_instance_nodes(node_categories=node_categories)
+
+        updated = []
+        for node in nodes:
+            role, replica_idx = node.get("Role", ""), node.get("ReplicaIndex", 1)
+
+            final_labels = update_dict_value(node.get("Labels") or {}, labels) if merge else labels
+
+            log.info(f"[VDCClientBase] Updating labels for {role} replica {replica_idx}: {final_labels}")
+            self.cloud_rm_api.update_labels(instance_id=self.instance_id, labels=final_labels, node_categories=[role],
+                                            replica_index=replica_idx, user_id=self.real_user_id)
+            updated.append({"role": role, "replicaIndex": replica_idx, "labels": final_labels})
+
+        log.info(f"[VDCClientBase] Updated {len(updated)} node replicas")
+        return updated
+
+    def rm_update_labels(self, labels: dict, instance_type: InstanceType = InstanceType.Milvus,
+                         merge: bool = True, timeout: int = 1800):
         """
-        Update labels for milvus instance
+        Update labels for milvus instance (all replicas)
+        :param labels: labels to set
+        :param instance_type: instance type
+        :param merge: if True, merge with existing labels; if False, overwrite
+        :param timeout: restart timeout
         """
         # Record server init status
         self.display_server(log_level=LogLevel.DEBUG)
@@ -407,10 +439,10 @@ class VDCClientBase:
             self.cloud_rm_api.update_biz_critical(instance_id=self.instance_id, enable=_enable,
                                                   user_id=self.real_user_id)
 
-        # update instance labels
+        # update instance labels for all replicas
         if labels:
             log.info(f"[VDCClientBase] Start updating labels:{labels} for instance: {self.instance_name}")
-            self.cloud_rm_api.update_labels(instance_id=self.instance_id, labels=labels, user_id=self.real_user_id)
+            self._update_labels_all_replicas(labels=labels, merge=merge)
 
         if instance_type == InstanceType.Milvus:
             self.rm_restart_server(timeout=timeout)
