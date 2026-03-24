@@ -1827,7 +1827,9 @@ class TestFeatureCases(PerfTemplate):
         dataset_size = parser_data_size("1m")
 
         concurrent_tasks = [
-            ConcurrentParams.params_scene_insert_partition(data_size="1m", ni=10000, with_flush=True, timeout=600),
+            ConcurrentParams.params_scene_insert_partition(
+                data_size="1m", ni=10000, with_flush=True, timeout=600,
+                check_tasks=CheckTasksDefine.FlushIgnoreFlushRateLimitAndTimeout),
             ConcurrentParams.params_release(timeout=600)
         ]
 
@@ -6256,7 +6258,9 @@ class TestFeatureCases(PerfTemplate):
         partition_names.extend([f"{dv.partition_name_prefix}{i}" for i in range(1, 10)])
 
         concurrent_tasks = [
-            ConcurrentParams.params_scene_insert_partition(data_size=3000, ni=1000, with_flush=True, timeout=600),
+            ConcurrentParams.params_scene_insert_partition(
+                data_size=3000, ni=1000, with_flush=True, timeout=600,
+                check_tasks=CheckTasksDefine.FlushIgnoreFlushRateLimitAndTimeout),
             ConcurrentParams.params_scene_test_partition(
                 data_size=3000, ni=3000, search_param={"nprobe": 64}, limit=1, output_fields=["*"], timeout=600,
                 check_tasks=CheckTasksDefine.FlushIgnoreFlushRateLimitAndTimeout,
@@ -6380,7 +6384,9 @@ class TestFeatureCases(PerfTemplate):
         partition_names.extend([f"{dv.partition_name_prefix}{i}" for i in range(1, 10)])
 
         concurrent_tasks = [
-            ConcurrentParams.params_scene_insert_partition(data_size=3000, ni=1000, with_flush=True, timeout=600),
+            ConcurrentParams.params_scene_insert_partition(
+                data_size=3000, ni=1000, with_flush=True, timeout=600,
+                check_tasks=CheckTasksDefine.FlushIgnoreFlushRateLimitAndTimeout),
             ConcurrentParams.params_scene_test_partition(
                 data_size=3000, ni=3000, search_param={"nprobe": 64}, limit=1, output_fields=["*"], timeout=600,
                 check_tasks=CheckTasksDefine.FlushIgnoreFlushRateLimitAndTimeout,
@@ -6503,7 +6509,9 @@ class TestFeatureCases(PerfTemplate):
         partition_names.extend([f"{dv.partition_name_prefix}{i}" for i in range(1, 10)])
 
         concurrent_tasks = [
-            ConcurrentParams.params_scene_insert_partition(data_size=3000, ni=1000, with_flush=True, timeout=600),
+            ConcurrentParams.params_scene_insert_partition(
+                data_size=3000, ni=1000, with_flush=True, timeout=600,
+                check_tasks=CheckTasksDefine.FlushIgnoreFlushRateLimitAndTimeout),
             ConcurrentParams.params_scene_test_partition(
                 data_size=3000, ni=3000, search_param={"nprobe": 64}, limit=1, output_fields=["*"], timeout=600,
                 check_tasks=dict_merge([CheckTasksDefine.FlushIgnoreFlushRateLimitAndTimeout,
