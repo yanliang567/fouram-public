@@ -34,7 +34,7 @@ class MilvusClientWrapper:
     def client(self, value):
         self._client = value
 
-    def init_milvus_client(self, uri="", user="", password="", db_name="", token="", timeout="", check_task=None,
+    def init_milvus_client(self, uri="", user="", password="", db_name="", token="", timeout=None, check_task=None,
                            check_items=None, **kwargs):
         func_name = sys._getframe().f_code.co_name
         res = api_request([MilvusClient, uri, user, password, db_name, token, timeout], **kwargs)

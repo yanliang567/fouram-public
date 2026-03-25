@@ -263,8 +263,24 @@ class MilvusClientBase:
             if self._main_db_name:
                 self.mc.use_database(db_name=self._main_db_name)
 
-    @classmethod
-    def check_backup_connect(cls, **kwargs) -> MilvusClientWrapper:
+    def _parser_connect_params(self, host=None, port=None, uri=None, secure=False, **kwargs):
+        if uri:
+            _uri = uri
+            log.debug(f"[{self.name}] Parse uri:{_uri}, remove host:{host}, port:{port}")
+        elif not host:
+            raise ValueError(f"[{self.name}] Either 'uri' or 'host' must be provided, got uri={uri!r}, host={host!r}")
+        else:
+            scheme = "https" if secure else "http"
+            _uri = f"{scheme}://{host}:{port}"
+            log.info(f"[{self.name}] Convert host and port to URI address: `{_uri}`")
+
+        return {
+            "uri": _uri,
+            "secure": secure,
+            **kwargs
+        }
+
+    def check_backup_connect(self, **kwargs) -> MilvusClientWrapper:
         _kwargs = copy.deepcopy(kwargs)
 
         _update_params = {"alias": dv.default_backup_alias, "db_name": dv.default_database}
@@ -273,7 +289,7 @@ class MilvusClientBase:
         _kwargs.update(_update_params)
 
         obj = MilvusClientWrapper()
-        obj.init_milvus_client(**_kwargs)
+        obj.init_milvus_client(**self._parser_connect_params(**_kwargs))
         return obj
 
     def create_user_role(self, user, password=dv.default_rbac_password, role_name=dv.default_rbac_role_name,
@@ -333,7 +349,7 @@ class MilvusClientBase:
 
         log.customize(log_level)("[{0}] Connection params: {1}".format(self.name, hide_dict_value(params, ["token"])))
         obj = mc_obj or self.mc
-        res = obj.init_milvus_client(**params)
+        res = obj.init_milvus_client(**self._parser_connect_params(**params))
 
         if obj == self.mc:
             self.main_alias = getattr(obj.client, "_using", DefaultConfig.DEFAULT_USING)
