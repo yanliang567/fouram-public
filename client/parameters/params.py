@@ -408,7 +408,7 @@ class ConcurrentGoBenchParamsSearch(DataClassBase):
     custom_range: Optional[list] = field(default_factory=lambda: [0, 1])
 
     def __post_init__(self):
-        _expr = self.expr.strip()
+        _expr = self.expr.strip() if isinstance(self.expr, str) else ""
         _prepare_symbol = " || " if not (_expr == "" or _expr.endswith("&&") or _expr.endswith("||")) else " "
 
         if self.expr_random_data or self.custom_expr:
@@ -642,7 +642,7 @@ class ConcurrentGoBenchParamsQuery(DataClassBase):
     custom_range: Optional[list] = field(default_factory=lambda: [0, 1])
 
     def __post_init__(self):
-        _expr = self.expr.strip()
+        _expr = self.expr.strip() if isinstance(self.expr, str) else ""
         _prepare_symbol = " || " if not (_expr == "" or _expr.endswith("&&") or _expr.endswith("||")) else " "
 
         if self.random_data or self.custom_expr:
