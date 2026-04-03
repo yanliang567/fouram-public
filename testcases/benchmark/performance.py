@@ -1118,7 +1118,7 @@ class TestGoBenchCases(PerfTemplate):
             concurrent_number=[100], during_time=1800, interval=20, **cdp.DefaultIndexParams.IVF_SQ8)
 
         node_resources = [
-            NodeResource(nodes=[proxy], cpu=1, mem=3),
+            NodeResource(nodes=[proxy], cpu=1, mem=5),
             NodeResource(nodes=[indexNode], cpu=4, mem=4),
             NodeResource(nodes=[queryNode], cpu=10, mem=16)
         ]
