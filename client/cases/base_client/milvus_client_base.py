@@ -1123,7 +1123,7 @@ class MilvusClientBase:
                     self.name, func_name, i, self.collection_name, all_partition))
 
         # release partitions
-        for p in all_partition:
+        for p in params.partitions:
             self.mc.release_partitions(collection_name=self.collection_name, partition_names=[p], **params.obj_params)
 
         log.debug(f"[{self.name}] {func_name} release partitions done: {all_partition}")
