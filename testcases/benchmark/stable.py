@@ -1290,6 +1290,35 @@ class TestConcurrentCases(PerfTemplate):
             default_case_params=default_case_params, node_resources=node_resources)
 
     @pytest.mark.locust
+    @pytest.mark.parametrize("client_type", [ClientType.MilvusClient])
+    @pytest.mark.parametrize("deploy_mode, architecture", [(CLUSTER, STREAMING)])
+    def test_concurrent_locust_1b_ivf_sq8_ddl_dql_streaming_cluster(
+            self, input_params: InputParamsBase, deploy_mode, architecture, client_type):
+        """
+        :test steps:
+            1. concurrent test and calculation of RT and QPS
+        """
+        concurrent_tasks = [
+            ConcurrentParams.params_search(weight=20, nq=10, top_k=10, search_param={"nprobe": 16}),
+            ConcurrentParams.params_query(weight=2, ids=[i for i in range(10)]),
+            ConcurrentParams.params_load(weight=1)]
+        default_case_params = ConcurrentParams().params_scene_concurrent(
+            concurrent_tasks, concurrent_number=[20], during_time="12h", interval=20, dataset_size="1b",
+            **cdp.DefaultIndexParams.IVF_SQ8)
+
+        node_resources = [
+            NodeResource(nodes=[dataNode], replicas=1, mem=8),
+            NodeResource(nodes=[streamingNode], replicas=2, cpu=2, mem=8),
+            NodeResource(nodes=[queryNode], replicas=6, cpu=8, mem=64),
+        ]
+
+        self.concurrency_template(
+            input_params=input_params, cpu=dp.min_cpu, mem=dp.min_mem, deploy_mode=deploy_mode, client_type=client_type,
+            old_version_format=self.get_report_version_format(False),
+            case_callable_obj=self.get_callable_object(ConcurrentClientBase().scene_concurrent_locust),
+            default_case_params=default_case_params, node_resources=node_resources, deploy_architecture=architecture)
+
+    @pytest.mark.locust
     @pytest.mark.parametrize("deploy_mode", [STANDALONE])
     def test_concurrent_locust_100m_ivf_sq8_ddl_dql_standalone(self, input_params: InputParamsBase, deploy_mode):
         """
