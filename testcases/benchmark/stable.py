@@ -1307,8 +1307,8 @@ class TestConcurrentCases(PerfTemplate):
             **cdp.DefaultIndexParams.IVF_SQ8)
 
         node_resources = [
-            NodeResource(nodes=[dataNode], replicas=1, mem=8),
-            NodeResource(nodes=[streamingNode], replicas=2, cpu=2, mem=8),
+            NodeResource(nodes=[dataNode], replicas=4, cpu=4, mem=8),
+            NodeResource(nodes=[streamingNode], replicas=2, cpu=2, mem=6),
             NodeResource(nodes=[queryNode], replicas=6, cpu=8, mem=64),
         ]
 
