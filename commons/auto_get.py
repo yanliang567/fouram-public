@@ -74,17 +74,23 @@ class AutoGetTag:
                 url = _url.format(page, str(limit))
                 res = self.req.get(url=url, headers=headers)
                 for r in res:
-                    t = r["tags"][0]["name"] if isinstance(r["tags"], list) else r["tags"]
-                    if isinstance(t, str) and t:
-                        if self._match_prefix_tag(prefix=self.prefix, target_str=t):
-                            log.info(
-                                "[AutoGetTag] Match the image according to the prefix: %s, image name used is %s" % (
-                                    self.prefix, str(t)))
-                            return t
-                        elif self._re_full_match_tag(re_str=self.prefix, target_str=t):
-                            log.info("[AutoGetTag] Match the image based on regular expr: %s, image name used is %s" % (
-                                self.prefix, str(t)))
-                            return t
+                    if isinstance(r["tags"], list):
+                        tag_names = [tag["name"] for tag in r["tags"]]
+                    else:
+                        tag_names = [r["tags"]]
+
+                    for t in tag_names:
+                        if isinstance(t, str) and t:
+                            if self._match_prefix_tag(prefix=self.prefix, target_str=t):
+                                log.info(
+                                    "[AutoGetTag] Match the image according to the prefix: %s, image name used is %s" % (
+                                        self.prefix, str(t)))
+                                return t
+                            elif self._re_full_match_tag(re_str=self.prefix, target_str=t):
+                                log.info(
+                                    "[AutoGetTag] Match the image based on regular expr: %s, image name used is %s" % (
+                                        self.prefix, str(t)))
+                                return t
         except Exception as e:
             log.error("[AutoGetTag] Can not get the tag list: {}".format(e))
 
