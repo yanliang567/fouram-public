@@ -366,6 +366,7 @@ class ConcurrentClientBase(CommonCases):
             params.update({
                 "dim": self.params_obj.dataset_params[pn.dim],
                 "sparse_range": sparse_range,
+                "nullable": all_fields_params.get_fields_params(vector_field_name).nullable,
                 "scalars_params": all_fields_params.get_scalar_other_params_no_dataset,
                 "anns_field": vector_field_name,
                 "dynamic_fields_schema": all_fields_params.gen_extra_dynamic_fields_schema(params[pn.dynamic_fields])})
@@ -401,6 +402,7 @@ class ConcurrentClientBase(CommonCases):
             params.update({
                 "dim": self.params_obj.dataset_params[pn.dim],
                 "sparse_range": sparse_range,
+                "nullable": all_fields_params.get_fields_params(vector_field_name).nullable,
                 "scalars_params": all_fields_params.get_scalar_other_params_no_dataset,
                 "anns_field": vector_field_name,
                 "varchar_id": self.params_obj.collection_params.get(pn.varchar_id, False),

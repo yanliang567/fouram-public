@@ -843,6 +843,7 @@ class ConcurrentTaskInsert(DataClassBase):
     nb: Optional[int] = 1
     timeout: Optional[int] = DefaultValue.default_timeout
     anns_field: Optional[str] = None
+    nullable: Optional[bool] = False
 
     data_organization: Optional[str] = None
     # dynamic fields for inserting
@@ -882,7 +883,8 @@ class ConcurrentTaskInsert(DataClassBase):
     def set_params(self):
         self._loop_ids = loop_ids(step=self.nb, start_id=self.start_id)
         self.fixed_ids = [k for k in range(self.start_id, self.start_id + self.nb)]
-        self.fixed_vectors = gen_vectors(self.nb, self.dim, field_name=self.anns_field, sparse_range=self.sparse_range)
+        self.fixed_vectors = gen_vectors(
+            self.nb, self.dim, field_name=self.anns_field, sparse_range=self.sparse_range, nullable=self.nullable)
 
     @property
     def get_ids(self):
@@ -902,7 +904,8 @@ class ConcurrentTaskInsert(DataClassBase):
     @property
     def get_vectors(self):
         if self.random_vector:
-            return gen_vectors(self.nb, self.dim, field_name=self.anns_field, sparse_range=self.sparse_range)
+            return gen_vectors(
+                self.nb, self.dim, field_name=self.anns_field, sparse_range=self.sparse_range, nullable=self.nullable)
         return self.fixed_vectors
 
     @property
@@ -941,6 +944,7 @@ class ConcurrentTaskUpsert(DataClassBase):
     nb: Optional[int] = 1
     timeout: Optional[int] = DefaultValue.default_timeout
     anns_field: Optional[str] = None
+    nullable: Optional[bool] = False
     partial_update: Optional[bool] = None
 
     data_organization: Optional[str] = None
@@ -987,7 +991,8 @@ class ConcurrentTaskUpsert(DataClassBase):
     def set_params(self):
         self._loop_ids = loop_ids(step=self.nb, start_id=self.start_id)
         self.fixed_ids = [k for k in range(self.start_id, self.start_id + self.nb)]
-        self.fixed_vectors = gen_vectors(self.nb, self.dim, field_name=self.anns_field, sparse_range=self.sparse_range)
+        self.fixed_vectors = gen_vectors(
+            self.nb, self.dim, field_name=self.anns_field, sparse_range=self.sparse_range, nullable=self.nullable)
 
     @property
     def get_ids(self):
@@ -1007,7 +1012,8 @@ class ConcurrentTaskUpsert(DataClassBase):
     @property
     def get_vectors(self):
         if self.random_vector:
-            return gen_vectors(self.nb, self.dim, field_name=self.anns_field, sparse_range=self.sparse_range)
+            return gen_vectors(
+                self.nb, self.dim, field_name=self.anns_field, sparse_range=self.sparse_range, nullable=self.nullable)
         return self.fixed_vectors
 
     @property
@@ -1207,6 +1213,7 @@ class ConcurrentTaskSceneInsertDeleteFlush(DataClassBase):
     delete_length: Optional[int] = 1
     start_id: Optional[int] = 0
     anns_field: Optional[str] = None
+    nullable: Optional[bool] = False
 
     data_organization: Optional[str] = None
     # dynamic fields for inserting
@@ -1256,7 +1263,7 @@ class ConcurrentTaskSceneInsertDeleteFlush(DataClassBase):
         self._loop_ids = loop_ids(step=self.insert_length, start_id=self.start_id)
         self.fixed_ids = [k for k in range(self.start_id, self.start_id + self.insert_length)]
         self.fixed_vectors = gen_vectors(self.insert_length, self.dim, field_name=self.anns_field,
-                                         sparse_range=self.sparse_range)
+                                         sparse_range=self.sparse_range, nullable=self.nullable)
 
     @property
     def get_insert_ids(self):
@@ -1272,7 +1279,9 @@ class ConcurrentTaskSceneInsertDeleteFlush(DataClassBase):
     @property
     def get_vectors(self):
         if self.random_vector:
-            return gen_vectors(self.insert_length, self.dim, field_name=self.anns_field, sparse_range=self.sparse_range)
+            return gen_vectors(
+                self.insert_length, self.dim, field_name=self.anns_field, sparse_range=self.sparse_range,
+                nullable=self.nullable)
         return self.fixed_vectors
 
     @property

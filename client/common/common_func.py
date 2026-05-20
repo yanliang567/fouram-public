@@ -398,18 +398,48 @@ def get_file_list(data_size, dim, data_type):
     return file_names
 
 
-def gen_vectors(nb, dim, field_name: str = None, sparse_range=dv.default_sparse_range):
+def gen_nullable_values(values, nullable: Optional[bool] = False):
+    if nullable is not True:
+        return values
+    if values is None or isspmatrix(values):
+        return values
+    if isinstance(values, (pd.Series, np.ndarray)):
+        values = values.tolist()
+    if not isinstance(values, list):
+        return values
+    return [None if (i + 1) % 10 == 0 else v for i, v in enumerate(values)]
+
+
+def gen_nullable_vectors(vectors, nullable: Optional[bool] = False):
+    return gen_nullable_values(vectors, nullable=nullable)
+
+
+def gen_vectors(nb, dim, field_name: str = None, sparse_range=dv.default_sparse_range,
+                nullable: Optional[bool] = False):
     if field_name and str(field_name).startswith("binary_vector"):
-        return gen_binary_vectors(nb, dim)
+        return gen_nullable_vectors(gen_binary_vectors(nb, dim), nullable)
     elif field_name and str(field_name).startswith("float16_vector"):
-        return gen_float16_vectors(nb, dim)
+        return gen_nullable_vectors(gen_float16_vectors(nb, dim), nullable)
     elif field_name and str(field_name).startswith("bfloat16_vector"):
-        return gen_bfloat16_vectors(nb, dim)
+        return gen_nullable_vectors(gen_bfloat16_vectors(nb, dim), nullable)
     elif field_name and str(field_name).startswith("sparse_float_vector"):
-        return gen_sparse_float_vectors(nb, dim, sparse_range=(sparse_range or dv.default_sparse_range))
+        return gen_nullable_vectors(
+            gen_sparse_float_vectors(nb, dim, sparse_range=(sparse_range or dv.default_sparse_range)), nullable)
     elif field_name and str(field_name).startswith("int8_vector"):
-        return gen_int8_vectors(nb, dim)
-    return gen_float_vectors(nb, dim)
+        return gen_nullable_vectors(gen_int8_vectors(nb, dim), nullable)
+    return gen_nullable_vectors(gen_float_vectors(nb, dim), nullable)
+
+
+def get_field_nullable(field_name: str, scalars_params: dict = None, field: dict = None):
+    field_params = (field or {}).get("params", {})
+    if isinstance(field_params, dict) and field_params.get("nullable") is True:
+        return True
+
+    field_config = (scalars_params or {}).get(field_name, {})
+    if not isinstance(field_config, dict):
+        return False
+    return field_config.get("params", {}).get("nullable") is True or \
+        field_config.get("other_params", {}).get("nullable") is True
 
 
 def gen_binary_vectors(nb, dim):
@@ -529,30 +559,36 @@ def gen_values(data_type, vectors, ids, varchar_filled=False, field: dict = {}, 
         _, _field_element = get_array_element_type(field["name"])
 
     values = None
+    _field_nullable = get_field_nullable(field.get("name"), field=field)
     if default_value is not None and (
             (isinstance(default_value, (list, np.ndarray)) and len(default_value) != 0) or isspmatrix(default_value)):
-        return handle_special_vector_data_type(data=default_value, vector_data_file=_field_element)
+        values = handle_special_vector_data_type(data=default_value, vector_data_file=_field_element)
     elif _field_element in [DataType.FLOAT_VECTOR]:
         _dim = field.get("params", {}).get("dim")
-        values = vectors if anns_field_bool else gen_float_vectors(nb=len(ids), dim=_dim)
+        values = vectors if anns_field_bool else gen_vectors(
+            nb=len(ids), dim=_dim, field_name=field["name"], nullable=_field_nullable)
     elif _field_element in [DataType.BINARY_VECTOR]:
         _dim = field.get("params", {}).get("dim")
-        values = vectors if anns_field_bool else gen_binary_vectors(nb=len(ids), dim=_dim)
+        values = vectors if anns_field_bool else gen_vectors(
+            nb=len(ids), dim=_dim, field_name=field["name"], nullable=_field_nullable)
     elif _field_element in [DataType.FLOAT16_VECTOR]:
         _dim = field.get("params", {}).get("dim")
-        values = vectors if anns_field_bool else gen_float16_vectors(nb=len(ids), dim=_dim)
+        values = vectors if anns_field_bool else gen_vectors(
+            nb=len(ids), dim=_dim, field_name=field["name"], nullable=_field_nullable)
     elif _field_element in [DataType.BFLOAT16_VECTOR]:
         _dim = field.get("params", {}).get("dim")
-        values = vectors if anns_field_bool else gen_bfloat16_vectors(nb=len(ids), dim=_dim)
+        values = vectors if anns_field_bool else gen_vectors(
+            nb=len(ids), dim=_dim, field_name=field["name"], nullable=_field_nullable)
         values = handle_bfloat16_type(data=values)
     elif _field_element in [DataType.SPARSE_FLOAT_VECTOR]:
         _dim = other_params.get("dim", dv.default_dim)
         _sparse_range = other_params.get("sparse_range", dv.default_sparse_range)
-        values = vectors if anns_field_bool else gen_sparse_float_vectors(
-            nb=len(ids), dim=_dim, sparse_range=_sparse_range)
+        values = vectors if anns_field_bool else gen_vectors(
+            nb=len(ids), dim=_dim, field_name=field["name"], sparse_range=_sparse_range, nullable=_field_nullable)
     elif _field_element in [DataType.INT8_VECTOR]:
         _dim = field.get("params", {}).get("dim")
-        values = vectors if anns_field_bool else gen_int8_vectors(nb=len(ids), dim=_dim)
+        values = vectors if anns_field_bool else gen_vectors(
+            nb=len(ids), dim=_dim, field_name=field["name"], nullable=_field_nullable)
     elif _field_element in [DataType.INT8]:
         # int8: [-128, 127]
         values = [i % 128 for i in ids]
@@ -588,6 +624,7 @@ def gen_values(data_type, vectors, ids, varchar_filled=False, field: dict = {}, 
 
     if str(field["name"]).lower().startswith(pn.ARRAY):
         values = [[v] * int(field["params"]["max_capacity"]) for v in values]
+    values = gen_nullable_values(values, nullable=_field_nullable)
     return values
 
 
@@ -649,9 +686,10 @@ def check_mc_data_organization(value, print_warn_msg: bool = True):
 def handle_bfloat16_type(data):
     if hasattr(data, 'dtype'):
         data.dtype = 'bfloat16'
-    elif len(data) > 0 and isinstance(data[0], np.ndarray) and not data[0].dtype == 'bfloat16':
+    elif len(data) > 0 and any(isinstance(d, np.ndarray) and d.dtype != 'bfloat16' for d in data):
         for d in data:
-            d.dtype = 'bfloat16'
+            if isinstance(d, np.ndarray):
+                d.dtype = 'bfloat16'
     return data
 
 

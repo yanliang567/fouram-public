@@ -15,7 +15,7 @@ from client.common.common_func import (
     remove_list_values, parser_segment_info, update_dict_value, hide_dict_value, check_mc_data_organization,
     get_default_search_params, parser_search_params_expr, get_ann_search_request_params, check_vector_index_params,
     parser_set_properties_params, parser_alter_collection_field_params, parser_alter_index_params,
-    check_vector_length, convert_scalar_index_params_to_list, check_user_length
+    check_vector_length, convert_scalar_index_params_to_list, check_user_length, get_field_nullable
 )
 from client.util.api_request import func_time_catch
 from client.client_base import MilvusClientWrapper, ResourceGroupConfig, DataType
@@ -548,17 +548,19 @@ class MilvusClientBase:
 
         p_i = input_obj or PrepareInsertParams(ni=ni, scalars_params=scalars_params, dim=dim, data_type=data_type,
                                                column_name=column_name, dataset_size=data_size, varchar_id=varchar_id)
+        vector_nullable = get_field_nullable(anns_field, scalars_params=scalars_params)
 
         if data_type == "local":
             for i in range(0, ni_cunt):
                 batch_rt += self.insert_batch(
-                    gen_vectors(ni, dim, field_name=anns_field, sparse_range=sparse_range),
+                    gen_vectors(ni, dim, field_name=anns_field, sparse_range=sparse_range, nullable=vector_nullable),
                     p_i.loop_ids(ni), data_size_format, varchar_filled, mc_obj, collection_schema, log_level,
                     p_i.insert_scalars_params(ni), anns_field, collection_name=collection_name, **kwargs)
 
             if last_insert > 0:
                 last_rt = self.insert_batch(
-                    gen_vectors(last_insert, dim, field_name=anns_field, sparse_range=sparse_range),
+                    gen_vectors(
+                        last_insert, dim, field_name=anns_field, sparse_range=sparse_range, nullable=vector_nullable),
                     p_i.loop_ids(last_insert), data_size_format, varchar_filled, mc_obj, collection_schema,
                     log_level, p_i.insert_scalars_params(last_insert), anns_field, collection_name=collection_name,
                     **kwargs)

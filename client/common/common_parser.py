@@ -320,6 +320,7 @@ class FieldsParamsBase:
     column_name: str = None
     metric_type: str = ""
     sparse_range: List[int] = None
+    nullable: Optional[bool] = False
     varchar_filled: Optional[bool] = None
     algorithm_params: Optional[dict] = field(default_factory=lambda: {})
     bounds: Optional[list] = None
@@ -334,6 +335,7 @@ class DynamicFieldParams:
     dim: int = dv.default_dim
     max_length: int = dv.default_max_length
     max_capacity: int = dv.default_array_max_capacity
+    nullable: Optional[bool] = False
 
     @property
     def to_dict(self):
@@ -436,16 +438,19 @@ class ParserFieldsParams:
             main_sparse_range = check_sparse_range(self._dataset_params.get(pn.sparse_range))
             # get main `varchar_filled`
             main_varchar_filled = self._dataset_params.get(pn.varchar_filled, False)
+            scalars_params = self._dataset_params.get(pn.scalars_params, {}) or {}
+            main_nullable = scalars_params.get(self._main_field_name, {}).get("params", {}).get("nullable", False)
 
             # set field params base
             self._field_params_base = FieldsParamsBase(dim=main_dim, sparse_range=main_sparse_range,
+                                                       nullable=main_nullable,
                                                        varchar_filled=main_varchar_filled).to_dict
 
             # set main vector field
             m = FieldsParamsBase(dim=main_dim, dataset=self._dataset_params.get(pn.dataset_name),
                                  column_name=self._dataset_params.get(pn.column_name),
                                  metric_type=self._dataset_params.get(pn.metric_type),
-                                 sparse_range=main_sparse_range)
+                                 sparse_range=main_sparse_range, nullable=main_nullable)
             self._set_main_attr(m)
             self._recover_attr(self._main_field_name, m)
 
@@ -453,6 +458,7 @@ class ParserFieldsParams:
             for f in self._get_scalar_fields():
                 self._set_attr(f, {"dim": main_dim,
                                    "sparse_range": main_sparse_range,
+                                   "nullable": scalars_params.get(f, {}).get("params", {}).get("nullable", False),
                                    "varchar_filled": main_varchar_filled,
                                    "bounds": dv.default_bounds})
 
@@ -462,7 +468,7 @@ class ParserFieldsParams:
                     self._set_attr(k1, {pn.metric_type: v1.get(pn.metric_type, dv.default_metric_type)})
 
             # set other fields from `dataset_params.scalars_params`
-            for k, v in self._dataset_params.get(pn.scalars_params, {}).items():
+            for k, v in scalars_params.items():
                 if isinstance(v, dict) and isinstance(v.get("other_params", {}), dict):
                     _other_params = v.get("other_params", {})
                     _p = {i: _other_params.get(i) for i in
@@ -472,6 +478,7 @@ class ParserFieldsParams:
 
                     # set dim, `other_params.dim` > `params.dim` > `dataset_params.dim`
                     _p["dim"] = _p.get("dim", v.get("params", {}).get("dim", main_dim))
+                    _p["nullable"] = v.get("params", {}).get("nullable", False)
 
                     if "sparse_range" in _p.keys():
                         _p["sparse_range"] = check_sparse_range(_p["sparse_range"])
@@ -502,7 +509,8 @@ class ParserFieldsParams:
                     params=DynamicFieldParams(
                         dim=filed_params.get(pn.dim, self.fields_params_entry.get_attr(name).dim),
                         max_length=filed_params.get(pn.max_length, _max_length),
-                        max_capacity=filed_params.get("max_capacity", dv.default_array_max_capacity)
+                        max_capacity=filed_params.get("max_capacity", dv.default_array_max_capacity),
+                        nullable=filed_params.get("nullable", False)
                     )
                 ).to_dict
             })
