@@ -958,7 +958,8 @@ class ORMClientBase:
                                 anns_field=params.anns_field, insert_scalars_params=params.scalars_params,
                                 data_organization=params.data_organization, dynamic_fields=params.dynamic_fields,
                                 dynamic_fields_schema=params.dynamic_fields_schema,
-                                partial_update_fields=params.partial_update_fields)
+                                partial_update_fields=params.partial_update_fields,
+                                nullable_offset=params.nullable_offset)
         return self.collection_wrap.upsert(entities, **params.obj_params)
 
     def concurrent_delete(self, params: ConcurrentTaskDelete):

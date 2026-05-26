@@ -918,6 +918,7 @@ class ConcurrentInputParamsUpsert(DataClassBase):
     nb: Optional[int] = 1  # number of batch upsert
     timeout: Optional[int] = DefaultValue.default_timeout
     partial_update: Optional[bool] = None
+    nullable_offset: Optional[int] = None
 
     data_organization: Optional[str] = None
     # dynamic fields for inserting
@@ -945,6 +946,7 @@ class ConcurrentTaskUpsert(DataClassBase):
     timeout: Optional[int] = DefaultValue.default_timeout
     anns_field: Optional[str] = None
     nullable: Optional[bool] = False
+    nullable_offset: Optional[int] = None
     partial_update: Optional[bool] = None
 
     data_organization: Optional[str] = None
@@ -976,6 +978,12 @@ class ConcurrentTaskUpsert(DataClassBase):
                 "[{0}] Check task:`{1}` can't be used in `{2}` concurrent request, only supports:{3}".format(
                     "ConcurrentTaskUpsert", self.check_task, "upsert", support_tasks))
 
+        if self.nullable_offset is None:
+            self.nullable_offset = random.randint(1, 9)
+        elif not (isinstance(self.nullable_offset, int) and 0 <= self.nullable_offset <= 9):
+            raise ValueError("[ConcurrentTaskUpsert] `nullable_offset` must be an int in [0, 9]: {0}".format(
+                self.nullable_offset))
+
         # if self.partial_update is not True:
         #     self.partial_update_fields = None
         if not (self.partial_update_fields is None or (isinstance(self.partial_update_fields, list) and all(
@@ -992,7 +1000,8 @@ class ConcurrentTaskUpsert(DataClassBase):
         self._loop_ids = loop_ids(step=self.nb, start_id=self.start_id)
         self.fixed_ids = [k for k in range(self.start_id, self.start_id + self.nb)]
         self.fixed_vectors = gen_vectors(
-            self.nb, self.dim, field_name=self.anns_field, sparse_range=self.sparse_range, nullable=self.nullable)
+            self.nb, self.dim, field_name=self.anns_field, sparse_range=self.sparse_range, nullable=self.nullable,
+            nullable_offset=self.nullable_offset)
 
     @property
     def get_ids(self):
@@ -1013,7 +1022,8 @@ class ConcurrentTaskUpsert(DataClassBase):
     def get_vectors(self):
         if self.random_vector:
             return gen_vectors(
-                self.nb, self.dim, field_name=self.anns_field, sparse_range=self.sparse_range, nullable=self.nullable)
+                self.nb, self.dim, field_name=self.anns_field, sparse_range=self.sparse_range, nullable=self.nullable,
+                nullable_offset=self.nullable_offset)
         return self.fixed_vectors
 
     @property

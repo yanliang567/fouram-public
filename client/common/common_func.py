@@ -398,7 +398,7 @@ def get_file_list(data_size, dim, data_type):
     return file_names
 
 
-def gen_nullable_values(values, nullable: Optional[bool] = False):
+def gen_nullable_values(values, nullable: Optional[bool] = False, nullable_offset: int = 0):
     if nullable is not True:
         return values
     if values is None or isspmatrix(values):
@@ -407,30 +407,34 @@ def gen_nullable_values(values, nullable: Optional[bool] = False):
         values = values.tolist()
     if not isinstance(values, list):
         return values
-    return [None if (i + 1) % 10 == 0 else v for i, v in enumerate(values)]
+    return [None if (i + 1 + nullable_offset) % 10 == 0 else v for i, v in enumerate(values)]
 
 
-def gen_nullable_vectors(vectors, nullable: Optional[bool] = False):
-    return gen_nullable_values(vectors, nullable=nullable)
+def gen_nullable_vectors(vectors, nullable: Optional[bool] = False, nullable_offset: int = 0):
+    return gen_nullable_values(vectors, nullable=nullable, nullable_offset=nullable_offset)
 
 
 def gen_vectors(nb, dim, field_name: str = None, sparse_range=dv.default_sparse_range,
-                nullable: Optional[bool] = False):
+                nullable: Optional[bool] = False, nullable_offset: int = 0):
     if field_name and str(field_name).startswith("binary_vector"):
-        return gen_nullable_vectors(gen_binary_vectors(nb, dim), nullable)
+        return gen_nullable_vectors(gen_binary_vectors(nb, dim), nullable, nullable_offset)
     elif field_name and str(field_name).startswith("float16_vector"):
-        return gen_nullable_vectors(gen_float16_vectors(nb, dim), nullable)
+        return gen_nullable_vectors(gen_float16_vectors(nb, dim), nullable, nullable_offset)
     elif field_name and str(field_name).startswith("bfloat16_vector"):
-        return gen_nullable_vectors(gen_bfloat16_vectors(nb, dim), nullable)
+        return gen_nullable_vectors(gen_bfloat16_vectors(nb, dim), nullable, nullable_offset)
     elif field_name and str(field_name).startswith("sparse_float_vector"):
         return gen_nullable_vectors(
-            gen_sparse_float_vectors(nb, dim, sparse_range=(sparse_range or dv.default_sparse_range)), nullable)
+            gen_sparse_float_vectors(nb, dim, sparse_range=(sparse_range or dv.default_sparse_range)), nullable,
+            nullable_offset)
     elif field_name and str(field_name).startswith("int8_vector"):
-        return gen_nullable_vectors(gen_int8_vectors(nb, dim), nullable)
-    return gen_nullable_vectors(gen_float_vectors(nb, dim), nullable)
+        return gen_nullable_vectors(gen_int8_vectors(nb, dim), nullable, nullable_offset)
+    return gen_nullable_vectors(gen_float_vectors(nb, dim), nullable, nullable_offset)
 
 
 def get_field_nullable(field_name: str, scalars_params: dict = None, field: dict = None):
+    if (field or {}).get("nullable") is True:
+        return True
+
     field_params = (field or {}).get("params", {})
     if isinstance(field_params, dict) and field_params.get("nullable") is True:
         return True
@@ -553,7 +557,7 @@ def gen_geometry_data(wkt_type: str, bounds: List[list], points_num: List[int] =
 
 
 def gen_values(data_type, vectors, ids, varchar_filled=False, field: dict = {}, default_value=None, other_params={},
-               anns_field_bool: bool = True):
+               anns_field_bool: bool = True, nullable_offset: int = 0):
     _field_element = data_type
     if str(field["name"]).lower().startswith(pn.ARRAY):
         _, _field_element = get_array_element_type(field["name"])
@@ -566,29 +570,35 @@ def gen_values(data_type, vectors, ids, varchar_filled=False, field: dict = {}, 
     elif _field_element in [DataType.FLOAT_VECTOR]:
         _dim = field.get("params", {}).get("dim")
         values = vectors if anns_field_bool else gen_vectors(
-            nb=len(ids), dim=_dim, field_name=field["name"], nullable=_field_nullable)
+            nb=len(ids), dim=_dim, field_name=field["name"], nullable=_field_nullable,
+            nullable_offset=nullable_offset)
     elif _field_element in [DataType.BINARY_VECTOR]:
         _dim = field.get("params", {}).get("dim")
         values = vectors if anns_field_bool else gen_vectors(
-            nb=len(ids), dim=_dim, field_name=field["name"], nullable=_field_nullable)
+            nb=len(ids), dim=_dim, field_name=field["name"], nullable=_field_nullable,
+            nullable_offset=nullable_offset)
     elif _field_element in [DataType.FLOAT16_VECTOR]:
         _dim = field.get("params", {}).get("dim")
         values = vectors if anns_field_bool else gen_vectors(
-            nb=len(ids), dim=_dim, field_name=field["name"], nullable=_field_nullable)
+            nb=len(ids), dim=_dim, field_name=field["name"], nullable=_field_nullable,
+            nullable_offset=nullable_offset)
     elif _field_element in [DataType.BFLOAT16_VECTOR]:
         _dim = field.get("params", {}).get("dim")
         values = vectors if anns_field_bool else gen_vectors(
-            nb=len(ids), dim=_dim, field_name=field["name"], nullable=_field_nullable)
+            nb=len(ids), dim=_dim, field_name=field["name"], nullable=_field_nullable,
+            nullable_offset=nullable_offset)
         values = handle_bfloat16_type(data=values)
     elif _field_element in [DataType.SPARSE_FLOAT_VECTOR]:
         _dim = other_params.get("dim", dv.default_dim)
         _sparse_range = other_params.get("sparse_range", dv.default_sparse_range)
         values = vectors if anns_field_bool else gen_vectors(
-            nb=len(ids), dim=_dim, field_name=field["name"], sparse_range=_sparse_range, nullable=_field_nullable)
+            nb=len(ids), dim=_dim, field_name=field["name"], sparse_range=_sparse_range, nullable=_field_nullable,
+            nullable_offset=nullable_offset)
     elif _field_element in [DataType.INT8_VECTOR]:
         _dim = field.get("params", {}).get("dim")
         values = vectors if anns_field_bool else gen_vectors(
-            nb=len(ids), dim=_dim, field_name=field["name"], nullable=_field_nullable)
+            nb=len(ids), dim=_dim, field_name=field["name"], nullable=_field_nullable,
+            nullable_offset=nullable_offset)
     elif _field_element in [DataType.INT8]:
         # int8: [-128, 127]
         values = [i % 128 for i in ids]
@@ -624,7 +634,7 @@ def gen_values(data_type, vectors, ids, varchar_filled=False, field: dict = {}, 
 
     if str(field["name"]).lower().startswith(pn.ARRAY):
         values = [[v] * int(field["params"]["max_capacity"]) for v in values]
-    values = gen_nullable_values(values, nullable=_field_nullable)
+    values = gen_nullable_values(values, nullable=_field_nullable, nullable_offset=nullable_offset)
     return values
 
 
@@ -636,7 +646,7 @@ def check_data_field(field_name: str, partial_update_fields: List[str]):
 
 def gen_entities(info, vectors=None, ids=None, varchar_filled=False, insert_scalars_params={}, anns_field: str = None,
                  data_organization: str = None, dynamic_fields: list = [], dynamic_fields_schema: dict = {},
-                 partial_update_fields: List[str] = None):
+                 partial_update_fields: List[str] = None, nullable_offset: int = 0):
     """
     insert_scalars_params = {<field name>: {"default_value": [], other_params: {}}...}
     """
@@ -653,7 +663,7 @@ def gen_entities(info, vectors=None, ids=None, varchar_filled=False, insert_scal
             entities.update({
                 field["name"]: gen_values(
                     field["type"], vectors, ids, varchar_filled, field, **insert_scalars_params.get(field["name"], {}),
-                    anns_field_bool=(field["name"] == anns_field))
+                    anns_field_bool=(field["name"] == anns_field), nullable_offset=nullable_offset)
             })
 
     for dynamic_field in dynamic_fields:
@@ -663,7 +673,7 @@ def gen_entities(info, vectors=None, ids=None, varchar_filled=False, insert_scal
 
         entities.update({dynamic_field: gen_values(
             f["type"], vectors, ids, varchar_filled, f, **insert_scalars_params.get(dynamic_field, {}),
-            anns_field_bool=(dynamic_field == anns_field))
+            anns_field_bool=(dynamic_field == anns_field), nullable_offset=nullable_offset)
         })
 
     if data_organization in [None, "", "column_insert"]:
